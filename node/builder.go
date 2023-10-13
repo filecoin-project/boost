@@ -42,7 +42,6 @@ import (
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
-	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
@@ -483,6 +482,17 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 	legacyFees := cfg.LotusFees.Legacy()
 
+	sealerApiInfos := cfg.SealerApiInfos
+	sectorApiInfos := cfg.SectorIndexApiInfos
+
+	if len(sealerApiInfos) == 0 {
+		sealerApiInfos = []string{cfg.SealerApiInfo}
+	}
+
+	if len(sectorApiInfos) == 0 {
+		sectorApiInfos = []string{cfg.SectorIndexApiInfo}
+	}
+
 	return Options(
 		ConfigCommon(&cfg.Common),
 
@@ -515,15 +525,11 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
 
-		// Sealing Pipeline State API
-		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
-
 		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr(cfg)),
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
 
 		Override(new(*legacy.LegacyDealsManager), modules.NewLegacyDealsManager),
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
-		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(storagemarket.CommpThrottle), modules.NewCommpThrottle(cfg)),
 		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
@@ -645,6 +651,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(paths.SectorIndex), From(new(lotus_modules.MinerSealingService))),
+
+		Override(new(smtypes.MinerEndpoints), modules.NewMinerEndpoints(sectorApiInfos, sealerApiInfos)),
 
 		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),

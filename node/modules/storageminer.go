@@ -67,6 +67,8 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/lib/sigs"
+	lotus_modules "github.com/filecoin-project/lotus/node/modules"
+	fdtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -378,10 +380,10 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, lsp gfm_storage
 	return nil
 }
 
-func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, me types.MinerEndpoints) {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, me types.MinerEndpoints) {
 
-		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi, cfg.Dealmaking.EnableLegacyStorageDeals)
+		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, me, cfg.Dealmaking.EnableLegacyStorageDeals)
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
@@ -622,13 +624,13 @@ func NewCommpThrottle(cfg *config.Boost) func() storagemarket.CommpThrottle {
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, commpt storagemarket.CommpThrottle, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager, me types.MinerEndpoints) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
-		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
-		commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API,
+		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher,
+		commpt storagemarket.CommpThrottle,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper,
-		lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+		lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager, me types.MinerEndpoints) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
 			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
@@ -644,7 +646,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks), httptransport.AllowPrivateIPsOpt(cfg.HttpDownload.AllowPrivateIPs))
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc, commpt, sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, commpt, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt, me)
 		if err != nil {
 			return nil, err
 		}
@@ -653,16 +655,16 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, me types.MinerEndpoints, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
-		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
+		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, me types.MinerEndpoints,
 		legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer,
 		ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory,
 		indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter,
 		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
 
 		resolverCtx, cancel := context.WithCancel(context.Background())
-		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, directDealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, ddProv, legacyDeals, legacyProv, legacyDT, ps, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma)
+		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, directDealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, me, prov, ddProv, legacyDeals, legacyProv, legacyDT, ps, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma)
 		server := gql.NewServer(cfg, resolver, bg)
 
 		lc.Append(fx.Hook{
@@ -914,5 +916,73 @@ func NewMpoolMonitor(cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode) 
 		})
 
 		return mpm
+	}
+}
+
+type minerEndpoints struct {
+	// need separate storage / sealing services as they might become separate processes soon
+	storageServices map[address.Address]lotus_modules.MinerStorageService
+	sealingServices map[address.Address]lotus_modules.MinerSealingService
+	sectorBlocks    map[address.Address]*sectorblocks.SectorBlocks
+}
+
+func (me *minerEndpoints) SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error) {
+	x := me.storageServices[addr]
+	if x == nil {
+		return nil, fmt.Errorf("can not find sealing pipiline api for miner %s. has the miner been configured correctly?", addr.String())
+	}
+	return x, nil
+}
+
+func (me *minerEndpoints) PieceAdder(addr address.Address) (types.PieceAdder, error) {
+	x := me.sectorBlocks[addr]
+	if x == nil {
+		return nil, fmt.Errorf("can not find piece adder for miner %s. has the miner been configured correctly?", addr.String())
+	}
+	return x, nil
+}
+
+func (me *minerEndpoints) CommpCalculator() (types.CommpCalculator, error) {
+	for _, ss := range me.storageServices {
+		return ss, nil
+	}
+	return nil, fmt.Errorf("can not get commp calculator as no miner has been configured")
+}
+
+func NewMinerEndpoints(storageApis, sealingApis []string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ds fdtypes.MetadataDS) (types.MinerEndpoints, error) {
+	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ds fdtypes.MetadataDS) (types.MinerEndpoints, error) {
+		me := minerEndpoints{
+			storageServices: make(map[address.Address]lotus_modules.MinerStorageService),
+			sealingServices: make(map[address.Address]lotus_modules.MinerSealingService),
+			sectorBlocks:    make(map[address.Address]*sectorblocks.SectorBlocks),
+		}
+		ctx := context.Background()
+
+		for _, s := range storageApis {
+			ss, err := lotus_modules.ConnectStorageService(s)(mctx, lc)
+			if err != nil {
+				return nil, fmt.Errorf("error connecting to storage service %s: %w", s, err)
+			}
+			addr, err := ss.ActorAddress(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error getting actor address %s: %w", s, err)
+			}
+			me.storageServices[addr] = ss
+			me.sectorBlocks[addr] = sectorblocks.NewSectorBlocks(ss, ds)
+		}
+
+		for _, s := range sealingApis {
+			ss, err := lotus_modules.ConnectSealingService(s)(mctx, lc)
+			if err != nil {
+				return nil, fmt.Errorf("error connecting to sealing service %s: %w", s, err)
+			}
+			addr, err := ss.ActorAddress(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error getting actor address %s: %w", s, err)
+			}
+			me.sealingServices[addr] = ss
+		}
+
+		return &me, nil
 	}
 }

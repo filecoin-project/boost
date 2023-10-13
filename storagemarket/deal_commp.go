@@ -51,7 +51,15 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
 func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
-	pi, err := generatePieceCommitment(p.ctx, p.commpCalc, p.commpThrottle, filepath, pieceSize, p.config.RemoteCommp)
+	// choose miner at random as it doesn't matter who generates commp
+	commpCalc, derr := p.me.CommpCalculator()
+	if derr != nil {
+		return cid.Undef, &dealMakingError{
+			retry: smtypes.DealRetryAuto,
+			error: derr,
+		}
+	}
+	pi, err := generatePieceCommitment(p.ctx, commpCalc, p.commpThrottle, filepath, pieceSize, p.config.RemoteCommp)
 	if err != nil {
 		return cid.Undef, err
 	}

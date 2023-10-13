@@ -75,13 +75,13 @@ type resolver struct {
 	publisher      *storageadapter.DealPublisher
 	idxProv        provider.Interface
 	idxProvWrapper *indexprovider.Wrapper
-	spApi          sealingpipeline.API
 	fullNode       v1api.FullNode
 	mpool          *mpoolmonitor.MpoolMonitor
 	mma            *lib.MultiMinerAccessor
+	me             types.MinerEndpoints
 }
 
-func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, me types.MinerEndpoints, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *resolver {
 	return &resolver{
 		ctx:            ctx,
 		cfg:            cfg,
@@ -103,7 +103,7 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		ps:             ps,
 		piecedirectory: piecedirectory,
 		publisher:      publisher,
-		spApi:          spApi,
+		me:             me,
 		idxProv:        indexProv,
 		idxProvWrapper: idxProvWrapper,
 		fullNode:       fullNode,
@@ -125,7 +125,12 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
+	spApi, err := r.me.SealingPipilineAPI(deal.ClientDealProposal.Proposal.Provider)
+	if err != nil {
+		return nil, err
+	}
+
+	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, spApi), nil
 }
 
 type filterArgs struct {
@@ -177,8 +182,12 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
+		spApi, err := r.me.SealingPipilineAPI(deal.ClientDealProposal.Proposal.Provider)
+		if err != nil {
+			return nil, err
+		}
 		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
-		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
+		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, spApi))
 	}
 
 	return &dealListResolver{
@@ -210,8 +219,13 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
+	spApi, err := r.me.SealingPipilineAPI(deal.ClientDealProposal.Proposal.Provider)
+	if err != nil {
+		return nil, err
+	}
+
 	net := make(chan *dealResolver, 1)
-	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi)
+	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, spApi)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -223,7 +237,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, fmt.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool}
+	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: spApi, mpool: r.mpool}
 	go func() {
 		sub.Pipe(ctx, net) // blocks until connection is closed
 		close(net)
@@ -262,11 +276,19 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, r.spApi)
-				totalCount, err := r.dealsDB.Count(ctx, "", nil)
-				if err != nil {
-					log.Errorf("getting total deal count: %w", err)
+				spApi, err := r.me.SealingPipilineAPI(di.ClientDealProposal.Proposal.Provider)
+				var rsv *dealResolver
+				var totalCount int
+				if err == nil {
+					rsv = newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, spApi)
+					totalCount, err = r.dealsDB.Count(ctx, "", nil)
+					if err != nil {
+						log.Errorf("getting total deal count: %w", err)
+					}
+				} else {
+					log.Errorf("Can not find sealing pipiline api %w", err)
 				}
+
 				dealNew := &dealNewResolver{
 					TotalCount: int32(totalCount),
 					Deal:       rsv,

@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/filecoin-project/go-address"
 	"io"
 	"strings"
 	"sync"
 
+	"github.com/filecoin-project/go-address"
+
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -26,6 +29,22 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 )
+
+type mockRemoteServices struct {
+	minerStub *MinerStub
+}
+
+func (rs *mockRemoteServices) SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error) {
+	return rs.minerStub, nil
+}
+
+func (rs *mockRemoteServices) PieceAdder(addr address.Address) (smtypes.PieceAdder, error) {
+	return rs.minerStub, nil
+}
+
+func (rs *mockRemoteServices) CommpCalculator() (types.CommpCalculator, error) {
+	return rs.minerStub, nil
+}
 
 type MinerStub struct {
 	*mock_types.MockDealPublisher
@@ -42,10 +61,11 @@ type MinerStub struct {
 	unblockWaitForPublish map[uuid.UUID]chan struct{}
 	unblockAddPiece       map[uuid.UUID]chan struct{}
 	unblockAnnounce       map[uuid.UUID]chan struct{}
+	MinerEndpoints        types.MinerEndpoints
 }
 
-func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
-	return &MinerStub{
+func NewMinerStub(ctrl *gomock.Controller, miner address.Address) *MinerStub {
+	ms := &MinerStub{
 		MockCommpCalculator:  mock_types.NewMockCommpCalculator(ctrl),
 		MockDealPublisher:    mock_types.NewMockDealPublisher(ctrl),
 		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
@@ -60,6 +80,10 @@ func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 		unblockAddPiece:       make(map[uuid.UUID]chan struct{}),
 		unblockAnnounce:       make(map[uuid.UUID]chan struct{}),
 	}
+	ms.MinerEndpoints = &mockRemoteServices{
+		minerStub: ms,
+	}
+	return ms
 }
 
 func (ms *MinerStub) UnblockCommp(id uuid.UUID) {

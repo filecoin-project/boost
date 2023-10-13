@@ -1,7 +1,8 @@
 package gql
 
 func (r *resolver) MinerAddress() string {
-	return r.provider.Address.String()
+	// TODO: this function doesn;t seem to be used at all. Confirm.
+	return r.provider.Addresses[0].String()
 }
 
 func (r *resolver) GraphsyncRetrievalMinerAddresses() []string {
