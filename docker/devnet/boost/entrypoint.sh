@@ -76,11 +76,15 @@ fi
 
 ## Override config options
 echo Updating config values
-sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8044"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 ## run boostd-data
-boostd-data -vv run leveldb --repo=$BOOSTD_DATA_PATH --addr=0.0.0.0:8042 &>$BOOSTD_DATA_PATH/boostd-data.log &
+#boostd-data -vv run leveldb --repo=$BOOSTD_DATA_PATH --addr=0.0.0.0:8042 &>$BOOSTD_DATA_PATH/boostd-data.log &
+
+## run boostd-data for yugabytedb
+#boostd-data -vv run yugabyte --hosts yugabytedb --connect-string="postgresql://postgres:postgres@yugabytedb:5433?sslmode=disable" --addr 0.0.0.0:8044 &>$BOOSTD_DATA_PATH/boostd-data.log &
+boostd-data -vv run yugabyte --hosts yugabytedb --connect-string="postgresql://yugabyte:yugabyte@yugabytedb:5433?sslmode=disable" --addr 0.0.0.0:8044 &>$BOOSTD_DATA_PATH/boostd-data.log &
 
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
 mkdir -p $BOOST_PATH/deal-staging

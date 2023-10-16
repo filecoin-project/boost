@@ -122,3 +122,20 @@ services:
     volumes:
       - ./data/sample:/usr/share/nginx/html:ro
 
+  yugabytedb:
+    container_name: yugabytedb
+      #image: yugabytedb/yugabyte:2.15.3.2-b1-el8-aarch64
+    image: boost/yugabyte
+    init: true
+    ports:
+      - "5433:5433"
+      #- "7001:7000"
+      - "9000:9000"
+      - "9042:9042"
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/yugabytedb-data:/root/var/data
+      - ./data/yugabytedb-logs:/root/var/logs
+        #    command:
+        #      - "bin/yugabyted start --base_dir=/home/yugabyte/yb_data --daemon=false"
