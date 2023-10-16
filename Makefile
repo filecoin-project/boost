@@ -312,9 +312,14 @@ docker/booster-bitswap:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
+docker/yugabytedb:
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/yugabytedb:dev \
+		-f docker/Dockerfile.yugabyte .
+.PHONY: docker/booster-http
 .PHONY: docker/booster-bitswap
 docker/all: $(lotus_build_cmd) $(boost_build_cmd) $(booster_http_build_cmd) $(booster_bitswap_build_cmd) \
-	docker/lotus docker/lotus-miner
+	docker/lotus docker/lotus-miner docker/yugabytedb
 .PHONY: docker/all
 
 ### To allow devs to pull individual images. Require build_boost=0 and boost_version to be supplied
