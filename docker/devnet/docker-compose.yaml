@@ -131,20 +131,20 @@ services:
       - "com.docker-tc.limit=1mbps"
       - "com.docker-tc.delay=100ms"
 
-  tc:
-    image: "${DOCKER_IMAGE_TERMINAL:-lukaszlach/docker-tc}"
+  yugabytedb:
+    container_name: yugabytedb
+      #image: yugabytedb/yugabyte:2.15.3.2-b1-el8-aarch64
+    image: boost/yugabyte
     init: true
-    container_name: docker-tc
-    cap_add:
-      - NET_ADMIN
+    ports:
+      - "5433:5433"
+      #- "7001:7000"
+      - "9000:9000"
+      - "9042:9042"
+    restart: unless-stopped
+    logging: *default-logging
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/docker-tc:/var/docker-tc
-    deploy:
-      mode: global
-      restart_policy:
-        condition: any
-    environment:
-      HTTP_BIND: "${HTTP_BIND:-127.0.0.1}"
-      HTTP_PORT: "${HTTP_PORT:-4080}"
-    network_mode: host
+      - ./data/yugabytedb-data:/root/var/data
+      - ./data/yugabytedb-logs:/root/var/logs
+        #    command:
+        #      - "bin/yugabyted start --base_dir=/home/yugabyte/yb_data --daemon=false"

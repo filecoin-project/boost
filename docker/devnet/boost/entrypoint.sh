@@ -80,4 +80,4 @@ sed -i 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_P
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
-exec boostd-data run leveldb --addr=0.0.0.0:8042 & boostd -vv run --nosync=true
+exec boostd-data -vv run yugabyte --hosts yugabytedb --connect-string="postgresql://yugabyte:yugabyte@yugabytedb:5433?sslmode=disable" --addr 0.0.0.0:8042 & boostd -vv run --nosync=true
