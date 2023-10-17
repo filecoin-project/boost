@@ -43,10 +43,33 @@ services:
       - LOTUS_SEALING_AGGREGATECOMMITS=false
       - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
       - LOTUS_SEALING_WAITDEALSDELAY=20s
+      - MINER_ADDR=t01000
     restart: unless-stopped
     logging: *default-logging
     volumes:
       - ./data/lotus-miner:/var/lib/lotus-miner:rw
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/genesis:/var/lib/genesis:ro
+      - ${FIL_PROOFS_PARAMETER_CACHE}:/var/tmp/filecoin-proof-parameters:rw
+
+  lotus-miner-2:
+    container_name: lotus-miner-2
+    image: ${LOTUS_MINER_IMAGE}
+    init: true
+    ports:
+      - "2346:2345"
+    environment:
+      - LOTUS_API_LISTENADDRESS=/dns/lotus-miner-2/tcp/2345/http
+      - LOTUS_API_REMOTELISTENADDRESS=lotus-miner-2:2345
+      - LOTUS_SEALING_BATCHPRECOMMITS=false
+      - LOTUS_SEALING_AGGREGATECOMMITS=false
+      - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
+      - LOTUS_SEALING_WAITDEALSDELAY=20s
+      - MINER_ADDR=t01001
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/lotus-miner-2:/var/lib/lotus-miner:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/genesis:/var/lib/genesis:ro
       - ${FIL_PROOFS_PARAMETER_CACHE}:/var/tmp/filecoin-proof-parameters:rw
