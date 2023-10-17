@@ -25,7 +25,7 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
     lotus send --from $DEFAULT_WALLET $PUBMSG_WALLET 10
     lotus send --from $DEFAULT_WALLET $CLIENT_WALLET 10
     lotus wallet market add --from $DEFAULT_WALLET --address $CLIENT_WALLET 5
-    lotus wallet market add --address $COLLAT_WALLET 5
+    lotus wallet market add --from $DEFAULT_WALLET --address $COLLAT_WALLET 5
 
 	until lotus-miner actor control set --really-do-it ${PUBMSG_WALLET}; do echo Waiting for storage miner API ready ...; sleep 1; done
 
