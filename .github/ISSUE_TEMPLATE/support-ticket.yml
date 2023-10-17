@@ -22,7 +22,7 @@ body:
         required: false
       - label: booster-bitswap
         required: false
-      - label: LID
+      - label: LID Database (Ex: Yugabyte)
         required: false
       - label: boostd-data
         required: false
@@ -58,9 +58,8 @@ body:
     label: Logging Information
     render: text
     description: |
-      Please provide debug logs of the problem, remember you can get set log level control for:
+      Please provide detailed logs for the problem. You can get set log level control as per the below example:
       * boostd: use `boostd log list` to get all log systems available and set level by `boostd log set-level`.
-      If you don't provide detailed logs when you raise the issue it will almost certainly be the first request we make before furthur diagnosing the problem.
   validations:
     required: true
 - type: textarea
@@ -75,11 +74,3 @@ body:
       ...
   validations:
     required: false
-- type: checkboxes
-  id: terms
-  attributes:
-    label: Code of Conduct
-    description: By submitting this issue, you agree to follow our [Code of Conduct](https://example.com)
-    options:
-      - label: I agree to follow this project's Code of Conduct
-        required: true
