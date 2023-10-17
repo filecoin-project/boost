@@ -22,7 +22,7 @@ body:
         required: false
       - label: booster-bitswap
         required: false
-      - label: LID Database (Ex: Yugabyte)
+      - label: LID Database - Yugabyte/LevelDB
         required: false
       - label: boostd-data
         required: false
