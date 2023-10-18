@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
@@ -286,8 +286,11 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 		return nil, fmt.Errorf("getting time piece tracker was last scanned: %w", err)
 	}
 
-	// Calculate approximate progress
-	progress := float64(scanned) / float64(total)
+	progress := float64(1)
+	if total != 0 {
+		// Calculate approximate progress
+		progress = float64(scanned) / float64(total)
+	}
 
 	// Given that the denominator may be a little inflated, round up to 100% if we're close
 	if progress > 0.95 {

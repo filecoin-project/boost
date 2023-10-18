@@ -35,7 +35,7 @@ func NewProtocolProxy(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*Proto
 		for _, protocol := range protocols {
 			_, existing := routesSet[protocol]
 			if existing {
-				return nil, errors.New("Route registered for multiple peers")
+				return nil, errors.New("route registered for multiple peers")
 			}
 			routesSet[protocol] = p
 		}

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 )

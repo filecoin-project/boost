@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -532,8 +532,13 @@ func (db *DB) ScanProgress(ctx context.Context, maddr address.Address) (*types.S
 	}
 	checkedLk.Unlock()
 
+	progress := float64(1.0)
+	if count != 0 {
+		progress = float64(checkedCount) / float64(count)
+	}
+
 	return &types.ScanProgress{
-		Progress: float64(checkedCount) / float64(count),
+		Progress: progress,
 		LastScan: lastScan,
 	}, nil
 }

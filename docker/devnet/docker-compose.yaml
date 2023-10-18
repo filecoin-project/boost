@@ -69,6 +69,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
+      - ./data/boostd-data:/var/lib/boostd-data:rw
       - ./data/boost:/var/lib/boost:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
@@ -121,3 +122,16 @@ services:
     volumes:
       - ./data/sample:/usr/share/nginx/html:ro
 
+  yugabytedb:
+    container_name: yugabytedb
+    image: filecoin/yugabytedb:dev
+    init: true
+    ports:
+      - "5433:5433"
+      - "9000:9000"
+      - "9042:9042"
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/yugabytedb-data:/root/var/data
+      - ./data/yugabytedb-logs:/root/var/logs

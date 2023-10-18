@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	model "github.com/filecoin-project/boostd-data/model"
+	model "github.com/filecoin-project/boost/extern/boostd-data/model"
 	mount "github.com/filecoin-project/dagstore/mount"
 	address "github.com/filecoin-project/go-address"
 	abi "github.com/filecoin-project/go-state-types/abi"

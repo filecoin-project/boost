@@ -96,6 +96,9 @@ function LIDContent() {
     var lastScanMsg = ''
     var lastScan = d.ScanProgress.LastScan
     const now = new Date()
+    if (!lastScan) {
+        lastScan = now
+    }
     if (lastScan > now) {
         lastScanMsg = 'just now'
     } else if (now.getTime() - lastScan.getTime() < 60 * 1000) {

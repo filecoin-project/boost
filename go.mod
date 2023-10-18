@@ -2,16 +2,6 @@ module github.com/filecoin-project/boost
 
 go 1.20
 
-replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
-
-replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
-
-// replace github.com/filecoin-project/boost-graphsync => ../boost-graphsync
-
-// replace github.com/filecoin-project/go-data-transfer => ../go-data-transfer
-
-// replace github.com/filecoin-project/boost-gfm => ../boost-gfm
-
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
 	github.com/BurntSushi/toml v1.3.2
@@ -323,7 +313,6 @@ require (
 )
 
 require (
-	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
 )
@@ -332,6 +321,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.9
+	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3
 	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/lotus v1.23.4-rc1

@@ -3,7 +3,7 @@ package yugabyte
 import (
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/yugabyte/gocql"

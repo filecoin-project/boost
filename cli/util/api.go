@@ -18,7 +18,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/api/client"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 )
 
 func TestPieceDirectoryYugabyte(t *testing.T) {
