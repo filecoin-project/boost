@@ -478,7 +478,6 @@ github.com/envoyproxy/protoc-gen-validate v0.10.0 h1:oIfnZFdC0YhpNNEX+SuIqko4cqq
 github.com/envoyproxy/protoc-gen-validate v0.10.0/go.mod h1:DRjgyB0I43LtJapqN6NiRwroiAU2PaFuvk/vjgh61ss=
 github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 h1:BBso6MBKW8ncyZLv37o+KNyy0HrrHgfnOaGQC2qvN+A=
 github.com/felixge/httpsnoop v1.0.3/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
-github.com/filecoin-project/filecoin-ffi v1.25.0-dev.1/go.mod h1:pr0xMh3m/uvi65h+F6GObPsS9t1nDvNZkBwbRdoXaco=
 github.com/filecoin-project/go-dagaggregator-unixfs v0.2.0 h1:h6nObyd44KVZNCUdfhPATclKw5Ci3QkOTTpTBCGTfXA=
 github.com/filecoin-project/go-indexer-core v0.2.16 h1:1SmJVhfHTsi0CC+U6JdyjIIQtOqmKvCl/tqpI3gI+18=
 github.com/filecoin-project/go-legs v0.4.9 h1:9ccbv5zDPqMviEpSpf0TdfKKI64TMYGSiuY2A1EXHFY=
@@ -1124,6 +1123,7 @@ github.com/warpfork/go-fsx v0.3.0/go.mod h1:oTACCMj+Zle+vgVa5SAhGAh7WksYpLgGUCKE
 github.com/warpfork/go-testmark v0.12.1/go.mod h1:kHwy7wfvGSPh1rQJYKayD4AbtNaeyZdcGi9tNJTaa5Y=
 github.com/weaveworks/common v0.0.0-20220810113439-c65105d60b18/go.mod h1:YfOOLoW1Q/jIIu0WLeSwgStmrKjuJEZSKTAUc+0KFvE=
 github.com/whyrusleeping/cbor-gen v0.0.0-20230126041949-52956bd4c9aa/go.mod h1:fgkXqYy7bV2cFeIEOkVTZS/WjXARfBqSH6Q2qHL33hQ=
+github.com/whyrusleeping/cbor-gen v0.0.0-20230818171029-f91ae536ca25/go.mod h1:fgkXqYy7bV2cFeIEOkVTZS/WjXARfBqSH6Q2qHL33hQ=
 github.com/whyrusleeping/go-ctrlnet v0.0.0-20180313164037-f564fbbdaa95 h1:c23eYhe7i8MG6dUSPzyIDDy5+cWOoZMovPamBKqrjYQ=
 github.com/whyrusleeping/go-logging v0.0.1 h1:fwpzlmT0kRC/Fmd0MdmGgJG/CXIZ6gFq46FQZjprUcc=
 github.com/whyrusleeping/go-notifier v0.0.0-20170827234753-097c5d47330f h1:M/lL30eFZTKnomXY6huvM6G0+gVquFNf6mxghaWlFUg=

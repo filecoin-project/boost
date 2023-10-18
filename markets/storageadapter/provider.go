@@ -187,7 +187,7 @@ func (n *ProviderNodeAdapter) GetProofType(ctx context.Context, maddr address.Ad
 		return 0, err
 	}
 
-	return miner.PreferredSealProofTypeFromWindowPoStType(nver, mi.WindowPoStProofType)
+	return miner.PreferredSealProofTypeFromWindowPoStType(nver, mi.WindowPoStProofType, false)
 }
 
 func (n *ProviderNodeAdapter) SignBytes(ctx context.Context, signer address.Address, b []byte) (*crypto.Signature, error) {
