@@ -25,7 +25,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.12.1
+	github.com/filecoin-project/go-state-types v0.12.5
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -85,7 +85,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
-	github.com/whyrusleeping/cbor-gen v0.0.0-20230818171029-f91ae536ca25
+	github.com/whyrusleeping/cbor-gen v0.0.0-20230923211252-36a87e1ba72f
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
@@ -325,7 +325,7 @@ require (
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.4-rc1
+	github.com/filecoin-project/lotus v1.25.0-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
 	github.com/ipni/go-libipni v0.5.1
