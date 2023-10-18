@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.8.3
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/urfave/cli/v2 v2.24.4
-	github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0
+	github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6
 	github.com/yugabyte/pgx/v4 v4.14.5
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.13.0

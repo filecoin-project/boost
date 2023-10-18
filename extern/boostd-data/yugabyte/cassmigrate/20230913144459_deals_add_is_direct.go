@@ -3,6 +3,7 @@ package cassmigrate
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/yugabyte/gocql"
 	"golang.org/x/sync/errgroup"
@@ -14,7 +15,12 @@ func ts20230913144459_dealsAddIsDirectDealColumn(ctx context.Context, session *g
 	err := session.Query(qry).WithContext(ctx).Exec()
 
 	if err != nil {
-		return fmt.Errorf("creating new column IsDirectDeal: %w", err)
+		errorStr := strings.Split(err.Error(), ";")
+		if strings.Compare("code=2200", errorStr[0]) == 0 {
+			log.Warn("column IsDirectDeal already exists")
+		} else {
+			return fmt.Errorf("creating new column IsDirectDeal: %w", err)
+		}
 	}
 
 	qry = `SELECT DealUuid from PieceDeal`
