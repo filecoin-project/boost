@@ -75,6 +75,7 @@ function ProviderIpniInfo({peerId}) {
     if (error) return <div>Error: {"Fetching provider info from "+idxHost+": "+error.message}</div>
     if (loading) return <div>Loading...</div>
     if (!data) return null
+    if (!head.data) return null
 
     return <>
         <ProviderIpniInfoRender data={data} idxHost={idxHost} lad={head.data.ipniLatestAdvertisement} />
@@ -573,10 +574,7 @@ export function IpniMenuItem(props) {
         <div className="menu-item" >
             <img className="icon" alt="" src={bezier2Img} />
             <Link key="ipni" to={basePath}>
-                <h3>Network Indexer {durationDisplay && '('+durationDisplay+')'}</h3>
-                <div className="menu-desc">
-                    <b>{count}</b> retrievals
-                </div>
+                <h3>Network Indexer</h3>
             </Link>
         </div>
     )
