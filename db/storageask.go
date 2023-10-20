@@ -29,9 +29,8 @@ func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) e
 	case err != nil:
 		return err
 	default:
-		s.update(ctx, ask)
+		return s.update(ctx, ask)
 	}
-	return nil
 }
 
 func (s *StorageAskDB) set(ctx context.Context, ask legacytypes.StorageAsk) error {

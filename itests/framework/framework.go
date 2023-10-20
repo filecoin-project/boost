@@ -14,19 +14,19 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	boostclient "github.com/filecoin-project/boost/client"
+	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	lotus_gfm_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
@@ -35,7 +35,6 @@ import (
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
@@ -68,6 +67,7 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -658,18 +658,6 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 	}, nil
 }
 
-func (f *TestFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
-	return lapi.StartDealParams{
-		Data:              &lotus_gfm_storagemarket.DataRef{TransferType: gfm_storagemarket.TTGraphsync},
-		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
-		MinBlocksDuration: uint64(lbuild.MinDealDuration),
-		Miner:             f.MinerAddr,
-		Wallet:            f.DefaultWallet,
-		DealStartEpoch:    35000,
-		FastRetrieval:     true,
-	}
-}
-
 func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
 	senderAddr, err := sender.WalletDefaultAddress(ctx)
 	if err != nil {
@@ -738,14 +726,14 @@ func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error
 		}
 
 		switch di.State {
-		case gfm_storagemarket.StorageDealAwaitingPreCommit, gfm_storagemarket.StorageDealSealing:
-		case gfm_storagemarket.StorageDealProposalRejected:
+		case legacytypes.StorageDealAwaitingPreCommit, legacytypes.StorageDealSealing:
+		case legacytypes.StorageDealProposalRejected:
 			return errors.New("deal rejected")
-		case gfm_storagemarket.StorageDealFailing:
+		case legacytypes.StorageDealFailing:
 			return errors.New("deal failed")
-		case gfm_storagemarket.StorageDealError:
+		case legacytypes.StorageDealError:
 			return fmt.Errorf("deal errored: %s", di.Message)
-		case gfm_storagemarket.StorageDealActive:
+		case legacytypes.StorageDealActive:
 			return nil
 		}
 
@@ -846,14 +834,14 @@ consumeEvents:
 				continue
 			}
 		}
-		switch evt.Status {
-		case lotus_gfm_retrievalmarket.DealStatusCompleted:
+		switch legacyretrievaltypes.DealStatus(evt.Status) {
+		case legacyretrievaltypes.DealStatusCompleted:
 			break consumeEvents
-		case lotus_gfm_retrievalmarket.DealStatusRejected:
+		case legacyretrievaltypes.DealStatusRejected:
 			t.Fatalf("Retrieval Proposal Rejected: %s", evt.Message)
 		case
-			lotus_gfm_retrievalmarket.DealStatusDealNotFound,
-			lotus_gfm_retrievalmarket.DealStatusErrored:
+			legacyretrievaltypes.DealStatusDealNotFound,
+			legacyretrievaltypes.DealStatusErrored:
 			t.Fatalf("Retrieval Error: %s", evt.Message)
 		}
 	}
@@ -875,4 +863,42 @@ consumeEvents:
 	}
 
 	return ret
+}
+
+type RetrievalInfo struct {
+	PayloadCID   cid.Cid
+	ID           legacyretrievaltypes.DealID
+	PieceCID     *cid.Cid
+	PricePerByte abi.TokenAmount
+	UnsealPrice  abi.TokenAmount
+
+	Status        legacyretrievaltypes.DealStatus
+	Message       string // more information about deal state, particularly errors
+	Provider      peer.ID
+	BytesReceived uint64
+	BytesPaidFor  uint64
+	TotalPaid     abi.TokenAmount
+
+	TransferChannelID *datatransfer.ChannelID
+	DataTransfer      *DataTransferChannel
+
+	// optional event if part of ClientGetRetrievalUpdates
+	Event *legacyretrievaltypes.ClientEvent
+}
+
+type RestrievalRes struct {
+	DealID legacyretrievaltypes.DealID
+}
+
+type DataTransferChannel struct {
+	TransferID  datatransfer.TransferID
+	Status      datatransfer.Status
+	BaseCID     cid.Cid
+	IsInitiator bool
+	IsSender    bool
+	Voucher     string
+	Message     string
+	OtherPeer   peer.ID
+	Transferred uint64
+	Stages      *datatransfer.ChannelStages
 }

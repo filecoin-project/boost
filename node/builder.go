@@ -538,8 +538,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
-		Override(new(*modules.LinkSystemProv), modules.NewLinkSystemProvider),
-		Override(new(server.LinkSystemProvider), From(new(*modules.LinkSystemProv))),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),

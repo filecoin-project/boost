@@ -3,12 +3,15 @@ package itests
 import (
 	"context"
 	"math"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/itests/kit"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-unixfsnode"
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -31,11 +34,12 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 	defer f.Stop()
 
 	// Create a CAR file
-	log.Debugw("using tempdir", "dir", f.HomeDir)
+	tempdir := t.TempDir()
+	log.Debugw("using tempdir", "dir", tempdir)
 	rseed := 0
 	size := 7 << 20 // 7MiB file
 
-	inPath, dirEnt := testutil.CreateRandomUnixfsFileInCar(t, f.HomeDir, rseed, size)
+	inPath, dirEnt := testutil.CreateRandomUnixfsFileInCar(t, tempdir, rseed, size)
 	root := dirEnt.Root
 	leaves := dirEnt.SelfCids[:len(dirEnt.SelfCids)-1]
 	/*
@@ -77,21 +81,29 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 		bafkreifokzy5zcluf3hj23nkrvr7tx6sivpshkd4be5tpfibk6vm2mzlxy | RawLeaf   |   /0[7172032:7340031] (168000 B)
 	*/
 
-	// Import and make a deal to store
+	// Start a web server to serve the car files
+	log.Debug("starting webserver")
+	server, err := testutil.HttpTestFileServer(t, tempdir)
+	require.NoError(t, err)
+	defer server.Close()
 
-	res, err := f.FullNode.ClientImport(ctx, lapi.FileRef{Path: inPath, IsCAR: true})
+	// Create a new dummy deal
+	log.Debug("creating dummy deal")
+	dealUuid := uuid.New()
+
+	// Make a deal
+	res, err := f.MakeDummyDeal(dealUuid, inPath, root, server.URL+"/"+filepath.Base(inPath), false)
+	require.NoError(t, err)
+	require.True(t, res.Result.Accepted)
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
 	require.NoError(t, err)
 
-	dp := f.DefaultMarketsV1DealParams()
-	dp.Data.Root = res.Root
+	time.Sleep(2 * time.Second)
 
-	log.Debugw("starting deal", "root", res.Root)
-	dealProposalCid, err := f.FullNode.ClientStartDeal(ctx, &dp)
-	require.NoError(t, err)
+	log.Debugw("got deal proposal cid", "cid", dealCid.String())
 
-	log.Debugw("got deal proposal cid", "cid", dealProposalCid)
-
-	err = f.WaitDealSealed(ctx, dealProposalCid)
+	err = f.WaitDealSealed(ctx, &dealCid)
 	require.NoError(t, err)
 
 	// Deal is stored and sealed, attempt different retrieval forms
@@ -165,8 +177,8 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 				selNode = ss.Node()
 			}
 
-			log.Debugw("deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
-			outPath := f.Retrieve(ctx, t, dealProposalCid, res.Root, false, selNode)
+			log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root)
+			outPath := f.Retrieve(ctx, t, &dealCid, root, false, selNode)
 
 			// Inspect what we got
 			gotCids, err := testutil.CidsInCar(outPath)

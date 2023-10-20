@@ -1,9 +1,11 @@
 package stores
 
-import "golang.org/x/xerrors"
+import (
+	"errors"
+)
 
-var ErrNotFound = xerrors.New("not found")
+var ErrNotFound = errors.New("not found")
 
 func IsNotFound(err error) bool {
-	return xerrors.Is(err, ErrNotFound)
+	return errors.Is(err, ErrNotFound)
 }

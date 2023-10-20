@@ -1,31 +1,28 @@
 package server
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 )
 
-var tlog = logging.Logger("testgs")
+//var tlog = logging.Logger("testgs")
 
-type testCase struct {
-	name                      string
-	reqPayloadCid             cid.Cid
-	watch                     func(client legacyretrievaltypes.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
-	ask                       *legacyretrievaltypes.Ask
-	noUnsealedCopy            bool
-	expectErr                 bool
-	expectClientCancelEvent   bool
-	expectProviderCancelEvent bool
-	expectRejection           string
-}
+//type testCase struct {
+//	name                      string
+//	reqPayloadCid             cid.Cid
+//	watch                     func(client legacyretrievaltypes.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
+//	ask                       *legacyretrievaltypes.Ask
+//	noUnsealedCopy            bool
+//	expectErr                 bool
+//	expectClientCancelEvent   bool
+//	expectProviderCancelEvent bool
+//	expectRejection           string
+//}
 
-var providerCancelled = errors.New("provider cancelled")
-var clientCancelled = errors.New("client cancelled")
-var clientRejected = errors.New("client received reject response")
+//var providerCancelled = errors.New("provider cancelled")
+//var clientCancelled = errors.New("client cancelled")
+//var clientRejected = errors.New("client received reject response")
 
 func TestGS(t *testing.T) {
 	t.Skip("refactor tests to use boost client")

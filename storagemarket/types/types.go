@@ -18,11 +18,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipni/go-libipni/maurl"
 )
-
-var log = logging.Logger("boost-provider-types")
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 //go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager,IndexProvider

@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 
-	blockstore "github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/ipld/merkledag"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -331,10 +330,10 @@ func (drsb *discardingReadSeekerPlusByte) Seek(offset int64, whence int) (int64,
 		if n < 0 {
 			panic("unsupported rewind via whence: io.SeekStart")
 		}
-		_, err := io.CopyN(ioutil.Discard, drsb, n)
+		_, err := io.CopyN(io.Discard, drsb, n)
 		return drsb.offset, err
 	case io.SeekCurrent:
-		_, err := io.CopyN(ioutil.Discard, drsb, offset)
+		_, err := io.CopyN(io.Discard, drsb, offset)
 		return drsb.offset, err
 	default:
 		panic("unsupported whence: io.SeekEnd")
@@ -1628,7 +1627,7 @@ func (b *ReadWrite) Finalize() error {
 
 	// Note that we can't use b.Close here, as that tries to grab the same
 	// mutex we're holding here.
-	defer b.ronly.closeWithoutMutex()
+	defer b.ronly.closeWithoutMutex() //nolint:errcheck
 
 	// TODO if index not needed don't bother flattening it.
 	fi, err := b.idx.flatten(b.opts.IndexCodec)

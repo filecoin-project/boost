@@ -3,7 +3,6 @@ package filestore
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -62,7 +61,7 @@ func (fs fileStore) Delete(p Path) error {
 }
 
 func (fs fileStore) CreateTemp() (File, error) {
-	f, err := ioutil.TempFile(fs.base, "fstmp")
+	f, err := os.CreateTemp(fs.base, "fstmp")
 	if err != nil {
 		return nil, err
 	}

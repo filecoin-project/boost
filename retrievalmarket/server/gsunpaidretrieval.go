@@ -19,7 +19,6 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hannahhoward/go-pubsub"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/stats"
@@ -39,10 +38,6 @@ type reqId struct {
 	id datatransfer2.TransferID
 }
 
-type LinkSystemProvider interface {
-	LinkSys() *ipld.LinkSystem
-}
-
 // GraphsyncUnpaidRetrieval intercepts incoming requests to Graphsync.
 // If the request is for a paid retrieval, it is forwarded to the existing
 // Graphsync implementation.
@@ -55,7 +50,6 @@ type GraphsyncUnpaidRetrieval struct {
 	validator  *requestValidator
 	pubSubDT   *pubsub.PubSub
 	pubSubMkts *pubsub.PubSub
-	linkSystem LinkSystemProvider
 
 	activeRetrievalsLk sync.RWMutex
 	activeRetrievals   map[reqId]*retrievalState

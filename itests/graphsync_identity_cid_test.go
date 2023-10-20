@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	gstestutil "github.com/filecoin-project/boost-graphsync/testutil"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/itests/kit"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/storage"
@@ -21,7 +24,7 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
-	multihash "github.com/multiformats/go-multihash"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +43,9 @@ func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
 	defer f.Stop()
 
 	// Create a CAR file
-	carPath := f.HomeDir + "/testfile.car"
+	tempdir := t.TempDir()
+	log.Debugw("using tempdir", "dir", tempdir)
+	carPath := tempdir + "/testfile.car"
 	log.Debugf("using test car %s", carPath)
 	carFile, err := os.Create(carPath)
 	req.NoError(err)
@@ -82,29 +87,31 @@ func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
 	req.NoError(car.ReplaceRootsInFile(carPath, []cid.Cid{rootLink.(cidlink.Link).Cid}))
 	log.Debugw("filled car, replaced root with correct root", "root", rootLink.String())
 
-	// Import and make a deal to store
+	// Start a web server to serve the car files
+	log.Debug("starting webserver")
+	server, err := testutil.HttpTestFileServer(t, tempdir)
+	require.NoError(t, err)
+	defer server.Close()
 
-	res, err := f.FullNode.ClientImport(ctx, lapi.FileRef{Path: carPath, IsCAR: true})
-	req.NoError(err)
+	// Create a new dummy deal
+	log.Debug("creating dummy deal")
+	dealUuid := uuid.New()
+	root := rootLink.(cidlink.Link).Cid
 
-	log.Debugw("imported data for deal")
+	// Make a deal
+	res, err := f.MakeDummyDeal(dealUuid, carPath, root, server.URL+"/"+filepath.Base(carPath), false)
+	require.NoError(t, err)
+	require.True(t, res.Result.Accepted)
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
+	require.NoError(t, err)
 
-	dp := f.DefaultMarketsV1DealParams()
-	dp.Data.Root = res.Root
-
-	log.Debugw("starting deal", "root", res.Root)
-	dealProposalCid, err := f.FullNode.ClientStartDeal(ctx, &dp)
-	req.NoError(err)
-
-	log.Debugw("got deal proposal cid", "cid", dealProposalCid)
-
-	err = f.WaitDealSealed(ctx, dealProposalCid)
-	req.NoError(err)
+	time.Sleep(2 * time.Second)
 
 	// Deal is stored and sealed, attempt different retrieval forms
 
-	log.Debugw("deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
-	outPath := f.Retrieve(ctx, t, dealProposalCid, rootLink.(cidlink.Link).Cid, false, selectorparse.CommonSelector_ExploreAllRecursively)
+	log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root.String())
+	outPath := f.Retrieve(ctx, t, &dealCid, root, false, selectorparse.CommonSelector_ExploreAllRecursively)
 
 	// Inspect what we got
 	gotCids, err := testutil.CidsInCar(outPath)

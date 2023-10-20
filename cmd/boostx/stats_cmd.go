@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
-	transports_types "github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	transports_types "github.com/filecoin-project/boost/retrievalmarket/types"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"

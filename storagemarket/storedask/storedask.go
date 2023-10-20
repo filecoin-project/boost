@@ -93,6 +93,8 @@ func signBytes(ctx context.Context, signer address.Address, b []byte, f api.Full
 		return nil, err
 	}
 
+	log.Debugf("signing the ask %s with address %s", string(b), signer.String())
+
 	localSignature, err := f.WalletSign(ctx, signer, b)
 	if err != nil {
 		return nil, err

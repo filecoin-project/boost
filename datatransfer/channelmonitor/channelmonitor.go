@@ -124,17 +124,6 @@ func (m *Monitor) Shutdown() {
 	m.stop()
 }
 
-// onShutdown shuts down all monitored channels. It is called when the run
-// loop exits.
-func (m *Monitor) onShutdown() {
-	m.lk.RLock()
-	defer m.lk.RUnlock()
-
-	for _, ch := range m.channels {
-		ch.Shutdown()
-	}
-}
-
 // onMonitoredChannelShutdown is called when a monitored channel shuts down
 func (m *Monitor) onMonitoredChannelShutdown(chid datatransfer.ChannelID) {
 	m.lk.Lock()
@@ -351,14 +340,6 @@ func (mc *monitoredChannel) resetConsecutiveRestarts() {
 	defer mc.restartLk.Unlock()
 
 	mc.consecutiveRestarts = 0
-}
-
-// Used by the tests
-func (mc *monitoredChannel) isRestarting() bool {
-	mc.restartLk.Lock()
-	defer mc.restartLk.Unlock()
-
-	return !mc.restartedAt.IsZero()
 }
 
 // Send a restart message for the channel

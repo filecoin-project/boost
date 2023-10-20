@@ -18,24 +18,10 @@ import (
 	"github.com/filecoin-project/lotus/metrics"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/ipfs/kubo/core/node/helpers"
-	"github.com/ipld/go-ipld-prime"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
 )
-
-// LinkSystemProv is used to avoid circular dependencies
-type LinkSystemProv struct {
-	*ipld.LinkSystem
-}
-
-func NewLinkSystemProvider() *LinkSystemProv {
-	return &LinkSystemProv{}
-}
-
-func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
-	return p.LinkSystem
-}
 
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
 func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter *server.RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
