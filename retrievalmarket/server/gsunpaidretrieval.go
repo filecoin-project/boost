@@ -91,7 +91,7 @@ type ValidationDeps struct {
 	DealDecider    DealDecider
 	PieceDirectory *piecedirectory.PieceDirectory
 	SectorAccessor SectorAccessor
-	AskStore       *RetrievalAskGetter
+	AskStore       RetrievalAskGetter
 }
 
 func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {

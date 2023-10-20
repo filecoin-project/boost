@@ -113,7 +113,7 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretriev
 	// Check if the piece is unsealed
 	_, isUnsealed, err := rv.getPiece(proposal.PayloadCID, proposal.PieceCID)
 	if err != nil {
-		if err == legacyretrievaltypes.ErrNotFound {
+		if errors.Is(err, legacyretrievaltypes.ErrNotFound) {
 			return fmt.Errorf("there is no piece containing payload cid %s: %w", proposal.PayloadCID, err)
 		}
 		return err
