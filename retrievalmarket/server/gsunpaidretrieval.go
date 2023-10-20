@@ -66,16 +66,20 @@ var defaultExtensions = []graphsync.ExtensionName{
 	extension.ExtensionDataTransfer1_1,
 }
 
-type RetrievalAskGetter struct {
+type RetrievalAskGetter interface {
+	GetAsk() *legacyretrievaltypes.Ask
+}
+
+type retrievalAskGetter struct {
 	ask legacyretrievaltypes.Ask
 }
 
-func (rag *RetrievalAskGetter) GetAsk() *legacyretrievaltypes.Ask {
+func (rag *retrievalAskGetter) GetAsk() *legacyretrievaltypes.Ask {
 	return &rag.ask
 }
 
-func NewRetrievalAskGetter() *RetrievalAskGetter {
-	return &RetrievalAskGetter{
+func NewRetrievalAskGetter() *retrievalAskGetter {
+	return &retrievalAskGetter{
 		ask: legacyretrievaltypes.Ask{
 			PricePerByte: abi.NewTokenAmount(0),
 			UnsealPrice:  abi.NewTokenAmount(0),

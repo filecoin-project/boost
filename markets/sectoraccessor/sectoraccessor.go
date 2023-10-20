@@ -8,9 +8,9 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
+	retrievalmarket_types "github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
@@ -32,7 +32,7 @@ type sectorAccessor struct {
 	full  v1api.FullNode
 }
 
-var _ retrievalmarket.SectorAccessor = (*sectorAccessor)(nil)
+var _ retrievalmarket_types.SectorAccessor = (*sectorAccessor)(nil)
 
 func NewSectorAccessor(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) dagstore.SectorAccessor {
 	return &sectorAccessor{address.Address(maddr), secb, pp, full}
