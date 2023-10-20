@@ -15,8 +15,7 @@ func ts20230913144459_dealsAddIsDirectDealColumn(ctx context.Context, session *g
 	err := session.Query(qry).WithContext(ctx).Exec()
 
 	if err != nil {
-		errorStr := strings.Split(err.Error(), ";")
-		if strings.Compare("code=2200", errorStr[0]) == 0 {
+		if strings.Contains(err.Error(), "code=2200") {
 			log.Warn("column IsDirectDeal already exists")
 		} else {
 			return fmt.Errorf("creating new column IsDirectDeal: %w", err)
