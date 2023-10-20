@@ -104,7 +104,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	// If there are any legacy deals to look up
 	if len(legacyDealIDs) > 0 {
 		// Get all deals from the legacy provider
-		legacyDeals, err := r.legacyProv.ListLocalDeals()
+		legacyDeals, err := r.legacyDeals.ListDeals()
 		if err != nil {
 			return nil, fmt.Errorf("getting legacy deals: %w", err)
 		}

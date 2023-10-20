@@ -15,8 +15,6 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	retrievalimpl "github.com/filecoin-project/boost/retrievalmarket/server"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/metrics"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/ipfs/kubo/core/node/helpers"
@@ -25,23 +23,6 @@ import (
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
 )
-
-type RetrievalAskGetter struct {
-	ask legacyretrievaltypes.Ask
-}
-
-func (rag *RetrievalAskGetter) GetAsk() *legacyretrievaltypes.Ask {
-	return &rag.ask
-}
-
-func NewRetrievalAskGetter() *RetrievalAskGetter {
-	return &RetrievalAskGetter{
-		ask: legacyretrievaltypes.Ask{
-			PricePerByte: abi.NewTokenAmount(0),
-			UnsealPrice:  abi.NewTokenAmount(0),
-		},
-	}
-}
 
 // LinkSystemProv is used to avoid circular dependencies
 type LinkSystemProv struct {
@@ -57,8 +38,8 @@ func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
 }
 
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
-func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter *RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter *RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter *server.RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter *server.RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
 		// Graphsync tracks metrics separately, pass nil blockMetrics to the remote blockstore
 		rb := remoteblockstore.NewRemoteBlockstore(pid, nil)
 

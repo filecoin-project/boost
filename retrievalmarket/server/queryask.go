@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-address"
@@ -31,12 +30,12 @@ type QueryAskHandler struct {
 	minerAddress address.Address
 	pd           *piecedirectory.PieceDirectory
 	sa           SectorAccessor
-	askStore     modules.RetrievalAskGetter
+	askStore     RetrievalAskGetter
 	full         v1api.FullNode
 	host         host.Host
 }
 
-func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirectory.PieceDirectory, sa SectorAccessor, askStore modules.RetrievalAskGetter, full v1api.FullNode) *QueryAskHandler {
+func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirectory.PieceDirectory, sa SectorAccessor, askStore RetrievalAskGetter, full v1api.FullNode) *QueryAskHandler {
 	return &QueryAskHandler{
 		host:         host,
 		minerAddress: maddr,

@@ -68,6 +68,26 @@ type channelState struct {
 	message string
 }
 
+func (c channelState) Vouchers() []datatransfer.Voucher {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c channelState) VoucherResults() []datatransfer.VoucherResult {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c channelState) LastVoucher() datatransfer.Voucher {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c channelState) LastVoucherResult() datatransfer.VoucherResult {
+	//TODO implement me
+	panic("implement me")
+}
+
 // EmptyChannelState is the zero value for channel state, meaning not present
 var EmptyChannelState = channelState{}
 
@@ -102,8 +122,8 @@ func (c channelState) Selector() ipld.Node {
 }
 
 // Voucher returns the voucher for this data transfer
-func (c channelState) Voucher() datatransfer.TypedVoucher {
-	return datatransfer.TypedVoucher{}
+func (c channelState) Voucher() datatransfer.Voucher {
+	return nil
 }
 
 // ReceivedCidsTotal returns the number of (non-unique) cids received so far

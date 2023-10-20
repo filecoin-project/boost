@@ -14,7 +14,6 @@ import (
 	dtgstransport "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
-	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
@@ -24,9 +23,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
-	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -59,7 +56,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
-	provider "github.com/ipni/index-provider"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -305,7 +301,7 @@ func NewAskDB(sqldb *sql.DB) *db.StorageAskDB {
 	return db.NewStorageAskDB(sqldb)
 }
 
-func HandleQueryAsk(lc fx.Lifecycle, h host.Host, maddr lotus_dtypes.MinerAddress, pd *piecedirectory.PieceDirectory, sa *lib.MultiMinerAccessor, askStore RetrievalAskGetter, full v1api.FullNode) {
+func HandleQueryAsk(lc fx.Lifecycle, h host.Host, maddr lotus_dtypes.MinerAddress, pd *piecedirectory.PieceDirectory, sa *lib.MultiMinerAccessor, askStore server.RetrievalAskGetter, full v1api.FullNode) {
 	handler := server.NewQueryAskHandler(h, address.Address(maddr), pd, sa, askStore, full)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -498,29 +494,6 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 
 		return prov, nil
-	}
-}
-
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask *storedask.StoredAsk) *gql.Server {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
-		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
-		legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory,
-		indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter,
-		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask *storedask.StoredAsk) *gql.Server {
-
-		resolverCtx, cancel := context.WithCancel(context.Background())
-		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyDeals, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma, sask)
-		svr := gql.NewServer(cfg, resolver, bg)
-
-		lc.Append(fx.Hook{
-			OnStart: svr.Start,
-			OnStop: func(ctx context.Context) error {
-				cancel()
-				return svr.Stop(ctx)
-			},
-		})
-
-		return svr
 	}
 }
 

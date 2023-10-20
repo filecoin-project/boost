@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
@@ -20,8 +19,6 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
 	"go.uber.org/fx"
 )
 
@@ -162,21 +159,4 @@ func NewPieceDoctor(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdc
 		},
 	})
 	return doc
-}
-
-func NewBlockGetter(pd *piecedirectory.PieceDirectory) gql.BlockGetter {
-	return &pdBlockGetter{pd: pd}
-}
-
-type pdBlockGetter struct {
-	pd *piecedirectory.PieceDirectory
-}
-
-func (p *pdBlockGetter) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
-	bz, err := p.pd.BlockstoreGet(ctx, c)
-	if err != nil {
-		return nil, err
-	}
-
-	return blocks.NewBlockWithCid(bz, c)
 }

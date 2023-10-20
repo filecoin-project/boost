@@ -523,8 +523,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 
 		// GraphQL server
-		Override(new(gql.BlockGetter), modules.NewBlockGetter),
-		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
+		Override(new(gql.BlockGetter), gql.NewBlockGetter),
+		Override(new(*gql.Server), gql.NewGraphqlServer(cfg)),
 
 		// Tracing
 		Override(new(*tracing.Tracing), modules.NewTracing(cfg)),
@@ -561,7 +561,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval)
 		Override(new(server.SectorAccessor), modules.NewSectorAccessor(cfg)),
-		Override(HandleSetRetrievalAskGetter, modules.NewRetrievalAskGetter),
+		Override(HandleSetRetrievalAskGetter, server.NewRetrievalAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalAskKey, modules.HandleQueryAsk),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),

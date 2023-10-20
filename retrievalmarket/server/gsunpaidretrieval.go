@@ -14,7 +14,6 @@ import (
 	"github.com/filecoin-project/boost/datatransfer/registry"
 	"github.com/filecoin-project/boost/datatransfer/transport/graphsync/extension"
 	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -73,11 +72,28 @@ var defaultExtensions = []graphsync.ExtensionName{
 	extension.ExtensionDataTransfer1_1,
 }
 
+type RetrievalAskGetter struct {
+	ask legacyretrievaltypes.Ask
+}
+
+func (rag *RetrievalAskGetter) GetAsk() *legacyretrievaltypes.Ask {
+	return &rag.ask
+}
+
+func NewRetrievalAskGetter() *RetrievalAskGetter {
+	return &RetrievalAskGetter{
+		ask: legacyretrievaltypes.Ask{
+			PricePerByte: abi.NewTokenAmount(0),
+			UnsealPrice:  abi.NewTokenAmount(0),
+		},
+	}
+}
+
 type ValidationDeps struct {
 	DealDecider    DealDecider
 	PieceDirectory *piecedirectory.PieceDirectory
 	SectorAccessor SectorAccessor
-	AskStore       *modules.RetrievalAskGetter
+	AskStore       *RetrievalAskGetter
 }
 
 func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {
