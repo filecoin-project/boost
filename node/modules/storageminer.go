@@ -297,10 +297,6 @@ func NewFundsDB(sqldb *sql.DB) *db.FundsDB {
 	return db.NewFundsDB(sqldb)
 }
 
-func NewAskDB(sqldb *sql.DB) *db.StorageAskDB {
-	return db.NewStorageAskDB(sqldb)
-}
-
 func HandleQueryAsk(lc fx.Lifecycle, h host.Host, maddr lotus_dtypes.MinerAddress, pd *piecedirectory.PieceDirectory, sa *lib.MultiMinerAccessor, askStore server.RetrievalAskGetter, full v1api.FullNode) {
 	handler := server.NewQueryAskHandler(h, address.Address(maddr), pd, sa, askStore, full)
 	lc.Append(fx.Hook{
@@ -465,9 +461,9 @@ func NewLegacyDealsManager(lc fx.Lifecycle, legacyFSM fsm.Group) legacy.LegacyDe
 	return mgr
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask *storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
-		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask *storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
+		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
 		commpc types.CommpCalculator, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
@@ -552,10 +548,14 @@ func NewMpoolMonitor(cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode) 
 	}
 }
 
-func NewLegacyDealsFSM(cfg *config.Boost) func(lc fx.Lifecycle, ds *backupds.Datastore) (fsm.Group, error) {
-	return func(lc fx.Lifecycle, ds *backupds.Datastore) (fsm.Group, error) {
+func NewLegacyDealsFSM(cfg *config.Boost) func(lc fx.Lifecycle, mds lotus_dtypes.MetadataDS) (fsm.Group, error) {
+	return func(lc fx.Lifecycle, mds lotus_dtypes.MetadataDS) (fsm.Group, error) {
 		// Get the deals FSM
-		provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
+		bds, err := backupds.Wrap(mds, "")
+		if err != nil {
+			return nil, fmt.Errorf("opening backupds: %w", err)
+		}
+		provDS := namespace.Wrap(bds, datastore.NewKey("/deals/provider"))
 		deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
 			StateType:     legacytypes.MinerDeal{},
 			StateKeyField: "State",

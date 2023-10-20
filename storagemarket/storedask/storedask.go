@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/shared"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -40,25 +39,35 @@ const DefaultMinPieceSize abi.PaddedPieceSize = 256
 // TODO: It would be nice to default this to the miner's sector size
 const DefaultMaxPieceSize abi.PaddedPieceSize = 1 << 20
 
-type StoredAsk struct {
+type StoredAsk interface {
+	GetAsk(miner address.Address) *legacytypes.SignedStorageAsk
+	SetAsk(ctx context.Context, price abi.TokenAmount, verifiedPrice abi.TokenAmount, duration abi.ChainEpoch, miner address.Address, options ...legacytypes.StorageAskOption) error
+}
+
+type storedAsk struct {
 	askLk    sync.RWMutex
 	asks     map[address.Address]*legacytypes.SignedStorageAsk
 	fullNode api.FullNode
-	db       *db.StorageAskDB
+	db       *StorageAskDB
 }
 
 // NewStoredAsk returns a new instance of StoredAsk
 // It will initialize a new SignedStorageAsk on disk if one is not set
 // Otherwise it loads the current SignedStorageAsk from disk
-func NewStoredAsk(cfg *config.Boost) func(lc fx.Lifecycle, db *db.StorageAskDB, fullNode api.FullNode) (*StoredAsk, error) {
-	return func(lc fx.Lifecycle, db *db.StorageAskDB, fullNode api.FullNode) (*StoredAsk, error) {
-		s := &StoredAsk{
-			fullNode: fullNode,
-			db:       db,
-			asks:     make(map[address.Address]*legacytypes.SignedStorageAsk),
+func NewStoredAsk(cfg *config.Boost) func(lc fx.Lifecycle, askdb *StorageAskDB, fullNode api.FullNode) (*storedAsk, error) {
+	return func(lc fx.Lifecycle, askdb *StorageAskDB, fullNode api.FullNode) (*storedAsk, error) {
+		ctx := context.Background()
+
+		err := createAskTable(ctx, askdb.db)
+		if err != nil {
+			return nil, err
 		}
 
-		ctx := context.Background()
+		s := &storedAsk{
+			fullNode: fullNode,
+			db:       askdb,
+			asks:     make(map[address.Address]*legacytypes.SignedStorageAsk),
+		}
 
 		var minerIDs []address.Address
 		miner, err := address.NewFromString(cfg.Wallets.Miner)
@@ -115,7 +124,7 @@ func getMinerWorkerAddress(ctx context.Context, maddr address.Address, tok share
 	return mi.Worker, nil
 }
 
-func (s *StoredAsk) sign(ctx context.Context, ask *legacytypes.StorageAsk) (*crypto.Signature, error) {
+func (s *storedAsk) sign(ctx context.Context, ask *legacytypes.StorageAsk) (*crypto.Signature, error) {
 	tok, err := s.fullNode.ChainHead(ctx)
 	if err != nil {
 		return nil, err
@@ -143,14 +152,14 @@ func signMinerData(ctx context.Context, data interface{}, address address.Addres
 	return sig, nil
 }
 
-func (s *StoredAsk) GetAsk(miner address.Address) *legacytypes.SignedStorageAsk {
+func (s *storedAsk) GetAsk(miner address.Address) *legacytypes.SignedStorageAsk {
 	s.askLk.RLock()
 	defer s.askLk.RUnlock()
 
 	return s.asks[miner]
 }
 
-func (s *StoredAsk) SetAsk(ctx context.Context, price abi.TokenAmount, verifiedPrice abi.TokenAmount, duration abi.ChainEpoch, miner address.Address, options ...legacytypes.StorageAskOption) error {
+func (s *storedAsk) SetAsk(ctx context.Context, price abi.TokenAmount, verifiedPrice abi.TokenAmount, duration abi.ChainEpoch, miner address.Address, options ...legacytypes.StorageAskOption) error {
 	s.askLk.Lock()
 	defer s.askLk.Unlock()
 	var seqno uint64
@@ -196,7 +205,7 @@ func (s *StoredAsk) SetAsk(ctx context.Context, price abi.TokenAmount, verifiedP
 
 }
 
-func (s *StoredAsk) getSignedAsk(ctx context.Context, miner address.Address) (legacytypes.SignedStorageAsk, error) {
+func (s *storedAsk) getSignedAsk(ctx context.Context, miner address.Address) (legacytypes.SignedStorageAsk, error) {
 	ask, err := s.db.Get(ctx, miner)
 	if err != nil {
 		return legacytypes.SignedStorageAsk{}, err
@@ -212,6 +221,6 @@ func (s *StoredAsk) getSignedAsk(ctx context.Context, miner address.Address) (le
 	}, nil
 }
 
-func (s *StoredAsk) storeAsk(ctx context.Context, ask legacytypes.StorageAsk) error {
+func (s *storedAsk) storeAsk(ctx context.Context, ask legacytypes.StorageAsk) error {
 	return s.db.Update(ctx, ask)
 }

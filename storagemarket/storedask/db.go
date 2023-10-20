@@ -1,21 +1,52 @@
-package db
+package storedask
 
 import (
 	"context"
 	"database/sql"
+	_ "embed"
+	"errors"
 	"fmt"
+	"path"
 
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"go.uber.org/fx"
 )
+
+const AskDBName = "ask.db"
+
+//go:embed create_ask_db.sql
+var createAskDBSQL string
+
+func createAskTable(ctx context.Context, askDB *sql.DB) error {
+	if _, err := askDB.ExecContext(ctx, createAskDBSQL); err != nil {
+		return fmt.Errorf("failed to create tables in ask DB: %w", err)
+	}
+	return nil
+}
 
 type StorageAskDB struct {
 	db *sql.DB
 }
 
-func NewStorageAskDB(db *sql.DB) *StorageAskDB {
-	return &StorageAskDB{db: db}
+func NewStorageAskDB(r lotus_repo.LockedRepo) (*StorageAskDB, error) {
+	dbPath := path.Join(r.Path(), AskDBName+"?cache=shared")
+	d, err := db.SqlDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	return &StorageAskDB{db: d}, nil
+}
+
+func CreateAskTables(lc fx.Lifecycle, db *StorageAskDB) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return createAskTable(ctx, db.db)
+		},
+	})
 }
 
 func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) error {
@@ -24,7 +55,7 @@ func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) e
 	row := s.db.QueryRowContext(ctx, qry, ask.Miner.String())
 	err := row.Scan(&minerString)
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		return s.set(ctx, ask)
 	case err != nil:
 		return err
@@ -36,7 +67,7 @@ func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) e
 func (s *StorageAskDB) set(ctx context.Context, ask legacytypes.StorageAsk) error {
 	qry := "INSERT INTO StorageAsk (Price, VerifiedPrice, MinPieceSize, MaxPieceSize, Miner, TS, Expiry, SeqNo) "
 	qry += "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-	values := []interface{}{ask.Price, ask.VerifiedPrice, ask.MinPieceSize, ask.MaxPieceSize, ask.Miner.String(), ask.Timestamp, ask.Expiry, ask.SeqNo}
+	values := []interface{}{ask.Price.Int64(), ask.VerifiedPrice.Int64(), ask.MinPieceSize, ask.MaxPieceSize, ask.Miner.String(), ask.Timestamp, ask.Expiry, ask.SeqNo}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
 }
@@ -45,7 +76,7 @@ func (s *StorageAskDB) update(ctx context.Context, ask legacytypes.StorageAsk) e
 	qry := "UPDATE StorageAsk (Price, VerifiedPrice, MinPieceSize, MaxPieceSize, TS, Expiry, SeqNo) "
 	qry += "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
 	qry += "WHERE Miner=?"
-	values := []interface{}{ask.Price, ask.VerifiedPrice, ask.MinPieceSize, ask.MaxPieceSize, ask.Timestamp, ask.Expiry, ask.SeqNo, ask.Miner.String()}
+	values := []interface{}{ask.Price.Int64(), ask.VerifiedPrice.Int64(), ask.MinPieceSize, ask.MaxPieceSize, ask.Timestamp, ask.Expiry, ask.SeqNo, ask.Miner.String()}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
 }

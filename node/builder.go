@@ -49,7 +49,6 @@ import (
 	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
-	mdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	lotus_common "github.com/filecoin-project/lotus/node/impl/common"
 	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
@@ -151,6 +150,7 @@ const (
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
+	HandleCreateAskTablesKey
 	HandleSetShardSelector
 	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey
@@ -433,7 +433,7 @@ var BoostNode = Options(
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
 	Override(new(*db.FundsDB), modules.NewFundsDB),
 	Override(new(*db.SectorStateDB), modules.NewSectorStateDB),
-	Override(new(*db.StorageAskDB), modules.NewAskDB),
+	Override(new(*storedask.StorageAskDB), storedask.NewStorageAskDB),
 	Override(new(*rtvllog.RetrievalLogDB), modules.NewRetrievalLogDB),
 )
 
@@ -514,6 +514,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr(cfg)),
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
+		Override(new(storedask.StoredAsk), storedask.NewStoredAsk(cfg)),
 
 		Override(new(legacy.LegacyDealManager), modules.NewLegacyDealsManager),
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
@@ -534,23 +535,15 @@ func ConfigBoost(cfg *config.Boost) Option {
 			DealPublishControl: []string{cfg.Wallets.PublishStorageDeals},
 		})),
 
-		Override(new(smtypes.AskGetter), storedask.NewStoredAsk(cfg)),
-
 		// Lotus Markets
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
+		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
-
-		// DAG Store
-
-		// TODO: Not sure how to completely get rid of these yet:
-		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
-		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
-		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
 		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*lib.MultiMinerAccessor), modules.NewMultiminerSectorAccessor(cfg)),
@@ -559,7 +552,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval)
 		Override(new(server.SectorAccessor), modules.NewSectorAccessor(cfg)),
-		Override(HandleSetRetrievalAskGetter, server.NewRetrievalAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalAskKey, modules.HandleQueryAsk),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
