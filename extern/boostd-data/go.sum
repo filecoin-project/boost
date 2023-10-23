@@ -2113,8 +2113,8 @@ github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:
 github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 h1:bAn7/zixMGCfxrRTfdpNzjtPYqr8smhKouy9mxVdGPU=
 github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673/go.mod h1:N3UwUGtsrSj3ccvlPHLoLsHnpR27oXr4ZE984MbSER8=
 github.com/ybbus/jsonrpc/v2 v2.1.6/go.mod h1:rIuG1+ORoiqocf9xs/v+ecaAVeo3zcZHQgInyKFMeg0=
-github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0 h1:68nrJsrWe0A6JiKnsjWChAaWhj20v+AwYJObtp86D1k=
-github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0/go.mod h1:LAokR6+vevDCrTxk52U7p6ki+4qELu4XU7JUGYa2O2M=
+github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6 h1:3sggdexlJg07v9sRBKkZ+/oSJ0sq53vVApx8iSbD98M=
+github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6/go.mod h1:LAokR6+vevDCrTxk52U7p6ki+4qELu4XU7JUGYa2O2M=
 github.com/yugabyte/pgx/v4 v4.14.5 h1:XLzEEiO3d/kWzpyctO8l4kwMLhzPQ9n2er7ATH7CJVA=
 github.com/yugabyte/pgx/v4 v4.14.5/go.mod h1:nFSvjsVq4CuA61TWGriwWG74ZVxeuJCcNu42Mkn+rgw=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
