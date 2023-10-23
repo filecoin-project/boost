@@ -13,6 +13,7 @@ import (
 	gstestutil "github.com/filecoin-project/boost-graphsync/testutil"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -28,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
+func TestDealAndRetrievalWithIdentityCID(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 	log := framework.Log
@@ -37,10 +38,14 @@ func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
 	opts = append(opts, framework.EnableLegacyDeals(true))
+	opts = append(opts, framework.WithMaxStagingDealsBytes(10000000))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	req.NoError(err)
 	defer f.Stop()
+
+	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
+	require.NoError(t, err)
 
 	// Create a CAR file
 	tempdir := t.TempDir()
@@ -105,13 +110,17 @@ func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
 	require.NoError(t, err)
+	pieceCid := res.DealParams.ClientDealProposal.Proposal.PieceCID
+	log.Infof("deal ID is : %s", dealCid.String())
+	// Wait for the first deal to be added to a sector and cleaned up so space is made
+	err = f.WaitForDealAddedToSector(dealUuid)
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Deal is stored and sealed, attempt different retrieval forms
 
 	log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root.String())
-	outPath := f.Retrieve(ctx, t, &dealCid, root, false, selectorparse.CommonSelector_ExploreAllRecursively)
+	outPath := f.Retrieve(ctx, t, tempdir, root, pieceCid, false, selectorparse.CommonSelector_ExploreAllRecursively)
 
 	// Inspect what we got
 	gotCids, err := testutil.CidsInCar(outPath)

@@ -150,7 +150,6 @@ const (
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
-	HandleCreateAskTablesKey
 	HandleSetShardSelector
 	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey

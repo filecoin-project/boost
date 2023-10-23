@@ -24,10 +24,10 @@ import (
 var log = logging.Logger("storedask")
 
 // DefaultPrice is the default price for unverified deals (in attoFil / GiB / Epoch)
-var DefaultPrice = abi.NewTokenAmount(500000000)
+var DefaultPrice = abi.NewTokenAmount(50000000)
 
 // DefaultVerifiedPrice is the default price for verified deals (in attoFil / GiB / Epoch)
-var DefaultVerifiedPrice = abi.NewTokenAmount(50000000)
+var DefaultVerifiedPrice = abi.NewTokenAmount(5000000)
 
 // DefaultDuration is the default number of epochs a storage ask is in effect for
 const DefaultDuration abi.ChainEpoch = 1000000
@@ -37,7 +37,7 @@ const DefaultMinPieceSize abi.PaddedPieceSize = 256
 
 // DefaultMaxPieceSize is the default maximum accepted size for pieces for deals
 // TODO: It would be nice to default this to the miner's sector size
-const DefaultMaxPieceSize abi.PaddedPieceSize = 1 << 20
+const DefaultMaxPieceSize abi.PaddedPieceSize = 32 << 30
 
 type StoredAsk interface {
 	GetAsk(miner address.Address) *legacytypes.SignedStorageAsk

@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"go.uber.org/fx"
 )
 
 const AskDBName = "ask.db"
@@ -39,14 +38,6 @@ func NewStorageAskDB(r lotus_repo.LockedRepo) (*StorageAskDB, error) {
 		return nil, err
 	}
 	return &StorageAskDB{db: d}, nil
-}
-
-func CreateAskTables(lc fx.Lifecycle, db *StorageAskDB) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return createAskTable(ctx, db.db)
-		},
-	})
 }
 
 func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) error {

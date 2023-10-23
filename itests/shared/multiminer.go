@@ -2,6 +2,10 @@ package shared
 
 import (
 	"context"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/node/config"
@@ -11,9 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 type RetrievalTest struct {
@@ -21,6 +22,8 @@ type RetrievalTest struct {
 	BoostAndMiner2 *framework.TestFramework
 	SampleFilePath string
 	RootCid        cid.Cid
+	PieceCid       cid.Cid
+	TempDir        string
 }
 
 func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
@@ -107,5 +110,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 		BoostAndMiner2: boostAndMiner2,
 		SampleFilePath: randomFilepath,
 		RootCid:        rootCid,
+		PieceCid:       res.DealParams.ClientDealProposal.Proposal.PieceCID,
+		TempDir:        tempdir,
 	})
 }

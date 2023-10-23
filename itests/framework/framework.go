@@ -8,17 +8,22 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
+	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
+	rc "github.com/filecoin-project/boost/retrievalmarket/client"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -50,6 +55,9 @@ import (
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
+	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/files"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	dstest "github.com/ipfs/boxo/ipld/merkledag/test"
@@ -57,27 +65,33 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
 	ipldcbor "github.com/ipfs/go-ipld-cbor"
 	ipldformat "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
 	"github.com/ipld/go-ipld-prime"
-	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/traversal/selector"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/traversal"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/term"
+	"golang.org/x/xerrors"
 )
 
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
-	Ensemble     *kit.Ensemble
-	EnableLegacy bool
+	Ensemble             *kit.Ensemble
+	EnableLegacy         bool
+	MaxStagingDealsBytes int64
 }
 
 type TestFramework struct {
@@ -106,6 +120,12 @@ func EnableLegacyDeals(enable bool) FrameworkOpts {
 func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.Ensemble = e
+	}
+}
+
+func WithMaxStagingDealsBytes(e int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MaxStagingDealsBytes = e
 	}
 }
 
@@ -327,6 +347,9 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	}
 	cfg.LotusFees.MaxPublishDealsFee = val
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+	if f.config.MaxStagingDealsBytes > 4000000 {
+		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingDealsBytes
+	}
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
@@ -741,18 +764,6 @@ func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error
 	}
 }
 
-func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Cid, root cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
-	// perform retrieval.
-	info, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
-	require.NoError(t, err)
-
-	offers, err := f.FullNode.ClientFindData(ctx, root, &info.PieceCID)
-	require.NoError(t, err)
-	require.NotEmpty(t, offers, "no offers")
-
-	return f.retrieve(ctx, t, offers[0], extractCar, selectorNode)
-}
-
 func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
 	bserv := dstest.Bserv()
 	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
@@ -788,81 +799,108 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	return tmpFile
 }
 
-func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
-	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, f.MinerAddr, root, pieceCid)
+func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir string, root cid.Cid, pieceCid cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
+	clientPath := path.Join(tempdir, "client")
+	_ = os.Mkdir(clientPath, 0755)
+
+	clientNode, err := clinode.Setup(clientPath)
 	require.NoError(t, err)
 
-	return f.retrieve(ctx, t, offer, extractCar, selectorNode)
-}
-
-func (f *TestFramework) retrieve(ctx context.Context, t *testing.T, offer lapi.QueryOffer, extractCar bool, selectorNode datamodel.Node) string {
-	p := path.Join(t.TempDir(), "ret-car-"+t.Name())
-	err := os.MkdirAll(path.Dir(p), 0755)
-	require.NoError(t, err)
-	carFile, err := os.Create(p)
+	addr, err := clientNode.Wallet.GetDefault()
 	require.NoError(t, err)
 
-	defer carFile.Close() //nolint:errcheck
-
-	caddr, err := f.FullNode.WalletDefaultAddress(ctx)
+	bstoreDatastore, err := flatfs.CreateOrOpen(path.Join(tempdir, "blockstore"), flatfs.NextToLast(3), false)
+	bstore := blockstore.NewBlockstore(bstoreDatastore, blockstore.NoPrefix())
 	require.NoError(t, err)
 
-	updatesCtx, cancel := context.WithCancel(ctx)
-	updates, err := f.FullNode.ClientGetRetrievalUpdates(updatesCtx)
+	//ds, err := levelds.NewDatastore(path.Join(clientPath, "dstore"), nil)
+	ds, err := levelds.NewDatastore("", nil)
 	require.NoError(t, err)
 
-	order := offer.Order(caddr)
-	if selectorNode != nil {
-		_, err := selector.CompileSelector(selectorNode)
-		require.NoError(t, err)
-		jsonSelector, err := ipld.Encode(selectorNode, dagjson.Encode)
-		require.NoError(t, err)
-		sel := lapi.Selector(jsonSelector)
-		order.DataSelector = &sel
-	}
-
-	retrievalRes, err := f.FullNode.ClientRetrieve(ctx, order)
+	// Create the retrieval client
+	fc, err := rc.NewClient(clientNode.Host, f.FullNode, clientNode.Wallet, addr, bstore, ds, clientPath)
 	require.NoError(t, err)
-consumeEvents:
-	for {
-		var evt lapi.RetrievalInfo
-		select {
-		case <-updatesCtx.Done():
-			t.Fatal("Retrieval Timed Out")
-		case evt = <-updates:
-			if evt.ID != retrievalRes.DealID {
-				continue
-			}
-		}
-		switch legacyretrievaltypes.DealStatus(evt.Status) {
-		case legacyretrievaltypes.DealStatusCompleted:
-			break consumeEvents
-		case legacyretrievaltypes.DealStatusRejected:
-			t.Fatalf("Retrieval Proposal Rejected: %s", evt.Message)
-		case
-			legacyretrievaltypes.DealStatusDealNotFound,
-			legacyretrievaltypes.DealStatusErrored:
-			t.Fatalf("Retrieval Error: %s", evt.Message)
-		}
-	}
-	cancel()
 
-	require.NoError(t, f.FullNode.ClientExport(ctx,
-		lapi.ExportRef{
-			Root:   offer.Root,
-			DealID: retrievalRes.DealID,
+	baddrs, err := f.Boost.NetAddrsListen(ctx)
+	require.NoError(t, err)
+
+	query, err := RetrievalQuery(ctx, t, clientNode, &baddrs, pieceCid)
+	require.NoError(t, err)
+
+	proposal, err := rc.RetrievalProposalForAsk(query, root, selectorNode)
+	require.NoError(t, err)
+
+	// Retrieve the data
+	_, err = fc.RetrieveContentWithProgressCallback(
+		ctx,
+		f.MinerAddr,
+		proposal,
+		func(bytesReceived_ uint64) {
+			printProgress(bytesReceived_, t)
 		},
-		lapi.FileRef{
-			Path:  carFile.Name(),
-			IsCAR: true,
-		}))
+	)
+	require.NoError(t, err)
 
-	ret := carFile.Name()
-	if extractCar {
-		ret = f.ExtractFileFromCAR(ctx, t, carFile)
+	dservOffline := dag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
+
+	// if we used a selector - need to find the sub-root the user actually wanted to retrieve
+	if !selectorNode.IsNull() {
+		var subRootFound bool
+		err := utils.TraverseDag(
+			ctx,
+			dservOffline,
+			root,
+			selectorNode,
+			func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
+				if r == traversal.VisitReason_SelectionMatch {
+
+					if p.LastBlock.Path.String() != p.Path.String() {
+						return xerrors.Errorf("unsupported selection path '%s' does not correspond to a node boundary (a.k.a. CID link)", p.Path.String())
+					}
+
+					cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
+					if !castOK {
+						return xerrors.Errorf("cidlink cast unexpectedly failed on '%s'", p.LastBlock.Link.String())
+					}
+
+					root = cidLnk.Cid
+					subRootFound = true
+				}
+				return nil
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, subRootFound)
 	}
 
-	return ret
+	dnode, err := dservOffline.Get(ctx, root)
+	require.NoError(t, err)
+
+	var out string
+
+	if !extractCar {
+		// Write file as car file
+		file, err := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String()+".car")
+		require.NoError(t, err)
+		out = file.Name()
+		err = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
+		require.NoError(t, err)
+
+	} else {
+		// Otherwise write file as UnixFS File
+		ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
+		require.NoError(t, err)
+		file, err := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String())
+		err = file.Close()
+		require.NoError(t, err)
+		err = os.Remove(file.Name())
+		require.NoError(t, err)
+		err = files.WriteTo(ufsFile, file.Name())
+		require.NoError(t, err)
+
+	}
+
+	return out
 }
 
 type RetrievalInfo struct {
@@ -901,4 +939,58 @@ type DataTransferChannel struct {
 	OtherPeer   peer.ID
 	Transferred uint64
 	Stages      *datatransfer.ChannelStages
+}
+
+func printProgress(bytesReceived uint64, t *testing.T) {
+	str := fmt.Sprintf("%v (%v)", bytesReceived, humanize.IBytes(bytesReceived))
+
+	termWidth, _, err := term.GetSize(int(os.Stdin.Fd()))
+	strLen := len(str)
+	if err == nil {
+
+		if strLen < termWidth {
+			// If the string is shorter than the terminal width, pad right side
+			// with spaces to remove old text
+			str = strings.Join([]string{str, strings.Repeat(" ", termWidth-strLen)}, "")
+		} else if strLen > termWidth {
+			// If the string doesn't fit in the terminal, cut it down to a size
+			// that fits
+			str = str[:termWidth]
+		}
+	}
+
+	t.Logf("%s\r", str)
+}
+
+func RetrievalQuery(ctx context.Context, t *testing.T, client *clinode.Node, peerAddr *peer.AddrInfo, pcid cid.Cid) (*legacyretrievaltypes.QueryResponse, error) {
+	client.Host.Peerstore().AddAddrs(peerAddr.ID, peerAddr.Addrs, peerstore.TempAddrTTL)
+	s, err := client.Host.NewStream(ctx, peerAddr.ID, rc.RetrievalQueryProtocol)
+	require.NoError(t, err)
+
+	client.Host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
+	defer func() {
+		client.Host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
+		s.Close()
+	}()
+
+	// We have connected
+
+	q := &legacyretrievaltypes.Query{
+		PayloadCID: pcid,
+	}
+
+	var resp legacyretrievaltypes.QueryResponse
+	dline, ok := ctx.Deadline()
+	if ok {
+		_ = s.SetDeadline(dline)
+		defer func() { _ = s.SetDeadline(time.Time{}) }()
+	}
+
+	err = cborutil.WriteCborRPC(s, q)
+	require.NoError(t, err)
+
+	err = cborutil.ReadCborRPC(s, &resp)
+	require.NoError(t, err)
+
+	return &resp, nil
 }

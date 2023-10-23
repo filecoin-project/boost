@@ -319,13 +319,13 @@ workflows:
           target: "./itests/dummydeal_test.go"
 
       - test:
-          name: test-itest-markets_v1_identity_cid
-          suite: itest-markets_v1_identity_cid
+          name: test-graphsync_identity_cid
+          suite: itest-graphsync_identity_cid
           target: "./itests/graphsync_identity_cid_test.go"
 
       - test:
-          name: test-itest-markets_v1_retrieval
-          suite: itest-markets_v1_retrieval
+          name: test-itest-retrieval
+          suite: itest-retrieval
           target: "./itests/graphsync_retrieval_test.go"
 
       - test:

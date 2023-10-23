@@ -10,6 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -20,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarketsV1DealRetrieval(t *testing.T) {
+func TestDealRetrieval(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 
@@ -28,10 +29,14 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
 	opts = append(opts, framework.EnableLegacyDeals(true))
+	opts = append(opts, framework.WithMaxStagingDealsBytes(10000000))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
+
+	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
+	require.NoError(t, err)
 
 	// Create a CAR file
 	tempdir := t.TempDir()
@@ -103,7 +108,7 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 
 	log.Debugw("got deal proposal cid", "cid", dealCid.String())
 
-	err = f.WaitDealSealed(ctx, &dealCid)
+	err = f.WaitForDealAddedToSector(res.DealParams.DealUUID)
 	require.NoError(t, err)
 
 	// Deal is stored and sealed, attempt different retrieval forms
@@ -178,7 +183,7 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 			}
 
 			log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root)
-			outPath := f.Retrieve(ctx, t, &dealCid, root, false, selNode)
+			outPath := f.Retrieve(ctx, t, tempdir, root, res.DealParams.ClientDealProposal.Proposal.PieceCID, false, selNode)
 
 			// Inspect what we got
 			gotCids, err := testutil.CidsInCar(outPath)
