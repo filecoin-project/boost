@@ -624,7 +624,7 @@ func NewCommpThrottle(cfg *config.Boost) func() storagemarket.CommpThrottle {
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, commpt storagemarket.CommpThrottle, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager, me types.MinerEndpoints) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, commpt storagemarket.CommpThrottle, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager, me types.MinerEndpoints) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher,
 		commpt storagemarket.CommpThrottle,
@@ -646,7 +646,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks), httptransport.AllowPrivateIPsOpt(cfg.HttpDownload.AllowPrivateIPs))
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, commpt, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt, me)
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, commpt, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt, me)
 		if err != nil {
 			return nil, err
 		}
@@ -920,6 +920,7 @@ func NewMpoolMonitor(cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode) 
 }
 
 type minerEndpoints struct {
+	actors []address.Address
 	// need separate storage / sealing services as they might become separate processes soon
 	storageServices map[address.Address]lotus_modules.MinerStorageService
 	sealingServices map[address.Address]lotus_modules.MinerSealingService
@@ -949,9 +950,14 @@ func (me *minerEndpoints) CommpCalculator() (types.CommpCalculator, error) {
 	return nil, fmt.Errorf("can not get commp calculator as no miner has been configured")
 }
 
+func (me *minerEndpoints) Actors() []address.Address {
+	return me.actors
+}
+
 func NewMinerEndpoints(storageApis, sealingApis []string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ds fdtypes.MetadataDS) (types.MinerEndpoints, error) {
 	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ds fdtypes.MetadataDS) (types.MinerEndpoints, error) {
 		me := minerEndpoints{
+			actors:          make([]address.Address, 0),
 			storageServices: make(map[address.Address]lotus_modules.MinerStorageService),
 			sealingServices: make(map[address.Address]lotus_modules.MinerSealingService),
 			sectorBlocks:    make(map[address.Address]*sectorblocks.SectorBlocks),
@@ -969,6 +975,7 @@ func NewMinerEndpoints(storageApis, sealingApis []string) func(mctx helpers.Metr
 			}
 			me.storageServices[addr] = ss
 			me.sectorBlocks[addr] = sectorblocks.NewSectorBlocks(ss, ds)
+			me.actors = append(me.actors, addr)
 		}
 
 		for _, s := range sealingApis {

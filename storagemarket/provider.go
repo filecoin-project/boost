@@ -137,7 +137,7 @@ type Provider struct {
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, commpThrottle CommpThrottle,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, commpThrottle CommpThrottle,
 	cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport, me types.MinerEndpoints) (*Provider, error) {
@@ -160,7 +160,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		ctx:       ctx,
 		cancel:    cancel,
 		config:    cfg,
-		Addresses: []address.Address{addr},
+		Addresses: me.Actors(),
 		newDealPS: newDealPS,
 		db:        sqldb,
 		dealsDB:   dealsDB,
