@@ -287,6 +287,10 @@ type DealmakingConfig struct {
 	// ignored, and deals will remain in the pending state until manually published.
 	ManualDealPublish bool
 
+	/**
+	TODO: we need to initialise GraphsyncStorageAccessApiInfo automatically from StorageApiInfos
+	*/
+
 	// The connect strings for the RPC APIs of each miner that boost can read
 	// sector data from when serving graphsync retrievals.
 	// If this parameter is not set, boost will serve data from the endpoint
