@@ -17,7 +17,7 @@ cn="\e[0m"
 
 chunks="${1:-51200}"
 links="${2:-100}"
-PROVIDER=${PROVIDER:t01000}
+PROVIDER=${PROVIDER:-"t01000"}
 
 printf "${ci}boostx generate-rand-car -c=$chunks -l=$links -s=5120000 /app/public/ | awk '{print $NF}'\n\n${cn}"
 
