@@ -3,20 +3,30 @@ set -e
 
 echo Wait for lotus is ready ...
 lotus wait-api
-echo Wait for lotus-miner is ready ...
+echo Wait for lotus-miner-1 is ready ...
+export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_1
 lotus-miner wait-api
+echo Wait for lotus-miner-2 is ready ...
+export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_2
+lotus-miner wait-api
+
 echo BOOST_PATH=$BOOST_PATH
 echo BOOSTD_DATA_PATH=$BOOSTD_DATA_PATH
 export DEFAULT_WALLET=`lotus wallet default`
 export FULLNODE_API_INFO=`lotus auth api-info --perm=admin | cut -f2 -d=`
-export MINER_API_INFO=`lotus-miner auth api-info --perm=admin | cut -f2 -d=`
+export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_1
+export MINER_API_INFO_1=`lotus-miner auth api-info --perm=admin | cut -f2 -d=`
+export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_2
+export MINER_API_INFO_2=`lotus-miner auth api-info --perm=admin | cut -f2 -d=`
+unset LOTUS_MINER_PATH
 
 if [ ! -f $BOOST_PATH/.init.boost ]; then
 	echo Init wallets ...
     export COLLAT_WALLET=`lotus wallet new bls`
     export PUBMSG_WALLET=`lotus wallet new bls`
     export CLIENT_WALLET=`lotus wallet new bls`
-	echo MINER_API_INFO=$MINER_API_INFO
+	echo MINER_API_INFO_1=$MINER_API_INFO_1
+	echo MINER_API_INFO_2=$MINER_API_INFO_2
 	echo FULLNODE_API_INFO=$FULLNODE_API_INFO
 	echo PUBMSG_WALLET=$PUBMSG_WALLET
 	echo COLLAT_WALLET=$COLLAT_WALLET
@@ -27,17 +37,22 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
     lotus wallet market add --from $DEFAULT_WALLET --address $CLIENT_WALLET 5
     lotus wallet market add --from $DEFAULT_WALLET --address $COLLAT_WALLET 5
 
+  export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_1
 	until lotus-miner actor control set --really-do-it ${PUBMSG_WALLET}; do echo Waiting for storage miner API ready ...; sleep 1; done
 
-	echo Init boost on first run ...
+  export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_2
+	until lotus-miner actor control set --really-do-it ${PUBMSG_WALLET}; do echo Waiting for storage miner API ready ...; sleep 1; done
 
-	boostd -vv --boost-repo $BOOST_PATH init --api-sealer=$MINER_API_INFO  \
-		--api-sector-index=$MINER_API_INFO   \
+  unset $LOTUS_MINER_PATH
+
+	echo Init boostd on first run ...
+  export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_1
+  export MINER_API_INFO=$MINER_API_INFO_1
+	boostd -vv --boost-repo $BOOST_PATH init --api-sealer=$MINER_API_INFO_1 --api-sealer=$MINER_API_INFO_2  \
+		--api-sector-index=$MINER_API_INFO_1 --api-sector-index=$MINER_API_INFO_2   \
 		--wallet-publish-storage-deals=$PUBMSG_WALLET   \
 		--wallet-deal-collateral=$COLLAT_WALLET   \
 		--max-staging-deals-bytes=2000000000
-
-	# echo exit code: $?
 
 	echo Setting port in boost config...
 	sed 's|#ListenAddresses = \["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"\]|ListenAddresses = \["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"\]|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
@@ -102,9 +117,17 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	MADDR=`cat $BOOST_PATH/boostd.log | grep maddr | cut -f3 -d"{" | cut -f1 -d:`
 	echo Got maddr=${MADDR}
 
+  export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_1
 	lotus-miner actor set-peer-id ${MADDR}
 	lotus-miner actor set-addrs /dns/boost/tcp/50000
-	echo Registered
+	echo Registered lotus-miner-1
+
+  export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_2
+	lotus-miner actor set-peer-id ${MADDR}
+	lotus-miner actor set-addrs /dns/boost/tcp/50000
+	echo Registered lotus-miner-2
+
+  unset $LOTUS_MINER_PATH
 
 	touch $BOOST_PATH/.register.boost
 	echo Try to stop boost...
