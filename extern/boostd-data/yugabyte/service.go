@@ -28,6 +28,8 @@ const pieceMetadataVersion = "1"
 
 const defaultKeyspace = "idx"
 
+const CqlTimeout = 60
+
 type DBSettings struct {
 	// The cassandra hosts to connect to
 	Hosts []string
@@ -35,6 +37,8 @@ type DBSettings struct {
 	ConnectString string
 	// The number of threads to use when inserting into the PayloadToPieces index
 	PayloadPiecesParallelism int
+	// CQL timeout in seconds
+	CQLTimeout int
 }
 
 type StoreOpt func(*Store)
@@ -63,6 +67,7 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
+	cluster.Timeout = time.Duration(settings.CQLTimeout) * time.Second
 	cluster.Keyspace = defaultKeyspace
 	s := &Store{
 		settings: settings,
