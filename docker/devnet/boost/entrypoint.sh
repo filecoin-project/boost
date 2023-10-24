@@ -122,6 +122,8 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	lotus-miner actor set-addrs /dns/boost/tcp/50000
 	echo Registered lotus-miner-1
 
+  sleep 13
+
   export LOTUS_MINER_PATH=$LOTUS_MINER_PATH_2
 	lotus-miner actor set-peer-id ${MADDR}
 	lotus-miner actor set-addrs /dns/boost/tcp/50000

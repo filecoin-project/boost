@@ -678,6 +678,9 @@ func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) er
 	rcfg.SealerApiInfos = cctx.StringSlice("api-sealer")
 	rcfg.SectorIndexApiInfos = cctx.StringSlice("api-sector-index")
 
+	fmt.Printf("Setting graphsync storage access apis (--api-sector-index): %s\n", cctx.StringSlice("api-sector-index"))
+	rcfg.Dealmaking.GraphsyncStorageAccessApiInfo = cctx.StringSlice("api-sector-index")
+
 	return nil
 }
 

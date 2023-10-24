@@ -163,6 +163,10 @@ export function DealDetail(props) {
                     <td>{deal.AnnounceToIPNI ? 'Yes' : 'No'}</td>
                 </tr>
                 <tr>
+                    <th>Provider</th>
+                    <td>{deal.ProviderAddress}</td>
+                </tr>
+                <tr>
                     <th>Piece CID</th>
                     <td><Link to={'/piece-doctor/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
                 </tr>
