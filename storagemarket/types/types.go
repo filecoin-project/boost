@@ -190,4 +190,5 @@ type MinerEndpoints interface {
 	SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error)
 	PieceAdder(addr address.Address) (PieceAdder, error)
 	CommpCalculator() (CommpCalculator, error)
+	Actors() []address.Address
 }

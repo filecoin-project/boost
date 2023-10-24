@@ -533,7 +533,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(storagemarket.CommpThrottle), modules.NewCommpThrottle(cfg)),
 		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
-		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
+		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(cfg)),
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 
 		// GraphQL server
@@ -585,6 +585,23 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
+
+		/** Tests
+		1. make a boost storage deal with boostd to minerA — payloadA
+		2. make a boost storage deal with boostd to minerB — payloadB
+		3. retrieve via graphsync (boost retrieve —provider minerA) — note that boostd has a single libp2p address on chain
+		4. retrieve via graphsync (boost retrieve —provider minerB) — note that boostd has a single libp2p address on chain
+
+
+		* Add a configuration for specifying multiple miner endpoints
+
+		Example - RunMultiminerRetrievalTest / no worries if it breaks we should rewrite it
+
+
+		*/
+
+		// check with the boost team whether this branch is used or not - because it assumes only a single miner while
+		// all other retrievals support multiminer setup.
 
 		// Lotus Markets (retrieval)
 		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),
@@ -648,6 +665,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
 			ManualDealPublish:       cfg.Dealmaking.ManualDealPublish,
 		})),
+
+		// for legacy deals just pick the first miner id - consider deprecating them soon
 
 		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(paths.SectorIndex), From(new(lotus_modules.MinerSealingService))),

@@ -31,6 +31,7 @@ import (
 )
 
 type mockRemoteServices struct {
+	actor     address.Address
 	minerStub *MinerStub
 }
 
@@ -44,6 +45,10 @@ func (rs *mockRemoteServices) PieceAdder(addr address.Address) (smtypes.PieceAdd
 
 func (rs *mockRemoteServices) CommpCalculator() (types.CommpCalculator, error) {
 	return rs.minerStub, nil
+}
+
+func (rs *mockRemoteServices) Actors() []address.Address {
+	return []address.Address{rs.actor}
 }
 
 type MinerStub struct {
@@ -81,6 +86,7 @@ func NewMinerStub(ctrl *gomock.Controller, miner address.Address) *MinerStub {
 		unblockAnnounce:       make(map[uuid.UUID]chan struct{}),
 	}
 	ms.MinerEndpoints = &mockRemoteServices{
+		actor:     miner,
 		minerStub: ms,
 	}
 	return ms
