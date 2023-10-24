@@ -37,12 +37,12 @@ import (
 const metadataNamespace = "/metadata"
 
 var minerApiFlags = []cli.Flag{
-	&cli.StringFlag{
+	&cli.StringSliceFlag{
 		Name:     "api-sealer",
 		Usage:    "miner/sealer API info (lotus-miner auth api-info --perm=admin)",
 		Required: true,
 	},
-	&cli.StringFlag{
+	&cli.StringSliceFlag{
 		Name:     "api-sector-index",
 		Usage:    "miner sector Index API info (lotus-miner auth api-info --perm=admin)",
 		Required: true,
@@ -51,7 +51,7 @@ var minerApiFlags = []cli.Flag{
 
 var initCmd = &cli.Command{
 	Name:  "init",
-	Usage: "Initialize a boost repository",
+	Usage: "Initialize a boostd repository",
 	Flags: append(minerApiFlags, []cli.Flag{
 		&cli.StringFlag{
 			Name:     "wallet-publish-storage-deals",
@@ -658,20 +658,25 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 
 func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) error {
 	ctx := cctx.Context
-	asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"), dialCheck)
+	asi, err := checkApiInfo(ctx, cctx.StringSlice("api-sector-index")[0], dialCheck)
 	if err != nil {
 		return fmt.Errorf("checking sector index API: %w", err)
 	}
 	fmt.Printf("Sector index api info: %s\n", asi)
 	rcfg.SectorIndexApiInfo = asi
 
-	ai, err := checkApiInfo(ctx, cctx.String("api-sealer"), dialCheck)
+	ai, err := checkApiInfo(ctx, cctx.StringSlice("api-sealer")[0], dialCheck)
 	if err != nil {
 		return fmt.Errorf("checking sealer API: %w", err)
 	}
 
 	fmt.Printf("Sealer api info: %s\n", ai)
 	rcfg.SealerApiInfo = ai
+
+	fmt.Printf("Setting miner endpoints (--api-sealer): %s\n", cctx.StringSlice("api-sealer"))
+	fmt.Printf("Setting miner endpoints (--api-sector-index): %s\n", cctx.StringSlice("api-sector-index"))
+	rcfg.SealerApiInfos = cctx.StringSlice("api-sealer")
+	rcfg.SectorIndexApiInfos = cctx.StringSlice("api-sector-index")
 
 	return nil
 }

@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
-      - ./data/lotus-miner:/var/lib/lotus-miner:rw
+      - ./data/lotus-miner-1:/var/lib/lotus-miner:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/genesis:/var/lib/genesis:ro
       - ${FIL_PROOFS_PARAMETER_CACHE}:/var/tmp/filecoin-proof-parameters:rw
@@ -85,7 +85,8 @@ services:
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
       - LOTUS_PATH=/var/lib/lotus
-      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+      - LOTUS_MINER_PATH_1=/var/lib/lotus-miner-1
+      - LOTUS_MINER_PATH_2=/var/lib/lotus-miner-2
       - LOTUS_TRACING_ENABLED=true
       - LOTUS_TRACING_SERVICENAME=boostd
       - LOTUS_TRACING_ENDPOINT=http://tempo:14268/api/traces
@@ -95,7 +96,8 @@ services:
       - ./data/boostd-data:/var/lib/boostd-data:rw
       - ./data/boost:/var/lib/boost:rw
       - ./data/lotus:/var/lib/lotus:ro
-      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+      - ./data/lotus-miner-1:/var/lib/lotus-miner-1:ro
+      - ./data/lotus-miner-2:/var/lib/lotus-miner-2:ro
       - ./data/sample:/app/public:rw
 
   booster-http:
@@ -109,12 +111,14 @@ services:
       - LID_API_INFO=http://boost:8042
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
+      - LOTUS_MINER_PATH_2=/var/lib/lotus-miner-2
     restart: unless-stopped
     logging: *default-logging
     volumes:
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
-      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+      - ./data/lotus-miner-1:/var/lib/lotus-miner:ro
+      - ./data/lotus-miner-2:/var/lib/lotus-miner-2:ro
 
   booster-bitswap:
     container_name: booster-bitswap
@@ -128,6 +132,7 @@ services:
       - LID_API_INFO=http://boost:8042
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
+      - LOTUS_MINER_PATH_2=/var/lib/lotus-miner-2
     restart: unless-stopped
     logging: *default-logging
     volumes:
