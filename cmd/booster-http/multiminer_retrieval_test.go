@@ -20,19 +20,16 @@ import (
 
 func TestMultiMinerHttpRetrieval(t *testing.T) {
 	shared.RunMultiminerRetrievalTest(t, func(ctx context.Context, t *testing.T, rt *shared.RetrievalTest) {
-		miner1ApiInfo, err := rt.BoostAndMiner1.LotusMinerApiInfo()
+		minerApiInfos, err := rt.BoostAndMiners.LotusMinerApiInfos()
 		require.NoError(t, err)
 
-		miner2ApiInfo, err := rt.BoostAndMiner2.LotusMinerApiInfo()
-		require.NoError(t, err)
-
-		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
+		fullNode2ApiInfo, err := rt.BoostAndMiners.LotusFullNodeApiInfo()
 		require.NoError(t, err)
 
 		port, err := testutil.FreePort()
 		require.NoError(t, err)
 
-		runAndWaitForBoosterHttp(ctx, t, []string{miner1ApiInfo, miner2ApiInfo}, fullNode2ApiInfo, port)
+		runAndWaitForBoosterHttp(ctx, t, minerApiInfos, fullNode2ApiInfo, port)
 
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rt.RootCid.String()), nil)
 		require.NoError(t, err)
@@ -46,7 +43,7 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 			require.Fail(t, msg)
 		}
 
-		wantCids, err := testutil.CidsInCar(rt.CarFilepath)
+		wantCids, err := testutil.CidsInCar(rt.CarFilepaths[0])
 		require.NoError(t, err)
 
 		cr, err := car.NewBlockReader(resp.Body)

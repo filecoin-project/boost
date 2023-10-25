@@ -35,7 +35,7 @@ func TestDisabledMarketsV1Deal(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a new markets v1 deal
-	dp := f.DefaultMarketsV1DealParams()
+	dp := f.DefaultMarketsV1DealParams(f.MinerAddrs[0])
 	dp.Data.Root = res.Root
 
 	log.Debugw("starting deal", "root", res.Root)

@@ -74,7 +74,7 @@ func TestIPNIPublish(t *testing.T) {
 	dealUuid := uuid.New()
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
+	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false, f.MinerAddrs[0])
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))

@@ -482,16 +482,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 	legacyFees := cfg.LotusFees.Legacy()
 
-	sealerApiInfos := cfg.SealerApiInfos
-	sectorApiInfos := cfg.SectorIndexApiInfos
-
-	if len(sealerApiInfos) == 0 {
-		sealerApiInfos = []string{cfg.SealerApiInfo}
-	}
-
-	if len(sectorApiInfos) == 0 {
-		sectorApiInfos = []string{cfg.SectorIndexApiInfo}
-	}
+	defaultSealerApiInfo := cfg.SealerApiInfos[0]
+	defaultSectorApiInfo := cfg.SectorIndexApiInfos[0]
 
 	return Options(
 		ConfigCommon(&cfg.Common),
@@ -671,12 +663,12 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(paths.SectorIndex), From(new(lotus_modules.MinerSealingService))),
 
-		Override(new(smtypes.MinerEndpoints), modules.NewMinerEndpoints(sectorApiInfos, sealerApiInfos)),
+		Override(new(smtypes.MinerEndpoints), modules.NewMinerEndpoints(cfg.SectorIndexApiInfos, cfg.SealerApiInfos)),
 
-		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
-		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
+		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(defaultSectorApiInfo)),
+		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(defaultSealerApiInfo)),
 
-		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
+		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(defaultSealerApiInfo)),
 		Override(new(*backupmgr.BackupMgr), modules.NewOnlineBackupMgr(cfg)),
 
 		// Dynamic Lotus configs

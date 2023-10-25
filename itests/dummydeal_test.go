@@ -62,7 +62,7 @@ func TestDummydealOnline(t *testing.T) {
 	dealUuid := uuid.New()
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
+	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false, f.MinerAddrs[0])
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
@@ -72,7 +72,7 @@ func TestDummydealOnline(t *testing.T) {
 	// Make a second deal - it should fail because the first deal took up all
 	// available space
 	failingDealUuid := uuid.New()
-	res2, err2 := f.MakeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
+	res2, err2 := f.MakeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false, f.MinerAddrs[0])
 	require.NoError(t, err2)
 	require.Contains(t, res2.Result.Reason, "no space left", res2.Result.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
@@ -84,7 +84,7 @@ func TestDummydealOnline(t *testing.T) {
 
 	// Make a third deal - it should succeed because the first deal has been cleaned up
 	passingDealUuid := uuid.New()
-	res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
+	res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false, f.MinerAddrs[0])
 	require.NoError(t, err2)
 	require.True(t, res2.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
@@ -94,6 +94,6 @@ func TestDummydealOnline(t *testing.T) {
 	require.NoError(t, err)
 
 	// rootCid is an identity CID
-	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil)
+	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil, f.MinerAddrs[0])
 	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

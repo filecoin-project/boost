@@ -525,8 +525,8 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		} else {
 			// If migrating from a split markets process, just copy across
 			// the sealing and indexing endpoints.
-			rcfg.SealerApiInfo = mktsCfg.Subsystems.SealerApiInfo
-			rcfg.SectorIndexApiInfo = mktsCfg.Subsystems.SectorIndexApiInfo
+			rcfg.SealerApiInfos = []string{mktsCfg.Subsystems.SealerApiInfo}
+			rcfg.SectorIndexApiInfos = []string{mktsCfg.Subsystems.SectorIndexApiInfo}
 		}
 		setCommonConfig(cctx, rcfg, bp)
 	})
@@ -663,7 +663,7 @@ func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) er
 		return fmt.Errorf("checking sector index API: %w", err)
 	}
 	fmt.Printf("Sector index api info: %s\n", asi)
-	rcfg.SectorIndexApiInfo = asi
+	rcfg.SectorIndexApiInfos = []string{asi}
 
 	ai, err := checkApiInfo(ctx, cctx.StringSlice("api-sealer")[0], dialCheck)
 	if err != nil {
@@ -671,7 +671,7 @@ func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) er
 	}
 
 	fmt.Printf("Sealer api info: %s\n", ai)
-	rcfg.SealerApiInfo = ai
+	rcfg.SealerApiInfos = []string{ai}
 
 	fmt.Printf("Setting miner endpoints (--api-sealer): %s\n", cctx.StringSlice("api-sealer"))
 	fmt.Printf("Setting miner endpoints (--api-sector-index): %s\n", cctx.StringSlice("api-sector-index"))
