@@ -25,8 +25,10 @@ import (
 	"go.opencensus.io/stats"
 )
 
-var log = logging.Logger("boostgs")
-var ErrRetrievalNotFound = fmt.Errorf("no transfer found")
+var (
+	log                  = logging.Logger("boostgs")
+	ErrRetrievalNotFound = fmt.Errorf("no transfer found")
+)
 
 var incomingReqExtensions = []graphsync.ExtensionName{
 	extension.ExtensionIncomingRequest1_1,
@@ -211,6 +213,7 @@ func (g *GraphsyncUnpaidRetrieval) List() []retrievalState {
 // Called when a transfer is received by graphsync and queued for processing
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestQueuedHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.RequestQueuedHookActions) {
+		log.Debugw("incoming request queued", "request", request)
 		stats.Record(g.ctx, metrics.GraphsyncRequestQueuedCount.M(1))
 
 		interceptRtvl, err := g.interceptRetrieval(p, request)
@@ -237,12 +240,14 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 	}
 	// Extension not found, ignore
 	if msg == nil {
+		log.Debugw("no extension found", "request", request)
 		return false, nil
 	}
 
 	// When a data transfer request comes in on graphsync, the remote peer
 	// initiated a pull request for data. If it's not a request, ignore it.
 	if !msg.IsRequest() {
+		log.Debugw("ignoring non-request message", "request", request)
 		return false, nil
 	}
 
@@ -253,6 +258,7 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 		// be in our map (because we must have already processed the new
 		// retrieval request)
 		_, ok := g.isActiveUnpaidRetrieval(reqId{p: p, id: msg.TransferID()})
+		log.Debugw("ignoring non-new request", "request", request, "isActiveUnpaidRetrieval", ok)
 		return ok, nil
 	}
 
@@ -263,6 +269,7 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 	if decodeErr != nil {
 		// If we don't recognize the voucher, don't intercept the retrieval.
 		// Instead it will be passed through to the legacy code for processing.
+		log.Debugw("decoding new request voucher", "request", request, "err", decodeErr)
 		if !errors.Is(decodeErr, unknownVoucherErr) {
 			return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 		}
@@ -271,13 +278,16 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 	case *legacyretrievaltypes.DealProposal:
 		// This is a retrieval deal
 		proposal := *v
+		log.Debugw("intercepting retrieval deal", "proposal", proposal)
 		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
 	case *migrations.DealProposal0:
 		// This is a retrieval deal with an older format
 		proposal := migrations.MigrateDealProposal0To1(*v)
+		log.Debugw("intercepting retrieval deal v1", "proposal", proposal)
 		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
 	}
 
+	log.Debugw("ignoring request", "request", request)
 	return false, nil
 }
 
@@ -332,6 +342,7 @@ func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datat
 // Called by graphsync when an incoming request is processed
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.OnIncomingRequestHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
+		log.Debugw("incoming request", "request", request)
 		stats.Record(g.ctx, metrics.GraphsyncRequestStartedCount.M(1))
 
 		// Check if this is a request for a retrieval that we should handle
@@ -340,6 +351,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			// Otherwise pass it through to the legacy code
 			hook(p, request, hookActions)
 			stats.Record(g.ctx, metrics.GraphsyncRequestStartedPaidCount.M(1))
+			log.Debugw("passing paid request through to legacy code", "request", request)
 			return
 		}
 
@@ -354,17 +366,20 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 		if msg.IsRestart() {
 			dtOpenMsg += " (restart)"
 		}
+		log.Debugw("handling unpaid request", "request", request, "msg", msg, "state", state)
 		g.publishDTEvent(datatransfer.Open, dtOpenMsg, state.cs)
 		g.publishMktsEvent(legacyretrievaltypes.ProviderEventOpen, *state.mkts)
 
 		err := func() error {
 			voucher, decodeErr := g.decodeVoucher(msg, g.decoder)
 			if decodeErr != nil {
+				log.Debugw("decoding new request voucher", "request", request, "err", decodeErr)
 				return fmt.Errorf("decoding new request voucher: %w", decodeErr)
 			}
 
 			// Validate the request
 			res, validateErr := g.validator.validatePullRequest(msg.IsRestart(), p, voucher, request.Root(), request.Selector())
+			log.Debugw("validating request", "request", request, "result", res, "err", validateErr)
 
 			isAccepted := validateErr == nil
 			const isPaused = false // There are no payments required, so never pause
@@ -397,8 +412,8 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 
 			return validateErr
 		}()
-
 		if err != nil {
+			log.Debugw("validation failed", "request", request, "err", err)
 			hookActions.TerminateWithError(err)
 			g.failTransfer(state, err)
 			stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidFailCount.M(1))
@@ -417,6 +432,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 		g.publishMktsEvent(legacyretrievaltypes.ProviderEventUnsealComplete, *state.mkts)
 
 		stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidSuccessCount.M(1))
+		log.Debugw("successfully validated request", "request", request)
 	})
 }
 
@@ -508,7 +524,6 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 
 func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener graphsync.OnRequestorCancelledListener) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterRequestorCancelledListener(func(p peer.ID, request graphsync.RequestData) {
-
 		stats.Record(g.ctx, metrics.GraphsyncRequestClientCancelledCount.M(1))
 
 		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
