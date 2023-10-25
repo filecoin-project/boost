@@ -78,6 +78,7 @@ var Log = logging.Logger("boosttest")
 type TestFrameworkConfig struct {
 	Ensemble     *kit.Ensemble
 	EnableLegacy bool
+	MinersNum    int
 }
 
 type TestFramework struct {
@@ -89,9 +90,9 @@ type TestFramework struct {
 	Client        *boostclient.StorageClient
 	Boost         api.Boost
 	FullNode      *kit.TestFullNode
-	LotusMiner    *kit.TestMiner
+	LotusMiners   []*kit.TestMiner
 	ClientAddr    address.Address
-	MinerAddr     address.Address
+	MinerAddrs    []address.Address
 	DefaultWallet address.Address
 }
 
@@ -109,26 +110,33 @@ func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	}
 }
 
+func WithMultipleMiners(n int) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MinersNum = n
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fmc := &TestFrameworkConfig{}
+	fmc := &TestFrameworkConfig{
+		MinersNum: 1,
+	}
 	for _, opt := range opts {
 		opt(fmc)
 	}
 
-	fullNode, miner := FullNodeAndMiner(t, fmc.Ensemble)
+	fullNode, miners := FullNodeAndMiners(t, fmc.Ensemble, fmc.MinersNum)
 	return &TestFramework{
-		ctx:        ctx,
-		config:     fmc,
-		HomeDir:    t.TempDir(),
-		FullNode:   fullNode,
-		LotusMiner: miner,
+		ctx:         ctx,
+		config:      fmc,
+		HomeDir:     t.TempDir(),
+		FullNode:    fullNode,
+		LotusMiners: miners,
 	}
 }
 
-func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiners(t *testing.T, ensemble *kit.Ensemble, minersNum int) (*kit.TestFullNode, []*kit.TestMiner) {
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
-	var miner kit.TestMiner
 
 	// 8MiB sectors
 	secSizeOpt := kit.SectorSize(8 << 20)
@@ -175,14 +183,23 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 		ensemble = kit.NewEnsemble(t, eOpts...)
 	}
 
-	ensemble.FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...)
+	ensemble.FullNode(&fullNode, fnOpts...)
+
+	var miners []*kit.TestMiner
+
+	for i := 0; i < minersNum; i++ {
+		var miner kit.TestMiner
+		ensemble.Miner(&miner, &fullNode, minerOpts...)
+		miners = append(miners, &miner)
+	}
+
 	if defaultEnsemble {
 		ensemble.Start()
 		blockTime := 100 * time.Millisecond
 		ensemble.BeginMining(blockTime)
 	}
 
-	return &fullNode, &miner
+	return &fullNode, miners
 }
 
 type ConfigOpt func(cfg *config.Boost)
@@ -254,16 +271,16 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 
-	minerApi := f.LotusMiner
+	for _, minerApi := range f.LotusMiners {
+		minerAddr, err := minerApi.ActorAddress(f.ctx)
+		if err != nil {
+			return err
+		}
 
-	minerAddr, err := minerApi.ActorAddress(f.ctx)
-	if err != nil {
-		return err
+		Log.Debugw("got miner actor addr", "addr", minerAddr)
+
+		f.MinerAddrs = append(f.MinerAddrs, minerAddr)
 	}
-
-	Log.Debugw("got miner actor addr", "addr", minerAddr)
-
-	f.MinerAddr = minerAddr
 
 	// Set the control address for the storage provider to be the publish
 	// storage deals wallet
@@ -292,8 +309,10 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 
+	defaultMinerAddress := f.MinerAddrs[0]
+
 	// Set the miner address in the datastore
-	err = ds.Put(f.ctx, datastore.NewKey("miner-address"), minerAddr.Bytes())
+	err = ds.Put(f.ctx, datastore.NewKey("miner-address"), defaultMinerAddress.Bytes())
 	if err != nil {
 		return err
 	}
@@ -304,19 +323,19 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 
-	apiInfo, err := f.LotusMinerApiInfo()
+	apiInfos, err := f.LotusMinerApiInfos()
 	if err != nil {
 		return err
 	}
-	Log.Debugf("miner API info: %s", apiInfo)
+	Log.Debugf("miner API infos: %s", apiInfos)
 
 	cfg, ok := c.(*config.Boost)
 	if !ok {
 		return fmt.Errorf("invalid config from repo, got: %T", c)
 	}
-	cfg.SectorIndexApiInfo = apiInfo
-	cfg.SealerApiInfo = apiInfo
-	cfg.Wallets.Miner = minerAddr.String()
+	cfg.SectorIndexApiInfos = apiInfos
+	cfg.SealerApiInfos = apiInfos
+	cfg.Wallets.Miner = defaultMinerAddress.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Wallets.DealCollateral = dealCollatAddr.String()
 	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
@@ -430,31 +449,33 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 
-	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ltypes.EmptyTSK)
-	if err != nil {
-		return err
-	}
+	for _, minerAddr := range f.MinerAddrs {
+		minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ltypes.EmptyTSK)
+		if err != nil {
+			return err
+		}
 
-	msg := &ltypes.Message{
-		To:     minerAddr,
-		From:   minerInfo.Owner,
-		Method: builtin.MethodsMiner.ChangePeerID,
-		Params: params,
-		Value:  ltypes.NewInt(0),
-	}
+		msg := &ltypes.Message{
+			To:     minerAddr,
+			From:   minerInfo.Owner,
+			Method: builtin.MethodsMiner.ChangePeerID,
+			Params: params,
+			Value:  ltypes.NewInt(0),
+		}
 
-	signed, err := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
-	if err != nil {
-		return err
-	}
+		signed, err := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
+		if err != nil {
+			return err
+		}
+		Log.Debugw("waiting for set peer id message to land on chain", "miner", minerAddr.String())
+		mw, err := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 1, api.LookbackNoLimit, true)
+		if err != nil {
+			return err
+		}
+		if exitcode.Ok != mw.Receipt.ExitCode {
+			return errors.New("expected mw.Receipt.ExitCode to be OK")
+		}
 
-	Log.Debugw("waiting for set peer id message to land on chain")
-	mw, err := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 1, api.LookbackNoLimit, true)
-	if err != nil {
-		return err
-	}
-	if exitcode.Ok != mw.Receipt.ExitCode {
-		return errors.New("expected mw.Receipt.ExitCode to be OK")
 	}
 
 	Log.Debugw("test framework setup complete")
@@ -476,13 +497,25 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	return nil
 }
 
-func (f *TestFramework) LotusMinerApiInfo() (string, error) {
-	token, err := f.LotusMiner.AuthNew(f.ctx, api.AllPermissions)
+func (f *TestFramework) DefaultLotusMinerApiInfo() (string, error) {
+	apiInfos, err := f.LotusMinerApiInfos()
 	if err != nil {
 		return "", err
 	}
+	return apiInfos[0], nil
+}
 
-	return fmt.Sprintf("%s:%s", token, f.LotusMiner.ListenAddr), nil
+func (f *TestFramework) LotusMinerApiInfos() ([]string, error) {
+	var apiInfos []string
+	for _, lotusMiner := range f.LotusMiners {
+		token, err := lotusMiner.AuthNew(f.ctx, api.AllPermissions)
+		if err != nil {
+			return nil, err
+		}
+		apiInfos = append(apiInfos, fmt.Sprintf("%s:%s", token, lotusMiner.ListenAddr))
+	}
+
+	return apiInfos, nil
 }
 
 func (f *TestFramework) LotusFullNodeApiInfo() (string, error) {
@@ -504,19 +537,23 @@ func (f *TestFramework) AddClientProviderBalance(bal abi.TokenAmount) error {
 		}
 		return f.WaitMsg(mcid)
 	})
-	errgp.Go(func() error {
-		mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, chaintypes.EmptyTSK)
-		if err != nil {
-			return err
-		}
+	for _, minerAddr := range f.MinerAddrs {
+		minerAddr := minerAddr
+		errgp.Go(func() error {
+			mi, err := f.FullNode.StateMinerInfo(f.ctx, minerAddr, chaintypes.EmptyTSK)
+			if err != nil {
+				return err
+			}
 
-		Log.Infof("adding provider balance %d to Storage Market Actor", bal)
-		mcid, err := f.FullNode.MarketAddBalance(f.ctx, mi.Owner, f.MinerAddr, bal)
-		if err != nil {
-			return fmt.Errorf("adding provider balance to Storage Market Actor: %w", err)
-		}
-		return f.WaitMsg(mcid)
-	})
+			Log.Infof("adding provider balance %d to Storage Market Actor %s", bal, minerAddr.String())
+			mcid, err := f.FullNode.MarketAddBalance(f.ctx, mi.Owner, minerAddr, bal)
+			if err != nil {
+				return fmt.Errorf("adding provider balance to Storage Market Actor %s: %w", minerAddr.String(), err)
+			}
+			return f.WaitMsg(mcid)
+		})
+	}
+
 	err := errgp.Wait()
 	if err != nil {
 		return err
@@ -566,7 +603,7 @@ type DealResult struct {
 	Result     *api.ProviderDealRejectionInfo
 }
 
-func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
+func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool, minerAddr address.Address) (*DealResult, error) {
 	cidAndSize, err := storagemarket.GenerateCommPLocally(carFilepath)
 	if err != nil {
 		return nil, err
@@ -586,7 +623,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		PieceSize:            cidAndSize.Size,
 		VerifiedDeal:         false,
 		Client:               f.ClientAddr,
-		Provider:             f.MinerAddr,
+		Provider:             minerAddr,
 		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             startEpoch + market.DealMinDuration,
@@ -658,12 +695,12 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 	}, nil
 }
 
-func (f *TestFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
+func (f *TestFramework) DefaultMarketsV1DealParams(minerAddr address.Address) lapi.StartDealParams {
 	return lapi.StartDealParams{
 		Data:              &lotus_gfm_storagemarket.DataRef{TransferType: gfm_storagemarket.TTGraphsync},
 		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
-		Miner:             f.MinerAddr,
+		Miner:             minerAddr,
 		Wallet:            f.DefaultWallet,
 		DealStartEpoch:    35000,
 		FastRetrieval:     true,
@@ -692,35 +729,37 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 }
 
 func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
-	mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, chaintypes.EmptyTSK)
-	if err != nil {
-		return err
-	}
+	for _, minerAddr := range f.MinerAddrs {
+		mi, err := f.FullNode.StateMinerInfo(f.ctx, minerAddr, chaintypes.EmptyTSK)
+		if err != nil {
+			return err
+		}
 
-	cwp := &minertypes.ChangeWorkerAddressParams{
-		NewWorker:       mi.Worker,
-		NewControlAddrs: []address.Address{psdAddr},
-	}
-	sp, err := actors.SerializeParams(cwp)
-	if err != nil {
-		return err
-	}
+		cwp := &minertypes.ChangeWorkerAddressParams{
+			NewWorker:       mi.Worker,
+			NewControlAddrs: []address.Address{psdAddr},
+		}
+		sp, err := actors.SerializeParams(cwp)
+		if err != nil {
+			return err
+		}
 
-	smsg, err := f.FullNode.MpoolPushMessage(f.ctx, &chaintypes.Message{
-		From:   mi.Owner,
-		To:     f.MinerAddr,
-		Method: builtin.MethodsMiner.ChangeWorkerAddress,
+		smsg, err := f.FullNode.MpoolPushMessage(f.ctx, &chaintypes.Message{
+			From:   mi.Owner,
+			To:     minerAddr,
+			Method: builtin.MethodsMiner.ChangeWorkerAddress,
 
-		Value:  big.Zero(),
-		Params: sp,
-	}, nil)
-	if err != nil {
-		return err
-	}
+			Value:  big.Zero(),
+			Params: sp,
+		}, nil)
+		if err != nil {
+			return err
+		}
 
-	err = f.WaitMsg(smsg.Cid())
-	if err != nil {
-		return err
+		err = f.WaitMsg(smsg.Cid())
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -800,8 +839,8 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	return tmpFile
 }
 
-func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
-	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, f.MinerAddr, root, pieceCid)
+func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, extractCar bool, selectorNode datamodel.Node, minerAddr address.Address) string {
+	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, minerAddr, root, pieceCid)
 	require.NoError(t, err)
 
 	return f.retrieve(ctx, t, offer, extractCar, selectorNode)

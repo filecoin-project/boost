@@ -123,7 +123,7 @@ func NewMultiminerSectorAccessor(cfg *config.Boost) func(full v1api.FullNode) *l
 		if len(storageApiInfos) == 0 {
 			// If the endpoints aren't explicitly configured, fall back to just
 			// serving retrieval data from the same endpoint where data is stored to
-			storageApiInfos = []string{cfg.SectorIndexApiInfo}
+			storageApiInfos = cfg.SectorIndexApiInfos
 		}
 
 		// Create a reader that muxes between all the storage access endpoints

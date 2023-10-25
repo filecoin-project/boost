@@ -17,13 +17,10 @@ import (
 
 func TestMultiMinerHttpRetrieval(t *testing.T) {
 	shared.RunMultiminerRetrievalTest(t, func(ctx context.Context, t *testing.T, rt *shared.RetrievalTest) {
-		miner1ApiInfo, err := rt.BoostAndMiner1.LotusMinerApiInfo()
+		minerApiInfos, err := rt.BoostAndMiners.LotusMinerApiInfos()
 		require.NoError(t, err)
 
-		miner2ApiInfo, err := rt.BoostAndMiner2.LotusMinerApiInfo()
-		require.NoError(t, err)
-
-		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
+		fullNode2ApiInfo, err := rt.BoostAndMiners.LotusFullNodeApiInfo()
 		require.NoError(t, err)
 
 		runCtx, cancelRun := context.WithCancel(ctx)
@@ -32,8 +29,7 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 			// Configure booster-http to
 			// - Get piece location information from the shared LID instance
 			// - Get the piece data from either miner1 or miner2 (depending on the location info)
-			apiInfo := []string{miner1ApiInfo, miner2ApiInfo}
-			_ = runBoosterHttp(runCtx, t.TempDir(), apiInfo, fullNode2ApiInfo, "ws://localhost:8042")
+			_ = runBoosterHttp(runCtx, t.TempDir(), minerApiInfos, fullNode2ApiInfo, "ws://localhost:8042")
 		}()
 
 		t.Logf("waiting for server to come up")
@@ -58,25 +54,27 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 		}, 30*time.Second, 100*time.Millisecond)
 		t.Logf("booster-http is up after %s", time.Since(start))
 
-		resp, err := http.Get("http://localhost:7777/ipfs/" + rt.RootCid.String())
-		require.NoError(t, err)
-		if resp.StatusCode != 200 {
-			body, err := io.ReadAll(resp.Body)
+		for i, rootCid := range rt.RootCids {
+			resp, err := http.Get("http://localhost:7777/ipfs/" + rootCid.String())
 			require.NoError(t, err)
-			msg := fmt.Sprintf("Failed to fetch root cid: %s\n%s", resp.Status, string(body))
-			require.Fail(t, msg)
+			if resp.StatusCode != 200 {
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				msg := fmt.Sprintf("Failed to fetch root cid: %s\n%s", resp.Status, string(body))
+				require.Fail(t, msg)
+			}
+
+			respBytes, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			outPath := path.Join(t.TempDir(), "out.dat")
+			err = os.WriteFile(outPath, respBytes, 0666)
+			require.NoError(t, err)
+
+			t.Logf("retrieval is done, compare in- and out- files in: %s, out: %s", rt.SampleFilePaths[i], outPath)
+			kit.AssertFilesEqual(t, rt.SampleFilePaths[i], outPath)
+			t.Logf("file retrieved successfully")
 		}
-
-		respBytes, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-
-		outPath := path.Join(t.TempDir(), "out.dat")
-		err = os.WriteFile(outPath, respBytes, 0666)
-		require.NoError(t, err)
-
-		t.Logf("retrieval is done, compare in- and out- files in: %s, out: %s", rt.SampleFilePath, outPath)
-		kit.AssertFilesEqual(t, rt.SampleFilePath, outPath)
-		t.Logf("file retrieved successfully")
 	})
 }
 

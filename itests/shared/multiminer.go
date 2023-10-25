@@ -8,8 +8,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
@@ -18,10 +18,9 @@ import (
 )
 
 type RetrievalTest struct {
-	BoostAndMiner1 *framework.TestFramework
-	BoostAndMiner2 *framework.TestFramework
-	SampleFilePath string
-	RootCid        cid.Cid
+	BoostAndMiners  *framework.TestFramework
+	SampleFilePaths []string
+	RootCids        []cid.Cid
 }
 
 func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
@@ -33,54 +32,23 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 	// Set up two miners, each with a separate boost instance connected to it
 	ensemble := kit.NewEnsemble(t)
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true), framework.WithEnsemble(ensemble))
-	boostAndMiner1 := framework.NewTestFramework(ctx, t, opts...)
-	boostAndMiner2 := framework.NewTestFramework(ctx, t, opts...)
+	opts = append(opts, framework.EnableLegacyDeals(true), framework.WithEnsemble(ensemble), framework.WithMultipleMiners(2))
+	boostAndMiners := framework.NewTestFramework(ctx, t, opts...)
 	ensemble.Start()
 
 	blockTime := 100 * time.Millisecond
 	ensemble.BeginMining(blockTime)
 
-	err := boostAndMiner1.Start()
+	err := boostAndMiners.Start()
 	require.NoError(t, err)
-	defer boostAndMiner1.Stop()
+	defer boostAndMiners.Stop()
 
-	// Get the listen address of the first miner
-	miner1ApiInfo, err := boostAndMiner1.LotusMinerApiInfo()
-	require.NoError(t, err)
-
-	err = boostAndMiner2.Start(func(cfg *config.Boost) {
-		// Set up the second boost instance so that it points at the LID
-		// service provided by the first boost instance
-		cfg.LocalIndexDirectory.EmbeddedServicePort = 0
-		cfg.LocalIndexDirectory.ServiceApiInfo = "ws://localhost:8042"
-
-		// Set up the second boost instance so that it can read sector data
-		// not only from the second miner, but also from the first miner
-		cfg.Dealmaking.GraphsyncStorageAccessApiInfo = []string{cfg.SectorIndexApiInfo, miner1ApiInfo}
-
-		// Set up some other ports so they don't clash
-		cfg.Graphql.Port = 8081
-		cfg.API.ListenAddress = "/ip4/127.0.0.1/tcp/1289/http"
-		cfg.API.RemoteListenAddress = "127.0.0.1:1289"
-	})
-	require.NoError(t, err)
-	defer boostAndMiner2.Stop()
-
-	err = boostAndMiner1.AddClientProviderBalance(abi.NewTokenAmount(1e15))
+	err = boostAndMiners.AddClientProviderBalance(abi.NewTokenAmount(1e15))
 	require.NoError(t, err)
 
 	// Create a CAR file
 	tempdir := t.TempDir()
 	t.Logf("using tempdir %s", tempdir)
-
-	fileSize := 200000
-	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
-	require.NoError(t, err)
-
-	// create a dense carv2 for deal making
-	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
-	require.NoError(t, err)
 
 	// Start a web server to serve the car files
 	t.Logf("starting webserver")
@@ -88,25 +56,40 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 	require.NoError(t, err)
 	defer server.Close()
 
-	// Create a new dummy deal
-	t.Logf("creating dummy deal")
-	dealUuid := uuid.New()
+	// make two deals, one on miner1 and one on miner2 to make sure that both are retrievable
+	createDealFunc := func(minerAddr address.Address) (cid.Cid, string) {
+		// Create a new dummy deal
+		t.Logf("creating dummy deal")
+		dealUuid := uuid.New()
 
-	// Make a storage deal on the first boost, which will store the index to
-	// LID and store the data on the first miner
-	res, err := boostAndMiner1.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
-	require.NoError(t, err)
-	require.True(t, res.Result.Accepted)
-	t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
+		fileSize := 200000
+		randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
+		require.NoError(t, err)
 
-	// Wait for the deal to be added to a sector
-	err = boostAndMiner1.WaitForDealAddedToSector(dealUuid)
-	require.NoError(t, err)
+		// create a dense carv2 for deal making
+		rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
+		require.NoError(t, err)
+
+		// Make a storage deal on the first boost, which will store the index to
+		// LID and store the data on the first miner
+		res, err := boostAndMiners.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false, minerAddr)
+		require.NoError(t, err)
+		require.True(t, res.Result.Accepted)
+		t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
+
+		// Wait for the deal to be added to a sector
+		err = boostAndMiners.WaitForDealAddedToSector(dealUuid)
+		require.NoError(t, err)
+
+		return rootCid, randomFilepath
+	}
+
+	rootCid1, filePath1 := createDealFunc(boostAndMiners.MinerAddrs[0])
+	rootCid2, filePath2 := createDealFunc(boostAndMiners.MinerAddrs[1])
 
 	rt(ctx, t, &RetrievalTest{
-		BoostAndMiner1: boostAndMiner1,
-		BoostAndMiner2: boostAndMiner2,
-		SampleFilePath: randomFilepath,
-		RootCid:        rootCid,
+		BoostAndMiners:  boostAndMiners,
+		SampleFilePaths: []string{filePath1, filePath2},
+		RootCids:        []cid.Cid{rootCid1, rootCid2},
 	})
 }
