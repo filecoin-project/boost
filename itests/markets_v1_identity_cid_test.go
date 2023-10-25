@@ -89,7 +89,7 @@ func TestMarketsV1DealAndRetrievalWithIdentityCID(t *testing.T) {
 
 	log.Debugw("imported data for deal")
 
-	dp := f.DefaultMarketsV1DealParams()
+	dp := f.DefaultMarketsV1DealParams(f.MinerAddrs[0])
 	dp.Data.Root = res.Root
 
 	log.Debugw("starting deal", "root", res.Root)

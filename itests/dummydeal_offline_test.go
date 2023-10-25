@@ -36,7 +36,7 @@ func TestDummydealOffline(t *testing.T) {
 
 	// make an offline deal
 	offlineDealUuid := uuid.New()
-	dealRes, err := f.MakeDummyDeal(offlineDealUuid, carFilepath, rootCid, "", true)
+	dealRes, err := f.MakeDummyDeal(offlineDealUuid, carFilepath, rootCid, "", true, f.MinerAddrs[0])
 	res := dealRes.Result
 	require.NoError(t, err)
 	require.True(t, res.Accepted)

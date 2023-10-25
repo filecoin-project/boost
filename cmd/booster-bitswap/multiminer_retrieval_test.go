@@ -21,13 +21,12 @@ import (
 
 func TestMultiMinerBitswapRetrieval(t *testing.T) {
 	shared.RunMultiminerRetrievalTest(t, func(ctx context.Context, t *testing.T, rt *shared.RetrievalTest) {
-		miner1ApiInfo, err := rt.BoostAndMiner1.LotusMinerApiInfo()
+		bbport := "8889"
+
+		minerApiInfos, err := rt.BoostAndMiners.LotusMinerApiInfos()
 		require.NoError(t, err)
 
-		miner2ApiInfo, err := rt.BoostAndMiner2.LotusMinerApiInfo()
-		require.NoError(t, err)
-
-		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
+		fullNodeApiInfo, err := rt.BoostAndMiners.LotusFullNodeApiInfo()
 		require.NoError(t, err)
 
 		repoDir := t.TempDir()
@@ -41,11 +40,10 @@ func TestMultiMinerBitswapRetrieval(t *testing.T) {
 			// Configure booster-bitswap to
 			// - Get piece location information from the shared LID instance
 			// - Get the piece data from either miner1 or miner2 (depending on the location info)
-			apiInfo := []string{miner1ApiInfo, miner2ApiInfo}
-			_ = runBoosterBitswap(runCtx, repoDir, apiInfo, fullNode2ApiInfo, "ws://localhost:8042")
+			_ = runBoosterBitswap(runCtx, repoDir, minerApiInfos, fullNodeApiInfo, "ws://localhost:8042", bbport)
 		}()
 
-		maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/8888")
+		maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/" + bbport)
 		require.NoError(t, err)
 
 		privKey, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
@@ -68,19 +66,22 @@ func TestMultiMinerBitswapRetrieval(t *testing.T) {
 
 		outPath := path.Join(t.TempDir(), "out.dat")
 		fetchAddr := maddr.String() + "/p2p/" + peerID.String()
-		err = runBoosterBitswapFetch(ctx, fetchAddr, rt.RootCid.String(), outPath)
-		require.NoError(t, err)
 
-		t.Logf("retrieval is done, compare root cid %s to downloaded CAR root cid", rt.RootCid)
-		r, err := carv2.OpenReader(outPath)
-		require.NoError(t, err)
+		for _, rootCid := range rt.RootCids {
+			err = runBoosterBitswapFetch(ctx, fetchAddr, rootCid.String(), outPath)
+			require.NoError(t, err)
 
-		roots, err := r.Roots()
-		require.NoError(t, err)
-		require.Len(t, roots, 1)
-		require.Equal(t, rt.RootCid, roots[0])
+			t.Logf("retrieval is done, compare root cid %s to downloaded CAR root cid", rootCid)
+			r, err := carv2.OpenReader(outPath)
+			require.NoError(t, err)
 
-		t.Logf("file retrieved successfully")
+			roots, err := r.Roots()
+			require.NoError(t, err)
+			require.Len(t, roots, 1)
+			require.Equal(t, rootCid, roots[0])
+
+			t.Logf("file retrieved successfully")
+		}
 	})
 }
 
@@ -113,7 +114,7 @@ func connectToHost(ctx context.Context, clientHost host.Host, maddr multiaddr.Mu
 	return nil
 }
 
-func runBoosterBitswap(ctx context.Context, repo string, minerApiInfo []string, fullNodeApiInfo string, lidApiInfo string) error {
+func runBoosterBitswap(ctx context.Context, repo string, minerApiInfo []string, fullNodeApiInfo string, lidApiInfo string, port string) error {
 	app.Setup()
 
 	args := []string{"booster-bitswap",
@@ -122,6 +123,7 @@ func runBoosterBitswap(ctx context.Context, repo string, minerApiInfo []string, 
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,
 		"--api-version-check=false",
+		"--port=" + port,
 		"--no-metrics",
 	}
 	for _, apiInfo := range minerApiInfo {

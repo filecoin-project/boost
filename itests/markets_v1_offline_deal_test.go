@@ -44,7 +44,7 @@ func TestMarketsV1OfflineDeal(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a new markets v1 deal
-	dp := f.DefaultMarketsV1DealParams()
+	dp := f.DefaultMarketsV1DealParams(f.MinerAddrs[0])
 	dp.Data.Root = res.Root
 	// Replace with params for manual storage deal (offline deal)
 	dp.Data.TransferType = storagemarket.TTManual

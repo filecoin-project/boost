@@ -82,7 +82,7 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 	res, err := f.FullNode.ClientImport(ctx, lapi.FileRef{Path: inPath, IsCAR: true})
 	require.NoError(t, err)
 
-	dp := f.DefaultMarketsV1DealParams()
+	dp := f.DefaultMarketsV1DealParams(f.MinerAddrs[0])
 	dp.Data.Root = res.Root
 
 	log.Debugw("starting deal", "root", res.Root)
