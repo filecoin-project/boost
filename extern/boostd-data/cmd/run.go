@@ -91,6 +91,12 @@ var yugabyteCmd = &cli.Command{
 			Name:     "connect-string",
 			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
+		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
 		}},
 		runFlags...,
 	),
@@ -99,6 +105,7 @@ var yugabyteCmd = &cli.Command{
 		settings := yugabyte.DBSettings{
 			Hosts:         cctx.StringSlice("hosts"),
 			ConnectString: cctx.String("connect-string"),
+			CQLTimeout:    cctx.Int("CQLTimeout"),
 		}
 
 		// One of the migrations requires a miner address. But we don't want to

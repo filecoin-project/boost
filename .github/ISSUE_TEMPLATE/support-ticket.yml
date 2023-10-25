@@ -1,0 +1,76 @@
+name: Support Ticket
+description: Support ticket for requesting help from Boost team
+title: "[Support Ticket]: "
+labels: ["support", "triage"]
+body:
+- type: checkboxes
+  attributes:
+    label: Boost component
+    description: Please select the boost component you are filing a bug for
+    options:
+      - label: boost daemon - storage providers
+        required: false
+      - label: boost client
+        required: false
+      - label: boost UI
+        required: false
+      - label: boost data-transfer
+        required: false
+      - label: boost index-provider
+        required: false
+      - label: booster-http
+        required: false
+      - label: booster-bitswap
+        required: false
+      - label: LID Database - Yugabyte/LevelDB
+        required: false
+      - label: boostd-data
+        required: false
+      - label: Other
+        required: false
+- type: textarea
+  id: version
+  attributes:
+    label: Boost Version
+    render: text
+    description: Enter the output of `boost --version` and `boostd --version` if applicable.
+    placeholder: |
+      e.g. 
+      Daemon: boostd version 0.0.1+git.b27fec5 
+      Client: boost version 0.0.1+git.b27fec5
+  validations:
+    required: true
+- type: textarea
+  id: Description
+  attributes:
+    label: Describe the problem
+    description: |
+      This is where you get to tell us what went wrong, when doing so, please try to provide a clear and concise description of the bug with all related information:
+      * What you were doing when you experienced the problem?
+      * Any *error* messages you saw, *where* you saw them, and what you believe may have caused them (if you have any ideas).
+      * What is the expected behaviour?
+      * For deal related problems, please include the deal logs from the boost UI.
+  validations:
+    required: true
+- type: textarea
+  id: extraInfo
+  attributes:
+    label: Logging Information
+    render: text
+    description: |
+      Please provide detailed logs for the problem. You can get set log level control as per the below example:
+      * boostd: use `boostd log list` to get all log systems available and set level by `boostd log set-level`.
+  validations:
+    required: true
+- type: textarea
+  id: RepoSteps
+  attributes:
+    label: Repo Steps
+    description: "Steps to reproduce the behavior if available"
+    value: |
+      1. Run '...'
+      2. Do '...'
+      3. See error '...'
+      ...
+  validations:
+    required: false
