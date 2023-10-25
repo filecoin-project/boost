@@ -40,6 +40,7 @@ func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersFor
 			SectorAccessor: sa,
 			AskStore:       askGetter,
 		}
+
 		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps)
 		if err != nil {
 			return nil, err

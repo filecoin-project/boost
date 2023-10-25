@@ -570,15 +570,19 @@ func (t *Transport) gsReqQueuedHook(p peer.ID, request graphsync.RequestData, ho
 
 // gsReqRecdHook is called when graphsync receives an incoming request for data
 func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
+	log.Infow("received incoming request", "request", request)
+
 	// if this is a push request the sender is us.
 	msg, err := extension.GetTransferData(request, t.supportedExtensions)
 	if err != nil {
+		log.Debugw("failed GetTransferData", "request", request, "err", err)
 		hookActions.TerminateWithError(err)
 		return
 	}
 
 	// extension not found; probably not our request.
 	if msg == nil {
+		log.Debugw("no transfer data", "request", request)
 		return
 	}
 
@@ -629,6 +633,7 @@ func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hook
 		// protocol versions out there.
 		extensions, extensionErr := extension.ToExtensionData(responseMessage, incomingReqExtensions)
 		if extensionErr != nil {
+			log.Debugw("failed to convert extension data", "err", extensionErr)
 			hookActions.TerminateWithError(err)
 			return
 		}
@@ -638,6 +643,7 @@ func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hook
 	}
 
 	if err != nil && err != datatransfer.ErrPause {
+		log.Debugw("failed to process request", "err", err)
 		hookActions.TerminateWithError(err)
 		return
 	}
@@ -749,7 +755,6 @@ func (t *Transport) gsRequestUpdatedHook(p peer.ID, request graphsync.RequestDat
 	if err != nil && err != datatransfer.ErrPause {
 		hookActions.TerminateWithError(err)
 	}
-
 }
 
 // gsIncomingResponseHook is a graphsync.OnIncomingResponseHook. We use it to pass on responses
@@ -787,7 +792,6 @@ func (t *Transport) gsIncomingResponseHook(p peer.ID, response graphsync.Respons
 }
 
 func (t *Transport) processExtension(chid datatransfer.ChannelID, gsMsg extension.GsExtended, p peer.ID, exts []graphsync.ExtensionName) (datatransfer.Message, error) {
-
 	// if this is a push request the sender is us.
 	msg, err := extension.GetTransferData(gsMsg, exts)
 	if err != nil {
