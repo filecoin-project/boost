@@ -4,8 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yugabyte/gocql"
 	"strings"
+	"time"
+
+	"github.com/yugabyte/gocql"
 )
 
 //go:embed create.cql
@@ -19,6 +21,7 @@ func (s *Store) CreateKeyspace(ctx context.Context) error {
 	// the new keyspace
 	log.Infow("creating cassandra keyspace " + s.cluster.Keyspace)
 	cluster := gocql.NewCluster(s.settings.Hosts...)
+	cluster.Timeout = time.Duration(s.settings.CQLTimeout) * time.Second
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("creating yugabyte cluster: %w", err)
