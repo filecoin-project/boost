@@ -32,16 +32,28 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "SealerApiInfo",
+			Type: "string",
+
+			Comment: `The connect string for the sealing RPC API (lotus miners).`,
+		},
+		{
+			Name: "SectorIndexApiInfo",
+			Type: "string",
+
+			Comment: `The connect string for the sector index RPC API (lotus miners).`,
+		},
+		{
 			Name: "SealerApiInfos",
 			Type: "[]string",
 
-			Comment: `Connect strings for the sealing RPC APIs (lotus miners).`,
+			Comment: `The connect strings for the sealing RPC APIs (lotus miners).`,
 		},
 		{
 			Name: "SectorIndexApiInfos",
 			Type: "[]string",
 
-			Comment: `Connect strings for the sector index RPC APIs (lotus miners).`,
+			Comment: `The connect strings for the sector index RPC APIs (lotus miners).`,
 		},
 		{
 			Name: "Dealmaking",

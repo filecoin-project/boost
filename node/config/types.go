@@ -36,9 +36,14 @@ type Boost struct {
 
 	Storage StorageConfig
 
-	// Connect strings for the sealing RPC APIs (lotus miners).
+	// The connect string for the sealing RPC API (lotus miners).
+	SealerApiInfo string
+	// The connect string for the sector index RPC API (lotus miners).
+	SectorIndexApiInfo string
+
+	// The connect strings for the sealing RPC APIs (lotus miners).
 	SealerApiInfos []string
-	// Connect strings for the sector index RPC APIs (lotus miners).
+	// The connect strings for the sector index RPC APIs (lotus miners).
 	SectorIndexApiInfos []string
 
 	Dealmaking          DealmakingConfig
