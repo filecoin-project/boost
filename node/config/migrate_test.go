@@ -176,6 +176,18 @@ func TestMigrate(t *testing.T) {
 	mockv1Tov2 := func(string) (string, error) {
 		return mockV2Config, nil
 	}
+
+	trueMigrations := migrations
+	defer func() {
+		// restore correct migration sequence after this test so other tests can run
+		migrations = trueMigrations
+	}()
+
+	migrations = []migrateUpFn{
+		v0Tov1,
+		mockv1Tov2,
+	}
+
 	migrations = []migrateUpFn{
 		v0Tov1,
 		mockv1Tov2,
@@ -250,6 +262,30 @@ func TestMigrate(t *testing.T) {
 	bz, err = os.ReadFile(symLink)
 	require.NoError(t, err)
 	require.Equal(t, v1FileContents, string(bz))
+}
+
+func TestMigrateAllTheWayToTheLatest(t *testing.T) {
+	repoDir := t.TempDir()
+	err := os.WriteFile(path.Join(repoDir, "config.toml"), []byte(`
+  SealerApiInfo = "sealer-api-endpoint"
+  SectorIndexApiInfo = "sector-index-api-endpoint"
+  
+  [API]
+    ListenAddress = "/ip4/127.0.0.1/tcp/1234/http"
+  `), 0644)
+	require.NoError(t, err)
+
+	// Migrate up to v1
+	err = configMigrate(repoDir, 6)
+	require.NoError(t, err)
+
+	bz, err := os.ReadFile(path.Join(repoDir, "config.toml"))
+	require.NoError(t, err)
+	v6FileContents := string(bz)
+
+	// verify that Sector / Sealer API infos have been correctly applied
+	require.True(t, strings.Contains(v6FileContents, `SealerApiInfos = ["sealer-api-endpoint"]`))
+	require.True(t, strings.Contains(v6FileContents, `SectorIndexApiInfos = ["sector-index-api-endpoint"]`))
 }
 
 func TestConfigDiff(t *testing.T) {
