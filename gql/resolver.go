@@ -616,7 +616,7 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.Published:
 		found, elapsedEpochs, err := dr.mpool.MsgExecElapsedEpochs(ctx, *dr.PublishCID)
 		if found {
-			return fmt.Sprintf("Awaiting Message Execution")
+			return "Awaiting Message Execution"
 		}
 		if err != nil {
 			return fmt.Sprint(err)
