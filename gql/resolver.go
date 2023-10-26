@@ -614,6 +614,9 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.Transferred:
 		return "Ready to Publish"
 	case dealcheckpoints.Published:
+		if *dr.PublishCID != cid.Undef {
+			return "Awaiting Message CID"
+		}
 		found, elapsedEpochs, err := dr.mpool.MsgExecElapsedEpochs(ctx, *dr.PublishCID)
 		if found {
 			return "Awaiting Message Execution"
