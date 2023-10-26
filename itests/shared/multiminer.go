@@ -21,11 +21,13 @@ type RetrievalTest struct {
 	BoostAndMiner1 *framework.TestFramework
 	BoostAndMiner2 *framework.TestFramework
 	SampleFilePath string
+	CarFilepath    string
 	RootCid        cid.Cid
 }
 
 func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
@@ -107,6 +109,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 		BoostAndMiner1: boostAndMiner1,
 		BoostAndMiner2: boostAndMiner2,
 		SampleFilePath: randomFilepath,
+		CarFilepath:    carFilepath,
 		RootCid:        rootCid,
 	})
 }
