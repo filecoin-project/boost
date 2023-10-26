@@ -37,6 +37,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
@@ -1068,7 +1069,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 				start := miner.MaxSectorExpirationExtension - market.DealMinDuration - 1
-				maxEndEpoch := miner.MaxSectorExpirationExtension + 100
+				maxEndEpoch := abi.ChainEpoch(1278*builtin.EpochsInDay) + 100 // TODO: Use v12 value from package when Lotus has updated the API package to use market v12
 				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(start), abi.ChainEpoch(maxEndEpoch))).withNoOpMinerStub().build()
 			},
 			expectedErr: "invalid deal end epoch",
