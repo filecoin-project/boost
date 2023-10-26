@@ -321,8 +321,8 @@ func (p *DealPublisher) publishReady(ready []*pendingDeal) {
 	}
 
 	// Validate each deal to make sure it can be published
-	validatedByProvider := make(map[address.Address][]*pendingDeal, 0)
-	dealsByProvider := make(map[address.Address][]market.ClientDealProposal, 0)
+	validated := make(map[address.Address][]*pendingDeal, 0)
+	deals := make(map[address.Address][]market.ClientDealProposal, 0)
 	for _, pd := range ready {
 		// Validate the deal
 		if err := p.validateDeal(pd.deal); err != nil {
@@ -331,16 +331,16 @@ func (p *DealPublisher) publishReady(ready []*pendingDeal) {
 			continue
 		}
 		provider := pd.deal.Proposal.Provider
-		if _, ok := dealsByProvider[pd.deal.Proposal.Provider]; !ok {
-			dealsByProvider[provider] = make([]market.ClientDealProposal, 0)
-			validatedByProvider[provider] = make([]*pendingDeal, 0)
+		if _, ok := deals[provider]; !ok {
+			deals[provider] = make([]market.ClientDealProposal, 0)
+			validated[provider] = make([]*pendingDeal, 0)
 		}
-		validatedByProvider[provider] = append(validatedByProvider[provider], pd)
-		dealsByProvider[provider] = append(dealsByProvider[provider], pd.deal)
+		validated[provider] = append(validated[provider], pd)
+		deals[provider] = append(deals[provider], pd.deal)
 	}
 
-	for provider, deals := range dealsByProvider {
-		validated := validatedByProvider[provider]
+	for provider, deals := range deals {
+		validated := validated[provider]
 		deals := deals
 		go func() {
 			// Send the publish message
