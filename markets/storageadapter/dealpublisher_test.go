@@ -233,6 +233,49 @@ func TestForcePublish(t *testing.T) {
 	checkPublishedDeals(t, dpapi, dealsToPublish, []int{2})
 }
 
+func TestPublishDealsFromDifferentProvidersIntheSameMessage(t *testing.T) {
+	dpapi := newDPAPI(t)
+
+	// Create a deal publisher
+	publishPeriod := time.Hour
+	dp := newDealPublisher(dpapi, nil, PublishMsgConfig{
+		Period:            publishPeriod,
+		MaxDealsPerMsg:    10,
+		ManualDealPublish: true,
+	}, &api.MessageSendSpec{MaxFee: abi.NewTokenAmount(1)})
+
+	publishDealWithCustomProvider(t, dp, 0, false, false, tutils.NewActorAddr(t, "provider1"))
+	publishDealWithCustomProvider(t, dp, 0, false, false, tutils.NewActorAddr(t, "provider2"))
+
+	build.Clock.Sleep(10 * time.Millisecond)
+
+	pendingInfo := dp.PendingDeals()
+	require.Len(t, pendingInfo.Deals, 2)
+
+	var pcids []cid.Cid
+	props := pendingInfo.Deals
+	for _, p := range props {
+		signedProp, err := cborutil.AsIpld(&p)
+		require.NoError(t, err)
+		pcids = append(pcids, signedProp.Cid())
+	}
+
+	// Publish three pending deals and verify all deals whose context has not expired have been published
+	publishedDeals := dp.PublishQueuedDeals(pcids)
+	require.Equal(t, publishedDeals, pcids)
+
+	seenProvs := make(map[address.Address]int, 0)
+	// Make sure the expected deals were published
+	checkPublishedDealsWithCustomProvider(t, dpapi, props, []int{1, 1}, func(addr address.Address) {
+		seenProvs[addr]++
+	})
+
+	// deals should be grouped by provider and get ublished in separate messages
+	require.Equal(t, 2, len(seenProvs))
+	require.Equal(t, 1, seenProvs[props[0].Proposal.Provider])
+	require.Equal(t, 1, seenProvs[props[1].Proposal.Provider])
+}
+
 func TestPublishPendingDeals(t *testing.T) {
 	dpapi := newDPAPI(t)
 
@@ -297,6 +340,10 @@ func TestPublishPendingDeals(t *testing.T) {
 }
 
 func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool, expired bool) markettypes.ClientDealProposal {
+	return publishDealWithCustomProvider(t, dp, invalid, ctxCancelled, expired, getProviderActor(t))
+}
+
+func publishDealWithCustomProvider(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool, expired bool, provider address.Address) markettypes.ClientDealProposal {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
@@ -314,7 +361,7 @@ func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool
 		Proposal: markettypes.DealProposal{
 			PieceCID:   generateCids(1)[0],
 			Client:     getClientActor(t),
-			Provider:   getProviderActor(t),
+			Provider:   provider,
 			StartEpoch: startEpoch,
 			EndEpoch:   abi.ChainEpoch(120),
 			PieceSize:  abi.PaddedPieceSize(invalid), // pass invalid into StateCall below
@@ -344,12 +391,18 @@ func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool
 }
 
 func checkPublishedDeals(t *testing.T, dpapi *dpAPI, dealsToPublish []markettypes.ClientDealProposal, expectedDealsPerMsg []int) {
+	checkPublishedDealsWithCustomProvider(t, dpapi, dealsToPublish, expectedDealsPerMsg, func(addr address.Address) {
+		require.Equal(t, getProviderActor(t), addr)
+	})
+}
+
+func checkPublishedDealsWithCustomProvider(t *testing.T, dpapi *dpAPI, dealsToPublish []markettypes.ClientDealProposal, expectedDealsPerMsg []int, providerVerifier func(address.Address)) {
 	// For each message that was expected to be sent
 	var publishedDeals []markettypes.ClientDealProposal
 	for _, expectedDealsInMsg := range expectedDealsPerMsg {
 		// Should have called StateMinerInfo with the provider address
 		stateMinerInfoAddr := <-dpapi.stateMinerInfoCalls
-		require.Equal(t, getProviderActor(t), stateMinerInfoAddr)
+		providerVerifier(stateMinerInfoAddr)
 
 		// Check the fields of the message that was sent
 		msg := <-dpapi.pushedMsgs
