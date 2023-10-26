@@ -321,8 +321,8 @@ func (p *DealPublisher) publishReady(ready []*pendingDeal) {
 	}
 
 	// Validate each deal to make sure it can be published
-	validated := make([]*pendingDeal, 0, len(ready))
-	deals := make([]market.ClientDealProposal, 0, len(ready))
+	validated := make(map[address.Address][]*pendingDeal, 0)
+	deals := make(map[address.Address][]market.ClientDealProposal, 0)
 	for _, pd := range ready {
 		// Validate the deal
 		if err := p.validateDeal(pd.deal); err != nil {
@@ -330,17 +330,27 @@ func (p *DealPublisher) publishReady(ready []*pendingDeal) {
 			go onComplete(pd, cid.Undef, xerrors.Errorf("publish validation failed: %w", err))
 			continue
 		}
-
-		validated = append(validated, pd)
-		deals = append(deals, pd.deal)
+		provider := pd.deal.Proposal.Provider
+		if _, ok := deals[provider]; !ok {
+			deals[provider] = make([]market.ClientDealProposal, 0)
+			validated[provider] = make([]*pendingDeal, 0)
+		}
+		validated[provider] = append(validated[provider], pd)
+		deals[provider] = append(deals[provider], pd.deal)
 	}
 
-	// Send the publish message
-	msgCid, err := p.publishDealProposals(deals)
+	for provider, deals := range deals {
+		validated := validated[provider]
+		deals := deals
+		go func() {
+			// Send the publish message
+			msgCid, err := p.publishDealProposals(deals)
 
-	// Signal that each deal has been published
-	for _, pd := range validated {
-		go onComplete(pd, msgCid, err)
+			// Signal that each deal has been published
+			for _, pd := range validated {
+				onComplete(pd, msgCid, err)
+			}
+		}()
 	}
 }
 
