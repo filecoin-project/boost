@@ -1069,7 +1069,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 				start := miner.MaxSectorExpirationExtension - market.DealMinDuration - 1
-				maxEndEpoch := abi.ChainEpoch(1278*builtin.EpochsInDay) + 100 // TODO: Use v12 value from package when Lotus has updated the API package to use market v12
+				maxEndEpoch := miner.MaxSectorExpirationExtension + 100
 				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(start), abi.ChainEpoch(maxEndEpoch))).withNoOpMinerStub().build()
 			},
 			expectedErr: "invalid deal end epoch",
@@ -1080,7 +1080,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 
-				return h.newDealBuilder(t, 1, withEpochs(10, market.DealMaxDuration+11)).withNoOpMinerStub().build()
+				return h.newDealBuilder(t, 1, withEpochs(10, abi.ChainEpoch(1278*builtin.EpochsInDay)+11)).withNoOpMinerStub().build() // TODO: Use v12 value from package when Lotus has updated the API package to use market v12
 			},
 			expectedErr: "deal duration out of bounds",
 		},
