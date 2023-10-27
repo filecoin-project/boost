@@ -132,6 +132,12 @@ var migrateYugabyteDBCmd = &cli.Command{
 			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
 			Value: 16,
 		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
+		},
 	}...),
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
@@ -150,6 +156,7 @@ var migrateYugabyteDBCmd = &cli.Command{
 			Hosts:                    cctx.StringSlice("hosts"),
 			ConnectString:            cctx.String("connect-string"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
+			CQLTimeout:               cctx.Int("CQLTimeout"),
 		}
 
 		// Note that it doesn't matter what address we pass here: because the
