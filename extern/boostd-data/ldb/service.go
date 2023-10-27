@@ -11,12 +11,14 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
+	"go.opencensus.io/stats"
 )
 
 // The current piece metadata version. This version will be used when doing
@@ -47,6 +49,7 @@ type Store struct {
 	sync.Mutex
 	db       *DB
 	repopath string
+	ctx      context.Context
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -78,6 +81,8 @@ func (s *Store) Start(ctx context.Context) error {
 		return err
 	}
 
+	s.ctx = ctx
+
 	log.Debugw("new leveldb local index directory service", "repo path", repopath)
 	return nil
 }
@@ -99,6 +104,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		if !errors.Is(err, ds.ErrNotFound) {
+			stats.Record(s.ctx, metrics.BoostdDataFailureAddDealForPieceCount.M(1))
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any metadata, so create new metadata
@@ -108,6 +114,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	// Check if the deal has already been added
 	for _, dl := range md.Deals {
 		if dl == dealInfo {
+			stats.Record(s.ctx, metrics.BoostdDataSuccessAddDealForPieceCount.M(1))
 			return nil
 		}
 	}
@@ -118,9 +125,11 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	// Write the piece metadata back to the db
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureAddDealForPieceCount.M(1))
 		return err
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessAddDealForPieceCount.M(1))
 	return nil
 }
 
@@ -139,10 +148,17 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetOffsetSizeCount.M(1))
 		return nil, normalizePieceCidError(pieceCid, err)
 	}
 
-	return s.db.GetOffsetSize(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
+	out, err := s.db.GetOffsetSize(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetOffsetSizeCount.M(1))
+	} else {
+		stats.Record(s.ctx, metrics.BoostdDataSuccessGetOffsetSizeCount.M(1))
+	}
+	return out, err
 }
 
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
@@ -158,9 +174,11 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetPieceMetadataCount.M(1))
 		return model.Metadata{}, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessGetPieceMetadataCount.M(1))
 	return md.Metadata, nil
 }
 
@@ -180,9 +198,11 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetPieceDealsCount.M(1))
 		return nil, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessGetPieceDealsCount.M(1))
 	return md.Deals, nil
 }
 
@@ -201,6 +221,11 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	defer s.Unlock()
 
 	pcs, err := s.db.GetPieceCidsByMultihash(ctx, m)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailurePiecesContainingMultihashCount.M(1))
+	} else {
+		stats.Record(s.ctx, metrics.BoostdDataSuccessPiecesContainingMultihashCount.M(1))
+	}
 	return pcs, normalizeMultihashError(m, err)
 }
 
@@ -219,12 +244,14 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetIndexCount.M(1))
 		return nil, normalizePieceCidError(pieceCid, err)
 	}
 
 	records, err := s.db.AllRecords(ctx, md.Cursor)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
+		stats.Record(s.ctx, metrics.BoostdDataFailureGetIndexCount.M(1))
 		return nil, fmt.Errorf("getting all records for cursor %d: %w", md.Cursor, err)
 	}
 
@@ -236,14 +263,17 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 	}
 	close(recs)
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessGetIndexCount.M(1))
 	return recs, nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureIsIndexedCount.M(1))
 		return false, err
 	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessIsIndexedCount.M(1))
 	return !t.IsZero(), nil
 }
 
@@ -259,9 +289,11 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureIsCompleteIndexCount.M(1))
 		return false, normalizePieceCidError(pieceCid, err)
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessIsCompleteIndexCount.M(1))
 	return md.CompleteIndex, nil
 }
 
@@ -281,6 +313,14 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 
 		s.Lock()
 		defer s.Unlock()
+		failureMetrics := true
+		defer func() {
+			if failureMetrics {
+				stats.Record(s.ctx, metrics.BoostdDataFailureAddIndexCount.M(1))
+			} else {
+				stats.Record(s.ctx, metrics.BoostdDataSuccessAddIndexCount.M(1))
+			}
+		}()
 
 		var recs []carindex.Record
 		for _, r := range records {
@@ -350,6 +390,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 			return
 		}
 		progress <- types.AddIndexProgress{Progress: 1}
+		failureMetrics = false
 	}()
 
 	return progress
@@ -370,9 +411,11 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil && !errors.Is(err, ds.ErrNotFound) {
+		stats.Record(s.ctx, metrics.BoostdDataFailureIndexedAtCount.M(1))
 		return time.Time{}, err
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessIndexedAtCount.M(1))
 	return md.IndexedAt, nil
 }
 
@@ -386,7 +429,13 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.PiecesCount(ctx, maddr)
+	out, err := s.db.PiecesCount(ctx, maddr)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailurePiecesCountCount.M(1))
+		return 0, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessPiecesCountCount.M(1))
+	return out, nil
 }
 
 func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
@@ -399,7 +448,13 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 		log.Debugw("handled.scan-progress", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.ScanProgress(ctx, maddr)
+	out, err := s.db.ScanProgress(ctx, maddr)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureScanProgressCount.M(1))
+		return nil, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessScanProgressCount.M(1))
+	return out, nil
 }
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
@@ -412,7 +467,13 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 		log.Debugw("handled.list-pieces", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.ListPieces(ctx)
+	out, err := s.db.ListPieces(ctx)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureListPiecesCount.M(1))
+		return nil, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessListPiecesCount.M(1))
+	return out, nil
 }
 
 func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
@@ -423,7 +484,13 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.NextPiecesToCheck(ctx, maddr)
+	out, err := s.db.NextPiecesToCheck(ctx, maddr)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureNextPiecesToCheckCount.M(1))
+		return nil, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessNextPiecesToCheckCount.M(1))
+	return out, nil
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool, maddr address.Address) error {
@@ -445,6 +512,7 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid, maddr)
 	if err != nil {
 		if !errors.Is(err, ds.ErrNotFound) {
+			stats.Record(s.ctx, metrics.BoostdDataFailureFlagPieceCount.M(1))
 			return fmt.Errorf("getting piece cid flagged metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any flagged metadata, so create new metadata
@@ -457,9 +525,11 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	// Write the piece metadata back to the db
 	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, maddr, fm)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureFlagPieceCount.M(1))
 		return err
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessFlagPieceCount.M(1))
 	return nil
 }
 
@@ -478,8 +548,10 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 
 	err := s.db.DeletePieceCidToFlagged(ctx, pieceCid, maddr)
 	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureUnflagPieceCount.M(1))
 		return fmt.Errorf("deleting piece cid flagged metadata for piece %s: %w", pieceCid, err)
 	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessUnflagPieceCount.M(1))
 	return nil
 }
 
@@ -493,7 +565,13 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 		log.Debugw("handled.flagged-pieces-list", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.ListFlaggedPieces(ctx, filter, cursor, offset, limit)
+	out, err := s.db.ListFlaggedPieces(ctx, filter, cursor, offset, limit)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureFlaggedPiecesListCount.M(1))
+		return nil, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessFlaggedPiecesListCount.M(1))
+	return out, nil
 }
 
 func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
@@ -506,7 +584,13 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 		log.Debugw("handled.flagged-pieces-count", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.FlaggedPiecesCount(ctx, filter)
+	out, err := s.db.FlaggedPiecesCount(ctx, filter)
+	if err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureFlaggedPiecesCountCount.M(1))
+		return 0, err
+	}
+	stats.Record(s.ctx, metrics.BoostdDataSuccessFlaggedPiecesCountCount.M(1))
+	return out, nil
 }
 
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {
@@ -543,9 +627,19 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 	s.Lock()
 	defer s.Unlock()
 
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.BoostdDataFailureRemoveDealForPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.BoostdDataSuccessRemoveDealForPieceCount.M(1))
+		}
+	}()
+
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		if errors.Is(err, ds.ErrNotFound) {
+			failureMetrics = false
 			return nil
 		}
 		return err
@@ -564,6 +658,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 		if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
 			return fmt.Errorf("failed to remove the Metadata after removing the last deal: %w", err)
 		}
+		failureMetrics = false
 		return nil
 	}
 
@@ -572,6 +667,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 		return err
 	}
 
+	failureMetrics = false
 	return nil
 }
 
@@ -590,9 +686,11 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	defer s.Unlock()
 
 	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+		stats.Record(s.ctx, metrics.BoostdDataFailureRemovePieceMetadataCount.M(1))
 		return err
 	}
 
+	stats.Record(s.ctx, metrics.BoostdDataSuccessRemovePieceMetadataCount.M(1))
 	return nil
 }
 
@@ -612,6 +710,15 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	s.Lock()
 	defer s.Unlock()
 
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.BoostdDataFailureRemoveIndexesCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.BoostdDataSuccessRemoveIndexesCount.M(1))
+		}
+	}()
+
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return err
@@ -623,7 +730,9 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 
 	md.IndexedAt = time.Time{}
 
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+	if err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md); err == nil {
+		failureMetrics = false
+	}
 
 	return err
 }

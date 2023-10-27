@@ -5,6 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
@@ -16,6 +17,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 )
 
 var runCmd = &cli.Command{
@@ -132,7 +136,20 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		ctx := lcli.ReqContext(cctx)
+		ctxx := lcli.ReqContext(cctx)
+		ctx, _ := tag.New(ctxx,
+			tag.Insert(metrics.Version, build.BuildVersion),
+			tag.Insert(metrics.Commit, build.CurrentCommit),
+			tag.Insert(metrics.NodeType, "booster-bitswap"),
+		)
+		// Register all metric views
+		if err := view.Register(
+			metrics.DefaultViews...,
+		); err != nil {
+			log.Fatalf("Cannot register the view: %v", err)
+		}
+		// Set the metric to one so, it is published to the exporter
+		stats.Record(ctx, metrics.BoostInfo.M(1))
 
 		// Instantiate the tracer and exporter
 		if cctx.Bool("tracing") {
