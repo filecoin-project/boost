@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
-	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"

@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
-	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -125,9 +125,9 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureAddDealForPieceCount.M(1))
+			stats.Record(s.ctx, metrics.FailureAddDealForPieceCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessAddDealForPieceCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessAddDealForPieceCount.M(1))
 		}
 	}()
 
@@ -168,9 +168,9 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureGetOffsetSizeCount.M(1))
+			stats.Record(s.ctx, metrics.FailureGetOffsetSizeCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessGetOffsetSizeCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessGetOffsetSizeCount.M(1))
 		}
 	}()
 
@@ -179,7 +179,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	err := s.session.Query(qry, pieceCid.Bytes(), hash).WithContext(ctx).Scan(&offset, &size)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
-		stats.Record(s.ctx, metrics.BoostdDataFailureGetOffsetSizeCount.M(1))
+		stats.Record(s.ctx, metrics.FailureGetOffsetSizeCount.M(1))
 		return nil, fmt.Errorf("getting offset / size: %w", err)
 	}
 
@@ -192,9 +192,9 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureGetPieceMetadataCount.M(1))
+			stats.Record(s.ctx, metrics.FailureGetPieceMetadataCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessGetPieceMetadataCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessGetPieceMetadataCount.M(1))
 		}
 	}()
 
@@ -237,9 +237,9 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureGetPieceDealsCount.M(1))
+			stats.Record(s.ctx, metrics.FailureGetPieceDealsCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessGetPieceDealsCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessGetPieceDealsCount.M(1))
 		}
 	}()
 
@@ -287,9 +287,9 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailurePiecesContainingMultihashCount.M(1))
+			stats.Record(s.ctx, metrics.FailurePiecesContainingMultihashCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessPiecesContainingMultihashCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessPiecesContainingMultihashCount.M(1))
 		}
 	}()
 
@@ -324,9 +324,9 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureGetIndexCount.M(1))
+			stats.Record(s.ctx, metrics.FailureGetIndexCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessGetIndexCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessGetIndexCount.M(1))
 		}
 	}()
 
@@ -434,7 +434,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 		var lastProg *types.AddIndexProgress
 		if err != nil {
 			// If there was an error, send it as the last progress update
-			stats.Record(s.ctx, metrics.BoostdDataFailureAddIndexCount.M(1))
+			stats.Record(s.ctx, metrics.FailureAddIndexCount.M(1))
 			lastProg = &types.AddIndexProgress{Err: err.Error()}
 		} else if lastUpdateValue != nil {
 			// If there is an outstanding update that hasn't been sent out
@@ -495,7 +495,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 		}
 		updateProgress(1)
 		completeProgress(nil)
-		stats.Record(s.ctx, metrics.BoostdDataSuccessAddIndexCount.M(1))
+		stats.Record(s.ctx, metrics.SuccessAddIndexCount.M(1))
 	}()
 
 	return progress
@@ -565,9 +565,9 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureIsCompleteIndexCount.M(1))
+			stats.Record(s.ctx, metrics.FailureIsCompleteIndexCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessIsCompleteIndexCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessIsCompleteIndexCount.M(1))
 		}
 	}()
 
@@ -584,9 +584,9 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureIsIndexedCount.M(1))
+			stats.Record(s.ctx, metrics.FailureIsIndexedCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessIsIndexedCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessIsIndexedCount.M(1))
 		}
 	}()
 
@@ -607,9 +607,9 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureIndexedAtCount.M(1))
+			stats.Record(s.ctx, metrics.FailureIndexedAtCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessIndexedAtCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessIndexedAtCount.M(1))
 		}
 	}()
 
@@ -631,9 +631,9 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureListPiecesCount.M(1))
+			stats.Record(s.ctx, metrics.FailureListPiecesCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessListPiecesCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessListPiecesCount.M(1))
 		}
 	}()
 
@@ -663,9 +663,9 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureRemoveDealForPieceCount.M(1))
+			stats.Record(s.ctx, metrics.FailureRemoveDealForPieceCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessRemoveDealForPieceCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessRemoveDealForPieceCount.M(1))
 		}
 	}()
 
@@ -705,9 +705,9 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureRemovePieceMetadataCount.M(1))
+			stats.Record(s.ctx, metrics.FailureRemovePieceMetadataCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessRemovePieceMetadataCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessRemovePieceMetadataCount.M(1))
 		}
 	}()
 
@@ -729,9 +729,9 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureRemoveIndexesCount.M(1))
+			stats.Record(s.ctx, metrics.FailureRemoveIndexesCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessRemoveIndexesCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessRemoveIndexesCount.M(1))
 		}
 	}()
 

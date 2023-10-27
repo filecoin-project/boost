@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
-	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
@@ -42,9 +42,9 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureNextPiecesToCheckCount.M(1))
+			stats.Record(s.ctx, metrics.FailureNextPiecesToCheckCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessNextPiecesToCheckCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessNextPiecesToCheckCount.M(1))
 		}
 	}()
 
@@ -257,9 +257,9 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailurePiecesCountCount.M(1))
+			stats.Record(s.ctx, metrics.FailurePiecesCountCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessPiecesCountCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessPiecesCountCount.M(1))
 		}
 	}()
 
@@ -281,9 +281,9 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureScanProgressCount.M(1))
+			stats.Record(s.ctx, metrics.FailureScanProgressCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessScanProgressCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessScanProgressCount.M(1))
 		}
 	}()
 
@@ -337,9 +337,9 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureFlagPieceCount.M(1))
+			stats.Record(s.ctx, metrics.FailureFlagPieceCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessFlagPieceCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessFlagPieceCount.M(1))
 		}
 	}()
 
@@ -362,9 +362,9 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureUnflagPieceCount.M(1))
+			stats.Record(s.ctx, metrics.FailureUnflagPieceCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessUnflagPieceCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessUnflagPieceCount.M(1))
 		}
 	}()
 
@@ -391,9 +391,9 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureFlaggedPiecesListCount.M(1))
+			stats.Record(s.ctx, metrics.FailureFlaggedPiecesListCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessFlaggedPiecesListCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessFlaggedPiecesListCount.M(1))
 		}
 	}()
 
@@ -479,9 +479,9 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
-			stats.Record(s.ctx, metrics.BoostdDataFailureFlaggedPiecesCountCount.M(1))
+			stats.Record(s.ctx, metrics.FailureFlaggedPiecesCountCount.M(1))
 		} else {
-			stats.Record(s.ctx, metrics.BoostdDataSuccessFlaggedPiecesCountCount.M(1))
+			stats.Record(s.ctx, metrics.SuccessFlaggedPiecesCountCount.M(1))
 		}
 	}()
 
