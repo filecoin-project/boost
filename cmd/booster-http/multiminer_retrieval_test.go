@@ -31,34 +31,36 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 
 		runAndWaitForBoosterHttp(ctx, t, minerApiInfos, fullNode2ApiInfo, port)
 
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rt.RootCid.String()), nil)
-		require.NoError(t, err)
-		req.Header.Set("Accept", "application/vnd.ipld.car")
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-		if resp.StatusCode != 200 {
-			body, err := io.ReadAll(resp.Body)
+		for i, rootCid := range rt.RootCids {
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rootCid.String()), nil)
 			require.NoError(t, err)
-			msg := fmt.Sprintf("Failed to fetch root cid: %s\n%s", resp.Status, string(body))
-			require.Fail(t, msg)
-		}
-
-		wantCids, err := testutil.CidsInCar(rt.CarFilepaths[0])
-		require.NoError(t, err)
-
-		cr, err := car.NewBlockReader(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, []cid.Cid{rt.RootCid}, cr.Roots)
-		cnt := 0
-		for ; ; cnt++ {
-			next, err := cr.Next()
-			if err != nil {
-				require.Equal(t, io.EOF, err)
-				break
+			req.Header.Set("Accept", "application/vnd.ipld.car")
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			if resp.StatusCode != 200 {
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				msg := fmt.Sprintf("Failed to fetch root cid: %s\n%s", resp.Status, string(body))
+				require.Fail(t, msg)
 			}
-			require.Contains(t, wantCids, next.Cid())
+
+			wantCids, err := testutil.CidsInCar(rt.CarFilepaths[i])
+			require.NoError(t, err)
+
+			cr, err := car.NewBlockReader(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, []cid.Cid{rootCid}, cr.Roots)
+			cnt := 0
+			for ; ; cnt++ {
+				next, err := cr.Next()
+				if err != nil {
+					require.Equal(t, io.EOF, err)
+					break
+				}
+				require.Contains(t, wantCids, next.Cid())
+			}
+			require.Equal(t, len(wantCids), cnt)
 		}
-		require.Equal(t, len(wantCids), cnt)
 	})
 }
 

@@ -47,7 +47,7 @@ func TestE2E(t *testing.T) {
 	req.NoError(boostAndMiner.AddClientProviderBalance(abi.NewTokenAmount(1e15)))
 
 	// Get the listen address of the miner
-	minerApiInfo, err := boostAndMiner.LotusMinerApiInfo()
+	minerApiInfos, err := boostAndMiner.LotusMinerApiInfos()
 	req.NoError(err)
 	fullNodeApiInfo, err := boostAndMiner.LotusFullNodeApiInfo()
 	req.NoError(err)
@@ -56,7 +56,7 @@ func TestE2E(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Starting booster-http")
-	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, boosterHttpPort, "--serve-pieces=false", "--serve-cars=true")
+	runAndWaitForBoosterHttp(ctx, t, minerApiInfos, fullNodeApiInfo, boosterHttpPort, "--serve-pieces=false", "--serve-cars=true")
 
 	cwd, err := os.Getwd()
 	req.NoError(err)
