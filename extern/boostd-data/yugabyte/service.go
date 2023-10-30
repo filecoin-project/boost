@@ -19,6 +19,7 @@ import (
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -292,6 +293,9 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 			stats.Record(s.ctx, metrics.SuccessPiecesContainingMultihashCount.M(1))
 		}
 	}()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.PiecesContainingMultihash"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	// Get all piece cids referred to by the multihash
 	pcids := make([]cid.Cid, 0, 1)
@@ -589,6 +593,9 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 			stats.Record(s.ctx, metrics.SuccessIsIndexedCount.M(1))
 		}
 	}()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.IsIndexed"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
@@ -612,6 +619,9 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 			stats.Record(s.ctx, metrics.SuccessIndexedAtCount.M(1))
 		}
 	}()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.IndexedAt"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
@@ -628,6 +638,9 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.ListPieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
