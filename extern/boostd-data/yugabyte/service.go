@@ -123,6 +123,9 @@ func (s *Store) Start(ctx context.Context) error {
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.add_deal_for_pieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -166,6 +169,9 @@ func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_offset_size"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -190,6 +196,9 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 
 // Get piece metadata with deals
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -235,6 +244,9 @@ func (s *Store) getPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_deals")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_piece_deals"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -285,6 +297,9 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.pieces_containing_multihash"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -293,9 +308,6 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 			stats.Record(s.ctx, metrics.SuccessPiecesContainingMultihashCount.M(1))
 		}
 	}()
-	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.PiecesContainingMultihash"))
-	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
-	defer stop()
 
 	// Get all piece cids referred to by the multihash
 	pcids := make([]cid.Cid, 0, 1)
@@ -325,6 +337,9 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -401,6 +416,9 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.add_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	// Set up the progress channel
 	progress := make(chan types.AddIndexProgress, 2)
@@ -566,6 +584,9 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.is_incomplete_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.is_complete_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -585,6 +606,9 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.is_indexed"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -593,9 +617,6 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 			stats.Record(s.ctx, metrics.SuccessIsIndexedCount.M(1))
 		}
 	}()
-	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.IsIndexed"))
-	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
-	defer stop()
 
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
@@ -611,6 +632,9 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.indexed_at")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.indexed_at"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -619,9 +643,6 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 			stats.Record(s.ctx, metrics.SuccessIndexedAtCount.M(1))
 		}
 	}()
-	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.IndexedAt"))
-	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
-	defer stop()
 
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
@@ -638,7 +659,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
 	defer span.End()
-	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.ListPieces"))
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.list_pieces"))
 	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
 	defer stop()
 	failureMetrics := true
@@ -673,6 +694,9 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_deal_for_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -715,6 +739,9 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -739,6 +766,9 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_indexes"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {

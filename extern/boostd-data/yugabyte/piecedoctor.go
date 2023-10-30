@@ -14,6 +14,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
@@ -38,6 +39,9 @@ type pieceCreated struct {
 func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.next_piece_to_check"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	failureMetrics := true
 	defer func() {
@@ -254,6 +258,9 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.piece_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -278,6 +285,9 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.scan_progress"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -334,6 +344,9 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -359,6 +372,9 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.unflag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -388,6 +404,9 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	span.SetAttributes(attribute.Int("offset", offset))
 	span.SetAttributes(attribute.Int("limit", limit))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flagged_pieces_list"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {
@@ -476,6 +495,9 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flagged_pieces_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	failureMetrics := true
 	defer func() {
 		if failureMetrics {

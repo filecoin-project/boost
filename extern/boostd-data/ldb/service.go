@@ -19,6 +19,7 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 )
 
 // The current piece metadata version. This version will be used when doing
@@ -93,6 +94,10 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.add_deal_for_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.add-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
@@ -139,6 +144,10 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.get_offset_size"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.get-offset-size", "took", time.Since(now).String())
 	}(time.Now())
@@ -167,6 +176,10 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_metadata")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.get_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.get-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
@@ -187,6 +200,10 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_deals")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.get_piece_deals"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-piece-deals", "took", time.Since(now).String())
@@ -213,6 +230,10 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.piece_containing_multihash"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.pieces-containing-mh", "took", time.Since(now).String())
 	}(time.Now())
@@ -234,6 +255,10 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.get_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Warnw("handled.get-index", "took", time.Since(now).String())
@@ -268,6 +293,9 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.is_indexed"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
 		stats.Record(s.ctx, metrics.FailureIsIndexedCount.M(1))
@@ -282,6 +310,10 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.is_incomplete_index")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.is_complete_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.is-complete-index", "took", time.Since(now).String())
@@ -302,6 +334,10 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.add_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.add-index", "took", time.Since(now).String())
@@ -402,6 +438,10 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	ctx, span := tracing.Tracer.Start(ctx, "store.indexed_at")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.indexed_at"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.indexed-at", "took", time.Since(now).String())
 	}(time.Now())
@@ -425,6 +465,10 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.pieces_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
 	}(time.Now())
@@ -443,6 +487,10 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.scan_progress")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.scan_progress"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.scan-progress", "took", time.Since(now).String())
@@ -463,6 +511,10 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.list_pieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.list-pieces", "took", time.Since(now).String())
 	}(time.Now())
@@ -479,6 +531,10 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.next_pieces_to_check"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
@@ -498,6 +554,10 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.flag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.flag-piece", "took", time.Since(now).String())
@@ -539,6 +599,10 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.unflag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.unflag-piece", "took", time.Since(now).String())
 	}(time.Now())
@@ -561,6 +625,10 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_list")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.flagged_piece_list"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.flagged-pieces-list", "took", time.Since(now).String())
 	}(time.Now())
@@ -579,6 +647,10 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.flagged_pieces_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.flagged-pieces-count", "took", time.Since(now).String())
@@ -619,6 +691,10 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.remove_deal_for_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
@@ -678,6 +754,10 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
 	defer span.End()
 
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.remove_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
@@ -702,6 +782,10 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
 	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.remove_indexes"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.remove-indexes", "took", time.Since(now).String())
