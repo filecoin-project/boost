@@ -59,7 +59,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 	defer server.Close()
 
 	// make two deals, one on miner1 and one on miner2 to make sure that both are retrievable
-	createDealFunc := func(minerAddr address.Address) (cid.Cid, string) {
+	createDealFunc := func(minerAddr address.Address) (cid.Cid, string, string) {
 		// Create a new dummy deal
 		t.Logf("creating dummy deal")
 		dealUuid := uuid.New()
@@ -83,16 +83,16 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 		err = boostAndMiners.WaitForDealAddedToSector(dealUuid)
 		require.NoError(t, err)
 
-		return rootCid, randomFilepath
+		return rootCid, randomFilepath, carFilepath
 	}
 
-	rootCid1, filePath1 := createDealFunc(boostAndMiners.MinerAddrs[0])
-	rootCid2, filePath2 := createDealFunc(boostAndMiners.MinerAddrs[1])
+	rootCid1, filePath1, carFilePath1 := createDealFunc(boostAndMiners.MinerAddrs[0])
+	rootCid2, filePath2, carFilePath2 := createDealFunc(boostAndMiners.MinerAddrs[1])
 
 	rt(ctx, t, &RetrievalTest{
 		BoostAndMiners:  boostAndMiners,
 		SampleFilePaths: []string{filePath1, filePath2},
-		CarFilepaths:    []string{carFilepath, carFilepath},
+		CarFilepaths:    []string{carFilePath1, carFilePath2},
 		RootCids:        []cid.Cid{rootCid1, rootCid2},
 	})
 }

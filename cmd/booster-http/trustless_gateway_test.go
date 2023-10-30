@@ -38,7 +38,7 @@ func TestTrustlessGateway(t *testing.T) {
 	req.NoError(boostAndMiner.AddClientProviderBalance(abi.NewTokenAmount(1e15)))
 
 	// Get the listen address of the miner
-	minerApiInfo, err := boostAndMiner.LotusMinerApiInfo()
+	minerApiInfos, err := boostAndMiner.LotusMinerApiInfos()
 	req.NoError(err)
 	fullNodeApiInfo, err := boostAndMiner.LotusFullNodeApiInfo()
 	req.NoError(err)
@@ -52,7 +52,7 @@ func TestTrustlessGateway(t *testing.T) {
 	port, err := testutil.FreePort()
 	require.NoError(t, err)
 
-	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, port, "--serve-pieces=false", "--serve-cars=true")
+	runAndWaitForBoosterHttp(ctx, t, minerApiInfos, fullNodeApiInfo, port, "--serve-pieces=false", "--serve-cars=true")
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -130,7 +130,7 @@ func dealTestCarInParts(ctx context.Context, t *testing.T, boostAndMiner *framew
 
 		// Make a storage deal on the first boost, which will store the index to
 		// LID and store the data on the first miner
-		res, err := boostAndMiner.MakeDummyDeal(dealUuid, file.Name(), rootCid, server.URL+"/"+filepath.Base(file.Name()), false)
+		res, err := boostAndMiner.MakeDummyDeal(dealUuid, file.Name(), rootCid, server.URL+"/"+filepath.Base(file.Name()), false, boostAndMiner.MinerAddrs[0])
 		req.NoError(err)
 		t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
 		req.True(res.Result.Accepted)
