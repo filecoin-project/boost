@@ -95,9 +95,11 @@ var statsCmd = &cli.Command{
 
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
-		var boostNodes, marketsNodes, noProtocolsNodes, indexerNodes int
+		var boostNodes, marketsNodes, venusNodes, noProtocolsNodes, indexerNodes int
 		boostRawBytePower := big.NewInt(0)
 		boostQualityAdjPower := big.NewInt(0)
+		venusRawBytePower := big.NewInt(0)
+		venusQualityAdjPower := big.NewInt(0)
 		agentVersions := make(map[string]int)
 		transportProtos := make(map[string]int)
 
@@ -169,7 +171,13 @@ var statsCmd = &cli.Command{
 					lk.Lock()
 					var out string
 					out += "Provider " + maddr.String()
-					if contains(protostrs, "/fil/storage/mk/1.2.0") {
+					if strings.Contains(agentVersion, "venus") || strings.Contains(agentVersion, "droplet") {
+						out += " is running venus"
+
+						venusNodes++
+						venusQualityAdjPower = big.Add(venusQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
+						venusRawBytePower = big.Add(venusRawBytePower, minerToMinerPower[maddr].RawBytePower)
+					} else if contains(protostrs, "/fil/storage/mk/1.2.0") {
 						out += " is running boost"
 
 						boostNodes++
@@ -224,6 +232,9 @@ var statsCmd = &cli.Command{
 		fmt.Println("Total Boost nodes:", boostNodes)
 		fmt.Println("Total Boost raw power:", boostRawBytePower)
 		fmt.Println("Total Boost quality adj power:", boostQualityAdjPower)
+		fmt.Println("Total Venus nodes:", venusNodes)
+		fmt.Println("Total Venus raw power:", venusRawBytePower)
+		fmt.Println("Total Venus quality adj power:", venusQualityAdjPower)
 		fmt.Println("Total Markets nodes:", marketsNodes)
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 		fmt.Println("Total Indexer nodes:", indexerNodes)
