@@ -91,6 +91,7 @@ var (
 
 var (
 	InfoView = &view.View{
+		Name:        NodeType.Name() + Version.Name() + Commit.Name() + StartedAt.Name(),
 		Description: "Boost service information",
 		Measure:     BoostInfo,
 		Aggregation: view.LastValue(),
