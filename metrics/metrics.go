@@ -91,7 +91,6 @@ var (
 
 var (
 	InfoView = &view.View{
-		Name:        "info",
 		Description: "Boost service information",
 		Measure:     BoostInfo,
 		Aggregation: view.LastValue(),
