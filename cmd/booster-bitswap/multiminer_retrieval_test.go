@@ -122,6 +122,7 @@ func runBoosterBitswap(ctx context.Context, repo string, minerApiInfo []string, 
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,
 		"--api-version-check=false",
+		"--no-metrics",
 	}
 	for _, apiInfo := range minerApiInfo {
 		args = append(args, "--api-storage="+apiInfo)

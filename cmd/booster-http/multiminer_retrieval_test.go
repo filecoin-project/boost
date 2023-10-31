@@ -108,6 +108,7 @@ func runBoosterHttp(ctx context.Context, t *testing.T, minerApiInfo []string, fu
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,
 		"--api-version-check=false",
+		"--no-metrics",
 	}, args...)
 	for _, apiInfo := range minerApiInfo {
 		args = append(args, "--api-storage="+apiInfo)

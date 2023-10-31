@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -125,6 +126,10 @@ var runCmd = &cli.Command{
 			Hidden: true,
 			Value:  true,
 		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -138,20 +143,26 @@ var runCmd = &cli.Command{
 		}
 
 		ctxx := lcli.ReqContext(cctx)
-		ctx, _ := tag.New(ctxx,
-			tag.Insert(metrics.Version, build.BuildVersion),
-			tag.Insert(metrics.Commit, build.CurrentCommit),
-			tag.Insert(metrics.NodeType, "booster-bitswap"),
-			tag.Insert(metrics.StartedAt, time.Now().String()),
-		)
-		// Register all metric views
-		if err := view.Register(
-			metrics.DefaultViews...,
-		); err != nil {
-			log.Fatalf("Cannot register the view: %v", err)
+		var ctx context.Context
+
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctxx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "booster-bitswap"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err := view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		} else {
+			ctx = ctxx
 		}
-		// Set the metric to one so, it is published to the exporter
-		stats.Record(ctx, metrics.BoostInfo.M(1))
 
 		// Instantiate the tracer and exporter
 		if cctx.Bool("tracing") {

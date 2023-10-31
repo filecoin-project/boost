@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/hashicorp/go.net/context"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -40,6 +41,10 @@ var runCmd = &cli.Command{
 			Name:  "nosync",
 			Usage: "dont wait for the full node to sync with the chain",
 		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -59,21 +64,26 @@ var runCmd = &cli.Command{
 		defer ncloser()
 
 		ctxx := lcli.ReqContext(cctx)
+		var ctx context.Context
 
-		ctx, _ := tag.New(ctxx,
-			tag.Insert(metrics.Version, build.BuildVersion),
-			tag.Insert(metrics.Commit, build.CurrentCommit),
-			tag.Insert(metrics.NodeType, "boostd"),
-			tag.Insert(metrics.StartedAt, time.Now().String()),
-		)
-		// Register all metric views
-		if err = view.Register(
-			metrics.DefaultViews...,
-		); err != nil {
-			log.Fatalf("Cannot register the view: %v", err)
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctxx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "boostd"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err = view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		} else {
+			ctx = ctxx
 		}
-		// Set the metric to one so, it is published to the exporter
-		stats.Record(ctx, metrics.BoostInfo.M(1))
 
 		log.Debug("Checking full node version")
 
