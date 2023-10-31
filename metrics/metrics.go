@@ -17,9 +17,10 @@ var defaultMillisecondsDistribution = view.Distribution(0.01, 0.05, 0.1, 0.3, 0.
 // Global Tags
 var (
 	// common
-	Version, _  = tag.NewKey("version")
-	Commit, _   = tag.NewKey("commit")
-	NodeType, _ = tag.NewKey("node_type")
+	Version, _   = tag.NewKey("version")
+	Commit, _    = tag.NewKey("commit")
+	NodeType, _  = tag.NewKey("node_type")
+	StartedAt, _ = tag.NewKey("started_at")
 
 	Endpoint, _     = tag.NewKey("endpoint")
 	APIInterface, _ = tag.NewKey("api")
@@ -94,7 +95,7 @@ var (
 		Description: "Boost service information",
 		Measure:     BoostInfo,
 		Aggregation: view.LastValue(),
-		TagKeys:     []tag.Key{Version, Commit, NodeType},
+		TagKeys:     []tag.Key{Version, Commit, NodeType, StartedAt},
 	}
 	APIRequestDurationView = &view.View{
 		Measure:     APIRequestDuration,

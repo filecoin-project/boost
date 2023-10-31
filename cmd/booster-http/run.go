@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
@@ -182,6 +183,7 @@ var runCmd = &cli.Command{
 			tag.Insert(metrics.Version, build.BuildVersion),
 			tag.Insert(metrics.Commit, build.CurrentCommit),
 			tag.Insert(metrics.NodeType, "booster-http"),
+			tag.Insert(metrics.StartedAt, time.Now().String()),
 		)
 		// Register all metric views
 		if err := view.Register(

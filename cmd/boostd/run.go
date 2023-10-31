@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"time"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
@@ -63,6 +64,7 @@ var runCmd = &cli.Command{
 			tag.Insert(metrics.Version, build.BuildVersion),
 			tag.Insert(metrics.Commit, build.CurrentCommit),
 			tag.Insert(metrics.NodeType, "boostd"),
+			tag.Insert(metrics.StartedAt, time.Now().String()),
 		)
 		// Register all metric views
 		if err = view.Register(
