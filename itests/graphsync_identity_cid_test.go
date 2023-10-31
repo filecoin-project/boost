@@ -114,6 +114,7 @@ func TestDealAndRetrievalWithIdentityCID(t *testing.T) {
 	log.Infof("deal ID is : %s", dealCid.String())
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
 	err = f.WaitForDealAddedToSector(dealUuid)
+	require.NoError(t, err)
 
 	time.Sleep(5 * time.Second)
 

@@ -536,6 +536,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
+		Override(new(server.ProviderDataTransfer), server.NewProviderDataTransfer),
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
@@ -543,7 +544,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
-
 		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*lib.MultiMinerAccessor), modules.NewMultiminerSectorAccessor(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),

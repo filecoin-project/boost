@@ -880,23 +880,24 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 
 	if !extractCar {
 		// Write file as car file
-		file, err := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String()+".car")
-		require.NoError(t, err)
+		file, err1 := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String()+".car")
+		require.NoError(t, err1)
 		out = file.Name()
-		err = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
-		require.NoError(t, err)
+		err1 = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
+		require.NoError(t, err1)
 
 	} else {
 		// Otherwise write file as UnixFS File
-		ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
-		require.NoError(t, err)
-		file, err := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String())
-		err = file.Close()
-		require.NoError(t, err)
-		err = os.Remove(file.Name())
-		require.NoError(t, err)
-		err = files.WriteTo(ufsFile, file.Name())
-		require.NoError(t, err)
+		ufsFile, err1 := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
+		require.NoError(t, err1)
+		file, err1 := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String())
+		require.NoError(t, err1)
+		err1 = file.Close()
+		require.NoError(t, err1)
+		err1 = os.Remove(file.Name())
+		require.NoError(t, err1)
+		err1 = files.WriteTo(ufsFile, file.Name())
+		require.NoError(t, err1)
 
 	}
 

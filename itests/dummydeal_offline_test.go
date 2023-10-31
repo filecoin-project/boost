@@ -45,4 +45,8 @@ func TestDummydealOffline(t *testing.T) {
 	require.True(t, res.Accepted)
 	err = f.WaitForDealAddedToSector(offlineDealUuid)
 	require.NoError(t, err)
+
+	// rootCid is an identity CID
+	outFile := f.Retrieve(ctx, t, tempdir, rootCid, dealRes.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil)
+	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }
