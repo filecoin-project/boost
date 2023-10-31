@@ -535,6 +535,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
+		Override(new(dtypes.ProviderTransport), modules.NewProviderTransport),
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(server.ProviderDataTransfer), server.NewProviderDataTransfer),
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
@@ -561,8 +562,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 
 		// Lotus Markets (storage)
-		Override(new(dtypes.ProviderTransport), modules.NewProviderTransport),
-
 		Override(new(fsm.Group), modules.NewLegacyDealsFSM(cfg)),
 		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals(cfg)),
 		Override(HandleContractDealsKey, modules.HandleContractDeals(&cfg.ContractDeals)),
