@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
