@@ -144,6 +144,7 @@ function StorageDealsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
+                <th>Provider</th>
                 <th>Size</th>
                 <th>Client</th>
                 <th>State</th>
@@ -304,6 +305,7 @@ function DealRow(props) {
             <td className="deal-id">
                 <ShortDealLink id={deal.ID} />
             </td>
+            <td className="provider">{deal.ProviderAddress}</td>
             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
             <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
@@ -368,15 +370,6 @@ export function StorageDealsMenuItem(props) {
             <Link key="storage-deals" to={dealsBasePath}>
                     <h3>Storage Deals</h3>
             </Link>
-            {data ? (
-                <Link key="legacy-storage-deals" to={dealsBasePath}>
-                    <div className="menu-desc">
-                        <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
-                    </div>
-                </Link>
-            ) : null}
-
-            <LegacyStorageDealsCount />
         </div>
     )
 }

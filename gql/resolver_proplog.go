@@ -23,6 +23,10 @@ func (pl *proposalLogResolver) ClientAddress() string {
 	return pl.ProposalLog.ClientAddress.String()
 }
 
+func (pl *proposalLogResolver) ProviderAddress() string {
+	return pl.ProposalLog.ProviderAddress.String()
+}
+
 func (pl *proposalLogResolver) PieceSize() gqltypes.Uint64 {
 	return gqltypes.Uint64(pl.ProposalLog.PieceSize)
 }

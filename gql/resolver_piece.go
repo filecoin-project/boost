@@ -520,9 +520,14 @@ func (ss *sealStatusReporter) sealStatus(ctx context.Context) *sealStatusResolve
 	}
 
 	// Get the sealing status as reported by the StorageList API call
-	ss.ssm.LatestUpdateMu.Lock()
-	lu := ss.ssm.LatestUpdate
-	ss.ssm.LatestUpdateMu.Unlock()
+
+	mu := ss.ssm.LatestUpdateMus[maddr]
+	if mu == nil {
+		return &sealStatusResolver{Error: fmt.Sprintf("unable to find miner %s", maddr.String())}
+	}
+	mu.Lock()
+	lu := ss.ssm.LatestUpdates[maddr]
+	mu.Unlock()
 
 	// Check if the StorageList API call has completed at least once.
 	// If not, just return the sealing status reported by the SectorsStatus API call.

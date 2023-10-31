@@ -10,11 +10,12 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
+	sectorstatemgr_types "github.com/filecoin-project/boost/sectorstatemgr/types"
+	storagemarket_types "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
-	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
@@ -24,6 +25,7 @@ import (
 var log = logging.Logger("sectorstatemgr")
 
 type SectorStateUpdates struct {
+	Maddr           address.Address
 	Updates         map[abi.SectorID]db.SealState
 	ActiveSectors   map[abi.SectorID]struct{}
 	SectorWithDeals map[abi.SectorID]struct{}
@@ -31,38 +33,47 @@ type SectorStateUpdates struct {
 	UpdatedAt       time.Time
 }
 
-type StorageAPI interface {
-	StorageRedeclareLocal(context.Context, *storiface.ID, bool) error
-	StorageList(context.Context) (map[storiface.ID][]storiface.Decl, error)
-}
-
 type SectorStateMgr struct {
 	sync.Mutex
 
 	cfg         config.StorageConfig
 	fullnodeApi api.FullNode
-	minerApi    StorageAPI
-	Maddr       address.Address
+	minerApis   []sectorstatemgr_types.StorageAPI
+	Maddrs      []address.Address
 
 	PubSub *PubSub
 
-	LatestUpdateMu sync.Mutex
-	LatestUpdate   *SectorStateUpdates
+	LatestUpdateMus map[address.Address]*sync.Mutex
+	LatestUpdates   map[address.Address]*SectorStateUpdates
 
 	sdb *db.SectorStateDB
 }
 
-func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
-	return func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
+func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorStateDB, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress, me storagemarket_types.MinerEndpoints) (*SectorStateMgr, error) {
+	return func(lc fx.Lifecycle, sdb *db.SectorStateDB, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress, me storagemarket_types.MinerEndpoints) (*SectorStateMgr, error) {
+		addrs := me.Actors()
+		apis := make([]sectorstatemgr_types.StorageAPI, 0, len(addrs))
+		mus := make(map[address.Address]*sync.Mutex)
+		for _, addr := range addrs {
+			sApi, err := me.StorageAPI(addr)
+			if err != nil {
+				return nil, err
+			}
+			apis = append(apis, sApi)
+			mus[addr] = &sync.Mutex{}
+		}
+
 		mgr := &SectorStateMgr{
 			cfg:         cfg.Storage,
-			minerApi:    minerApi,
+			minerApis:   apis,
 			fullnodeApi: fullnodeApi,
-			Maddr:       address.Address(maddr),
+			Maddrs:      addrs,
 
 			PubSub: NewPubSub(),
 
-			sdb: sdb,
+			sdb:             sdb,
+			LatestUpdates:   make(map[address.Address]*SectorStateUpdates),
+			LatestUpdateMus: mus,
 		}
 
 		cctx, cancel := context.WithCancel(context.Background())
@@ -78,7 +89,7 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 			},
 		})
 
-		return mgr
+		return mgr, nil
 	}
 }
 
@@ -95,9 +106,14 @@ func (m *SectorStateMgr) UpdateLatest(ctx context.Context) {
 				}
 				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
 
-				m.LatestUpdateMu.Lock()
-				m.LatestUpdate = u
-				m.LatestUpdateMu.Unlock()
+				mu := m.LatestUpdateMus[u.Maddr]
+				if mu == nil {
+					log.Errorf("Received state update for an unknown miner %s", u.Maddr.String())
+					return
+				}
+				mu.Lock()
+				m.LatestUpdates[u.Maddr] = u
+				mu.Unlock()
 
 			case <-ctx.Done():
 				return
@@ -140,38 +156,69 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 
 	defer func(start time.Time) { log.Debugw("checkForUpdates", "took", time.Since(start)) }(time.Now())
 
-	ssu, err := m.refreshState(ctx)
+	ssus, err := m.refreshState(ctx)
 	if err != nil {
 		return err
 	}
 
-	for sectorID, sectorSealState := range ssu.Updates {
-		// Update the sector seal state in the database
-		err = m.sdb.Update(ctx, sectorID, sectorSealState)
-		if err != nil {
-			return fmt.Errorf("updating sectors unseal state in database for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+	for _, ssu := range ssus {
+		for sectorID, sectorSealState := range ssu.Updates {
+			// Update the sector seal state in the database
+			err = m.sdb.Update(ctx, sectorID, sectorSealState)
+			if err != nil {
+				return fmt.Errorf("updating sectors unseal state in database for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+			}
 		}
-	}
 
-	m.PubSub.Publish(ssu)
+		m.PubSub.Publish(ssu)
+	}
 
 	return nil
 }
 
-func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates, error) {
+func (m *SectorStateMgr) refreshState(ctx context.Context) ([]*SectorStateUpdates, error) {
+	var wg sync.WaitGroup
+	results := make(chan *SectorStateUpdates, len(m.Maddrs))
+
+	for i, addr := range m.Maddrs {
+		addr := addr
+		mapi := m.minerApis[i]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ssu, err := m.refreshMinerState(ctx, addr, mapi)
+			if err != nil {
+				log.Errorf("Error refrshing miner %s sectors state: %w", addr.String(), err)
+				return
+			}
+			results <- ssu
+		}()
+	}
+	wg.Wait()
+
+	close(results)
+
+	ssus := make([]*SectorStateUpdates, 0, len(m.Maddrs))
+	for ssu := range results {
+		ssus = append(ssus, ssu)
+	}
+	return ssus, nil
+}
+
+func (m *SectorStateMgr) refreshMinerState(ctx context.Context, maddr address.Address, minerApi sectorstatemgr_types.StorageAPI) (*SectorStateUpdates, error) {
 	defer func(start time.Time) { log.Debugw("refreshState", "took", time.Since(start)) }(time.Now())
 
 	// Tell lotus to update it's storage list and remove any removed sectors
 	if m.cfg.RedeclareOnStorageListRefresh {
 		log.Info("redeclaring storage")
-		err := m.minerApi.StorageRedeclareLocal(ctx, nil, true)
+		err := minerApi.StorageRedeclareLocal(ctx, nil, true)
 		if err != nil {
 			log.Errorw("redeclaring local storage on lotus miner", "err", err)
 		}
 	}
 
 	// Get the current unsealed state of all sectors from lotus
-	storageList, err := m.minerApi.StorageList(ctx)
+	storageList, err := minerApi.StorageList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting sectors state from lotus: %w", err)
 	}
@@ -234,17 +281,17 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		return nil, err
 	}
 
-	activeSet, err := m.fullnodeApi.StateMinerActiveSectors(ctx, m.Maddr, head.Key())
+	activeSet, err := m.fullnodeApi.StateMinerActiveSectors(ctx, maddr, head.Key())
 	if err != nil {
 		return nil, err
 	}
 
-	allSet, err := m.fullnodeApi.StateMinerSectors(ctx, m.Maddr, nil, head.Key())
+	allSet, err := m.fullnodeApi.StateMinerSectors(ctx, maddr, nil, head.Key())
 	if err != nil {
 		return nil, err
 	}
 
-	mid, err := address.IDFromAddress(m.Maddr)
+	mid, err := address.IDFromAddress(maddr)
 	if err != nil {
 		return nil, err
 	}
@@ -278,5 +325,5 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		}
 	}
 
-	return &SectorStateUpdates{sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
+	return &SectorStateUpdates{maddr, sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
 }
