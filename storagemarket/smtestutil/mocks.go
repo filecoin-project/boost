@@ -13,6 +13,8 @@ import (
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	mock_sectorstatemgr "github.com/filecoin-project/boost/sectorstatemgr/mock"
+	sectorstatemgr_types "github.com/filecoin-project/boost/sectorstatemgr/types"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -47,6 +49,10 @@ func (rs *mockRemoteServices) CommpCalculator() (types.CommpCalculator, error) {
 	return rs.minerStub, nil
 }
 
+func (rs *mockRemoteServices) StorageAPI(addr address.Address) (sectorstatemgr_types.StorageAPI, error) {
+	return rs.minerStub, nil
+}
+
 func (rs *mockRemoteServices) Actors() []address.Address {
 	return []address.Address{rs.actor}
 }
@@ -59,6 +65,7 @@ type MinerStub struct {
 	*mock_types.MockIndexProvider
 	*mock_piecedirectory.MockPieceReader
 	*mock_sealingpipeline.MockAPI
+	*mock_sectorstatemgr.MockStorageAPI
 
 	lk                    sync.Mutex
 	unblockCommp          map[uuid.UUID]chan struct{}

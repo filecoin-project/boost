@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	sectorstatemgr_types "github.com/filecoin-project/boost/sectorstatemgr/types"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
@@ -190,5 +191,6 @@ type MinerEndpoints interface {
 	SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error)
 	PieceAdder(addr address.Address) (PieceAdder, error)
 	CommpCalculator() (CommpCalculator, error)
+	StorageAPI(addr address.Address) (sectorstatemgr_types.StorageAPI, error)
 	Actors() []address.Address
 }

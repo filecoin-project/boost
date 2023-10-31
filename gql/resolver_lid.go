@@ -41,72 +41,94 @@ type lidState struct {
 
 // query: lid: [LID]
 func (r *resolver) LID(ctx context.Context) (*lidState, error) {
-	var lu *sectorstatemgr.SectorStateUpdates
-	for lu == nil {
-		r.ssm.LatestUpdateMu.Lock()
-		lu = r.ssm.LatestUpdate
-		r.ssm.LatestUpdateMu.Unlock()
-		if lu == nil {
-			time.Sleep(2 * time.Second)
-			log.Debug("LID sector states updates is nil, waiting for update...")
-		} else {
-			log.Debug("LID sector states updates set")
+	lus := make([]*sectorstatemgr.SectorStateUpdates, 0, len(r.ssm.Maddrs))
+
+	for _, addr := range r.ssm.Maddrs {
+		var lu *sectorstatemgr.SectorStateUpdates
+		for lu == nil {
+			mu := r.ssm.LatestUpdateMus[addr]
+			mu.Lock()
+			lu = r.ssm.LatestUpdates[addr]
+			mu.Unlock()
+			if lu == nil {
+				time.Sleep(2 * time.Second)
+				log.Debugf("LID sector states updates for miner %s is nil, waiting for update...", addr.String())
+			} else {
+				log.Debugf("LID sector states updates for miner %s set", addr.String())
+			}
 		}
+		lus = append(lus, lu)
 	}
 
 	var sealed, unsealed int32
-	for id, s := range lu.SectorStates { // TODO: consider adding this data directly in SSM
-		_, sectorHasDeals := lu.SectorWithDeals[id]
+	var sectorstates, activesectors int
+	for _, lu := range lus {
+		sectorstates += len(lu.SectorStates)
+		activesectors += len(lu.ActiveSectors)
 
-		if s == db.SealStateUnsealed {
-			unsealed++
-		} else if s == db.SealStateSealed && sectorHasDeals {
-			sealed++
+		for id, s := range lu.SectorStates { // TODO: consider adding this data directly in SSM
+			_, sectorHasDeals := lu.SectorWithDeals[id]
 
-			log.Debugw("LID only sealed sector", "miner", id.Miner, "sector_number", id.Number)
+			if s == db.SealStateUnsealed {
+				unsealed++
+			} else if s == db.SealStateSealed && sectorHasDeals {
+				sealed++
+
+				log.Debugw("LID only sealed sector", "miner", id.Miner, "sector_number", id.Number)
+			}
 		}
 	}
 
-	// TODO: pass in miner id explicitly from the UI
-	maddr := r.provider.Addresses[0]
-	fpHasUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
-		HasUnsealedCopy: true,
-		MinerAddr:       maddr,
-	})
-	if err != nil {
-		return nil, err
-	}
+	var fpHasUnsealed int
+	var fpNoUnsealed int
+	var ap int
+	// var scanProgress int
 
-	fpNoUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
-		HasUnsealedCopy: false,
-		MinerAddr:       maddr,
-	})
-	if err != nil {
-		return nil, err
+	for _, maddr := range r.ssm.Maddrs {
+		// TODO: pass in miner id explicitly from the UI
+		tfpHasUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
+			HasUnsealedCopy: true,
+			MinerAddr:       maddr,
+		})
+		if err != nil {
+			return nil, err
+		}
+		fpHasUnsealed += tfpHasUnsealed
+
+		tfpNoUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
+			HasUnsealedCopy: false,
+			MinerAddr:       maddr,
+		})
+		if err != nil {
+			return nil, err
+		}
+		fpNoUnsealed += tfpNoUnsealed
+
+		tap, err := r.piecedirectory.PiecesCount(ctx, maddr)
+		if err != nil {
+			return nil, err
+		}
+		ap += tap
+
+		// tscanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// scanProgress += int(tscanProgress.Progress)
 	}
 
 	flaggedPiecesCount := fpHasUnsealed + fpNoUnsealed
 
-	ap, err := r.piecedirectory.PiecesCount(ctx, maddr)
-	if err != nil {
-		return nil, err
-	}
-
-	scanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
-	if err != nil {
-		return nil, err
-	}
-
-	var lastScan *graphql.Time
-	if !scanProgress.LastScan.IsZero() {
-		lastScan = &graphql.Time{Time: scanProgress.LastScan}
-	}
+	// var lastScan *graphql.Time
+	// if !scanProgress.LastScan.IsZero() {
+	// 	lastScan = &graphql.Time{Time: scanProgress.LastScan}
+	// }
 
 	ls := &lidState{
-		ScanProgress: resolverScanProgress{
-			Progress: scanProgress.Progress,
-			LastScan: lastScan,
-		},
+		// ScanProgress: resolverScanProgress{
+		// 	Progress: scanProgress.Progress,
+		// 	LastScan: lastScan,
+		// },
 		FlaggedPieces: int32(flaggedPiecesCount),
 		Pieces: pieces{
 			Indexed:         int32(ap - flaggedPiecesCount),
@@ -118,8 +140,8 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 			Unsealed: unsealed,
 		},
 		SectorProvingState: sectorProvingState{
-			Active:   int32(len(lu.ActiveSectors)),
-			Inactive: int32(len(lu.SectorStates) - len(lu.ActiveSectors)), // TODO: add an explicit InactiveSectors in ssm
+			Active:   int32(activesectors),
+			Inactive: int32(sectorstates) - int32(activesectors), // TODO: add an explicit InactiveSectors in ssm
 		},
 	}
 

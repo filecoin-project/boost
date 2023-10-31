@@ -3,6 +3,7 @@ package sectorstatemgr
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/sectorstatemgr/mock"
+	sectorstatemgr_types "github.com/filecoin-project/boost/sectorstatemgr/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
@@ -38,12 +40,17 @@ func TestRefreshState(t *testing.T) {
 	mid, _ := address.IDFromAddress(maddr)
 	aid := abi.ActorID(mid)
 
+	mus := make(map[address.Address]*sync.Mutex)
+	mus[maddr] = &sync.Mutex{}
+
 	// setup sectorstatemgr
 	mgr := &SectorStateMgr{
-		cfg:         cfg,
-		minerApi:    minerApi,
-		fullnodeApi: fullnodeApi,
-		Maddr:       maddr,
+		cfg:             cfg,
+		minerApis:       []sectorstatemgr_types.StorageAPI{minerApi},
+		fullnodeApi:     fullnodeApi,
+		Maddrs:          []address.Address{maddr},
+		LatestUpdates:   make(map[address.Address]*SectorStateUpdates),
+		LatestUpdateMus: mus,
 
 		PubSub: NewPubSub(),
 	}
@@ -120,6 +127,7 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				expected2 := &SectorStateUpdates{
+					Maddr: maddr,
 					Updates: map[abi.SectorID]db.SealState{
 						sid3: db.SealStateUnsealed,
 						sid4: db.SealStateSealed,
@@ -143,10 +151,14 @@ func TestRefreshState(t *testing.T) {
 					require.NoError(t, err)
 
 					// trigger refreshState and later verify resulting struct
-					got2, err := mgr.refreshState(ctx)
+					got2s, err := mgr.refreshState(ctx)
 					require.NoError(t, err)
+					// we know that there is just one update given that there is just one miner
+					require.Equal(t, 1, len(got2s))
+					got2 := got2s[0]
 
 					zero := time.Time{}
+
 					require.NotEqual(t, got2.UpdatedAt, zero)
 
 					//null timestamp, so that we can do deep equal
@@ -200,6 +212,7 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				expected := &SectorStateUpdates{
+					Maddr: maddr,
 					Updates: map[abi.SectorID]db.SealState{
 						sid1: db.SealStateUnsealed,
 						sid2: db.SealStateSealed,
@@ -218,8 +231,11 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				exerciseAndVerify := func() {
-					got, err := mgr.refreshState(ctx)
+					gots, err := mgr.refreshState(ctx)
 					require.NoError(t, err)
+					// we know that there is just one update as there is just one miner
+					require.Equal(t, 1, len(gots))
+					got := gots[0]
 
 					zero := time.Time{}
 					require.NotEqual(t, got.UpdatedAt, zero)

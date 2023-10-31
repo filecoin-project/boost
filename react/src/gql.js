@@ -88,6 +88,7 @@ const DealsListQuery = gql`
                 ID
                 CreatedAt
                 ClientAddress
+                ProviderAddress
                 Checkpoint
                 CheckpointAt
                 AnnounceToIPNI
@@ -252,6 +253,7 @@ const ProposalLogsListQuery = gql`
                 CreatedAt
                 ClientAddress
                 PieceSize
+                ProviderAddress
             }
             totalCount
             more
@@ -324,7 +326,7 @@ const RetrievalLogsListQuery = gql`
                 TotalSent
                 DTStatus
                 DTMessage
-            }
+                            }
             totalCount
             more
         }

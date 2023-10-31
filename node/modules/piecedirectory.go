@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
@@ -161,8 +162,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(address.Address(maddr), store, ssm, fullnodeApi)
+func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode, me types.MinerEndpoints) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(me.Actors(), store, ssm, fullnodeApi)
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

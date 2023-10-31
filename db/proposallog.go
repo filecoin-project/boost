@@ -15,12 +15,13 @@ import (
 )
 
 type ProposalLog struct {
-	DealUUID      uuid.UUID
-	Accepted      bool
-	Reason        string
-	CreatedAt     time.Time
-	ClientAddress address.Address
-	PieceSize     abi.PaddedPieceSize
+	DealUUID        uuid.UUID
+	Accepted        bool
+	Reason          string
+	CreatedAt       time.Time
+	ClientAddress   address.Address
+	PieceSize       abi.PaddedPieceSize
+	ProviderAddress address.Address
 }
 
 type ProposalLogsDB struct {
@@ -32,8 +33,8 @@ func NewProposalLogsDB(db *sql.DB) *ProposalLogsDB {
 }
 
 func (p *ProposalLogsDB) InsertLog(ctx context.Context, deal types.DealParams, accepted bool, reason string) error {
-	qry := "INSERT INTO ProposalLogs (DealUUID, Accepted, Reason, CreatedAt, ClientAddress, PieceSize) "
-	qry += "VALUES (?, ?, ?, ?, ?, ?)"
+	qry := "INSERT INTO ProposalLogs (DealUUID, Accepted, Reason, CreatedAt, ClientAddress, PieceSize, ProviderAddress) "
+	qry += "VALUES (?, ?, ?, ?, ?, ?, ?)"
 	values := []interface{}{
 		deal.DealUUID,
 		accepted,
@@ -41,13 +42,14 @@ func (p *ProposalLogsDB) InsertLog(ctx context.Context, deal types.DealParams, a
 		time.Now(),
 		deal.ClientDealProposal.Proposal.Client.String(),
 		deal.ClientDealProposal.Proposal.PieceSize,
+		deal.ClientDealProposal.Proposal.Provider.String(),
 	}
 	_, err := p.db.ExecContext(ctx, qry, values...)
 	return err
 }
 
 func (p *ProposalLogsDB) List(ctx context.Context, accepted *bool, cursor *time.Time, offset int, limit int) ([]ProposalLog, error) {
-	qry := "SELECT DealUUID, Accepted, Reason, CreatedAt, ClientAddress, PieceSize FROM ProposalLogs"
+	qry := "SELECT DealUUID, Accepted, Reason, CreatedAt, ClientAddress, PieceSize, ProviderAddress FROM ProposalLogs"
 	where := ""
 	args := []interface{}{}
 	if cursor != nil {
@@ -90,23 +92,35 @@ func (p *ProposalLogsDB) List(ctx context.Context, accepted *bool, cursor *time.
 	propsLogs := make([]ProposalLog, 0, sz)
 	for rows.Next() {
 		var propsLog ProposalLog
-		addrFD := &fielddef.AddrFieldDef{F: &propsLog.ClientAddress}
+		clientAddrFD := &fielddef.AddrFieldDef{F: &propsLog.ClientAddress}
+		providerAddrFD := &fielddef.AddrFieldDef{F: &propsLog.ProviderAddress}
 		err := rows.Scan(
 			&propsLog.DealUUID,
 			&propsLog.Accepted,
 			&propsLog.Reason,
 			&propsLog.CreatedAt,
-			addrFD.FieldPtr(),
-			&propsLog.PieceSize)
+			clientAddrFD.FieldPtr(),
+			&propsLog.PieceSize,
+			providerAddrFD.FieldPtr(),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("getting deal proposal log: %w", err)
 		}
 
-		err = addrFD.Unmarshall()
+		err = clientAddrFD.Unmarshall()
 		if err != nil {
-			return nil, fmt.Errorf("unmarshalling client address %s: %w", addrFD.Marshalled, err)
+			return nil, fmt.Errorf("unmarshalling client address %s: %w", clientAddrFD.Marshalled, err)
 		}
-		propsLog.ClientAddress = *addrFD.F
+		propsLog.ClientAddress = *clientAddrFD.F
+
+		// provider address can be empty for older deals
+		if len(providerAddrFD.Marshalled) > 0 {
+			err = providerAddrFD.Unmarshall()
+			if err != nil {
+				return nil, fmt.Errorf("unmarshalling provider address %s: %w", providerAddrFD.Marshalled, err)
+			}
+			propsLog.ProviderAddress = *providerAddrFD.F
+		}
 
 		propsLogs = append(propsLogs, propsLog)
 	}

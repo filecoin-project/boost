@@ -96,6 +96,7 @@ function ProposalLogsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
+                <th>Provider</th>
                 <th>Piece Size</th>
                 <th>Client</th>
                 <th>Status</th>
@@ -156,6 +157,7 @@ function LogRow(props) {
                 <span id={copyId} className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
                 {log.Accepted ? <ShortDealLink id={log.DealUUID} /> : <ShortDealID id={log.DealUUID} />}
             </td>
+            <td className="provider">{log.ProviderAddress}</td>
             <td className="size">
                 {humanFileSize(log.PieceSize)}
             </td>

@@ -38,6 +38,7 @@ import (
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/sectorstatemgr"
+	sectorstatemgr_types "github.com/filecoin-project/boost/sectorstatemgr/types"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -928,9 +929,9 @@ type minerEndpoints struct {
 }
 
 func (me *minerEndpoints) SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error) {
-	x := me.storageServices[addr]
+	x := me.sealingServices[addr]
 	if x == nil {
-		return nil, fmt.Errorf("can not find sealing pipiline api for miner %s. has the miner been configured correctly?", addr.String())
+		return nil, fmt.Errorf("can not find sealing service for miner %s. has the miner been configured correctly?", addr.String())
 	}
 	return x, nil
 }
@@ -948,6 +949,14 @@ func (me *minerEndpoints) CommpCalculator() (types.CommpCalculator, error) {
 		return ss, nil
 	}
 	return nil, fmt.Errorf("can not get commp calculator as no miner has been configured")
+}
+
+func (me *minerEndpoints) StorageAPI(addr address.Address) (sectorstatemgr_types.StorageAPI, error) {
+	x := me.storageServices[addr]
+	if x == nil {
+		return nil, fmt.Errorf("can not find storage service for miner %s. has the miner been configured correctly?", addr.String())
+	}
+	return x, nil
 }
 
 func (me *minerEndpoints) Actors() []address.Address {

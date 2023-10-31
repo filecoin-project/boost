@@ -236,6 +236,7 @@ type ProposalLog {
   CreatedAt: Time!
   ClientAddress: String!
   PieceSize: Uint64!
+  ProviderAddress: String!
 }
 
 type ProposalLogsList {
@@ -283,7 +284,7 @@ type RetrievalState {
   DTMessage: String!
   DTEvents: [DTEvent]!
   MarketEvents: [MarketEvent]!
-}
+  }
 
 type RetrievalStateList {
   totalCount: Int!
