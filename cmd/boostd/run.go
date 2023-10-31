@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -11,7 +12,6 @@ import (
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/hashicorp/go.net/context"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
