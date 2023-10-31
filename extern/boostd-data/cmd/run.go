@@ -197,6 +197,12 @@ var yugabyteMigrateCmd = &cli.Command{
 			Name:  "miner-address",
 			Usage: "default miner address eg f1234",
 		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("migrations", "info")
@@ -206,6 +212,7 @@ var yugabyteMigrateCmd = &cli.Command{
 		settings := yugabyte.DBSettings{
 			Hosts:         cctx.StringSlice("hosts"),
 			ConnectString: cctx.String("connect-string"),
+			CQLTimeout:    cctx.Int("CQLTimeout"),
 		}
 
 		maddr := migrations.DisabledMinerAddr
