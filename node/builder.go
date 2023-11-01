@@ -131,47 +131,22 @@ const (
 	StartListeningKey
 	BootstrapKey
 
-	// filecoin
-	SetGenesisKey
-
-	RunHelloKey
-	RunChainExchangeKey
-	RunChainGraphsync
-	RunPeerMgrKey
-
-	HandleIncomingBlocksKey
-	HandleIncomingMessagesKey
-	HandleMigrateClientFundsKey
-	HandlePaymentChannelManagerKey
-
 	// miner
-	GetParamsKey
+	StartProviderDataTransferKey
 	StartPieceDoctorKey
-	HandleMigrateProviderFundsKey
-	HandleDealsKey
 	HandleCreateRetrievalTablesKey
-	HandleSetShardSelector
-	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey
-	HandleRetrievalKey
 	HandleRetrievalAskKey
 	HandleRetrievalTransportsKey
 	HandleProtocolProxyKey
-	RunSectorServiceKey
 
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
 	HandleContractDealsKey
 	HandleProposalLogCleanerKey
-	HandleOnlineBackupMgrKey
 
 	// daemon
 	ExtractApiKey
-	HeadMetricsKey
-	SettlePaymentChannelsKey
-	RunPeerTaggerKey
-	SetupFallbackBlockstoresKey
-	HandleSetLinkSystem
 
 	SetApiEndpointKey
 
@@ -537,7 +512,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Lotus Markets
 		Override(new(dtypes.ProviderTransport), modules.NewProviderTransport),
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
-		Override(new(server.ProviderDataTransfer), server.NewProviderDataTransfer),
+		Override(StartProviderDataTransferKey, server.NewProviderDataTransfer),
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),

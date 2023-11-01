@@ -844,61 +844,65 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 	dservOffline := dag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
 
 	// if we used a selector - need to find the sub-root the user actually wanted to retrieve
-	if !selectorNode.IsNull() {
-		var subRootFound bool
-		err := utils.TraverseDag(
-			ctx,
-			dservOffline,
-			root,
-			selectorNode,
-			func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
-				if r == traversal.VisitReason_SelectionMatch {
+	if selectorNode != nil {
+		if !selectorNode.IsNull() {
+			var subRootFound bool
+			err := utils.TraverseDag(
+				ctx,
+				dservOffline,
+				root,
+				selectorNode,
+				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
+					if r == traversal.VisitReason_SelectionMatch {
 
-					if p.LastBlock.Path.String() != p.Path.String() {
-						return xerrors.Errorf("unsupported selection path '%s' does not correspond to a node boundary (a.k.a. CID link)", p.Path.String())
+						if p.LastBlock.Path.String() != p.Path.String() {
+							return xerrors.Errorf("unsupported selection path '%s' does not correspond to a node boundary (a.k.a. CID link)", p.Path.String())
+						}
+
+						cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
+						if !castOK {
+							return xerrors.Errorf("cidlink cast unexpectedly failed on '%s'", p.LastBlock.Link.String())
+						}
+
+						root = cidLnk.Cid
+						subRootFound = true
 					}
-
-					cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
-					if !castOK {
-						return xerrors.Errorf("cidlink cast unexpectedly failed on '%s'", p.LastBlock.Link.String())
-					}
-
-					root = cidLnk.Cid
-					subRootFound = true
-				}
-				return nil
-			},
-		)
-		require.NoError(t, err)
-		require.True(t, subRootFound)
+					return nil
+				},
+			)
+			require.NoError(t, err)
+			require.True(t, subRootFound)
+		}
 	}
 
 	dnode, err := dservOffline.Get(ctx, root)
 	require.NoError(t, err)
 
 	var out string
+	retPath := path.Join(tempdir, "retrievals")
+	_ = os.Mkdir(retPath, 0755)
 
 	if !extractCar {
 		// Write file as car file
-		file, err1 := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String()+".car")
-		require.NoError(t, err1)
+		file, err := os.CreateTemp(retPath, "*"+root.String()+".car")
+		require.NoError(t, err)
 		out = file.Name()
-		err1 = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
-		require.NoError(t, err1)
+		err = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
+		require.NoError(t, err)
 
 	} else {
 		// Otherwise write file as UnixFS File
-		ufsFile, err1 := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
-		require.NoError(t, err1)
-		file, err1 := os.CreateTemp(path.Join(tempdir, "retrievals"), "*"+root.String())
-		require.NoError(t, err1)
-		err1 = file.Close()
-		require.NoError(t, err1)
-		err1 = os.Remove(file.Name())
-		require.NoError(t, err1)
-		err1 = files.WriteTo(ufsFile, file.Name())
-		require.NoError(t, err1)
-
+		ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
+		require.NoError(t, err)
+		file, err := os.CreateTemp(retPath, "*"+root.String())
+		require.NoError(t, err)
+		err = file.Close()
+		require.NoError(t, err)
+		err = os.Remove(file.Name())
+		require.NoError(t, err)
+		err = files.WriteTo(ufsFile, file.Name())
+		require.NoError(t, err)
+		out = file.Name()
 	}
 
 	return out

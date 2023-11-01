@@ -31,6 +31,7 @@ func NewProviderDataTransfer(lc fx.Lifecycle, net dtypes.ProviderTransferNetwork
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			dt.SubscribeToEvents(marketevents.DataTransferLogger)
+			log.Infof("started provider data transfer")
 			return dt.Start(ctx)
 		},
 		OnStop: func(ctx context.Context) error {
