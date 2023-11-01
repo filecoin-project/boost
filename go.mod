@@ -323,7 +323,7 @@ require (
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.25.0-rc1
+	github.com/filecoin-project/lotus v1.25.0-rc2
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
 	github.com/ipld/frisbii v0.4.1
