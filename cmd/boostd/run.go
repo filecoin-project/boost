@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -63,11 +62,10 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		ctxx := lcli.ReqContext(cctx)
-		var ctx context.Context
+		ctx := lcli.ReqContext(cctx)
 
 		if !cctx.Bool("no-metrics") {
-			ctx, _ = tag.New(ctxx,
+			ctx, _ = tag.New(ctx,
 				tag.Insert(metrics.Version, build.BuildVersion),
 				tag.Insert(metrics.Commit, build.CurrentCommit),
 				tag.Insert(metrics.NodeType, "boostd"),
@@ -81,8 +79,6 @@ var runCmd = &cli.Command{
 			}
 			// Set the metric to one so, it is published to the exporter
 			stats.Record(ctx, metrics.BoostInfo.M(1))
-		} else {
-			ctx = ctxx
 		}
 
 		log.Debug("Checking full node version")

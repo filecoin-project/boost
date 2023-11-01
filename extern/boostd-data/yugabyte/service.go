@@ -186,7 +186,6 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	err := s.session.Query(qry, pieceCid.Bytes(), hash).WithContext(ctx).Scan(&offset, &size)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
-		stats.Record(s.ctx, metrics.FailureGetOffsetSizeCount.M(1))
 		return nil, fmt.Errorf("getting offset / size: %w", err)
 	}
 
