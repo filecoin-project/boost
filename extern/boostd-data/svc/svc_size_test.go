@@ -11,7 +11,7 @@ import (
 
 	"github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/testutils"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
@@ -60,7 +60,7 @@ func testSizeLimit(ctx context.Context, t *testing.T, bdsvc *Service, addr strin
 
 	// 32GB file with 1k block size
 	recordCount := 32 * 1024 * 1024
-	baseCid := testutil.GenerateCid().Bytes()
+	baseCid := testutils.GenerateCid().Bytes()
 	recStart := time.Now()
 	tlg.Infof("generating %d records", recordCount)
 	var records []model.Record

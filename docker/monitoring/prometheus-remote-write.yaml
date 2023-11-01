@@ -23,6 +23,11 @@ scrape_configs:
       - targets: [ 'booster-http:7777' ]
         labels:
           host: 'unknown'
+  - job_name: 'boostd-data'
+    static_configs:
+      - targets: [ 'boostd-data:8042' ]
+        labels:
+          host: 'unknown'
 
 remote_write:
   - url: <remote-write-url>

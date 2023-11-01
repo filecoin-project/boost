@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
@@ -17,6 +18,8 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -57,6 +60,7 @@ type Store struct {
 	session   *gocql.Session
 	db        *pgxpool.Pool
 	startOnce sync.Once
+	ctx       context.Context
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -107,6 +111,7 @@ func (s *Store) Start(ctx context.Context) error {
 			return
 		}
 		s.db = db
+		s.ctx = ctx
 
 		// Create tables
 		startErr = s.Create(ctx)
@@ -118,6 +123,17 @@ func (s *Store) Start(ctx context.Context) error {
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.add_deal_for_pieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureAddDealForPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessAddDealForPieceCount.M(1))
+		}
+	}()
 
 	err := s.createPieceMetadata(ctx, pieceCid)
 	if err != nil {
@@ -136,6 +152,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 		return fmt.Errorf("inserting deal %s for piece %s", dealInfo.DealUuid, pieceCid)
 	}
 
+	failureMetrics = false
 	return nil
 }
 
@@ -145,12 +162,24 @@ func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	if err != nil {
 		return fmt.Errorf("inserting piece metadata for piece %s: %w", pieceCid, err)
 	}
+
 	return nil
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_offset_size"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureGetOffsetSizeCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessGetOffsetSizeCount.M(1))
+		}
+	}()
 
 	var offset, size uint64
 	qry := `SELECT BlockOffset, BlockSize FROM PieceBlockOffsetSize WHERE PieceCid = ? AND PayloadMultihash = ?`
@@ -160,11 +189,24 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 		return nil, fmt.Errorf("getting offset / size: %w", err)
 	}
 
+	failureMetrics = false
 	return &model.OffsetSize{Offset: offset, Size: size}, nil
 }
 
 // Get piece metadata with deals
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureGetPieceMetadataCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessGetPieceMetadataCount.M(1))
+		}
+	}()
+
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return md, err
@@ -176,6 +218,7 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	}
 	md.Deals = deals
 
+	failureMetrics = false
 	return md, nil
 }
 
@@ -200,6 +243,17 @@ func (s *Store) getPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_deals")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_piece_deals"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureGetPieceDealsCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessGetPieceDealsCount.M(1))
+		}
+	}()
 
 	// Get deals for piece
 	qry := `SELECT DealUuid, IsLegacy, ChainDealID, MinerAddr, ` +
@@ -234,6 +288,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 		}
 	}
 
+	failureMetrics = false
 	return deals, nil
 }
 
@@ -241,6 +296,17 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.pieces_containing_multihash"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailurePiecesContainingMultihashCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessPiecesContainingMultihashCount.M(1))
+		}
+	}()
 
 	// Get all piece cids referred to by the multihash
 	pcids := make([]cid.Cid, 0, 1)
@@ -263,12 +329,24 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 		return nil, normalizeMultihashError(m, types.ErrNotFound)
 	}
 
+	failureMetrics = false
 	return pcids, nil
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.get_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureGetIndexCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessGetIndexCount.M(1))
+		}
+	}()
 
 	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM PieceBlockOffsetSize WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
@@ -330,12 +408,16 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 		}
 	}
 
+	failureMetrics = false
 	return records, nil
 }
 
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.add_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
 
 	// Set up the progress channel
 	progress := make(chan types.AddIndexProgress, 2)
@@ -373,6 +455,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 		var lastProg *types.AddIndexProgress
 		if err != nil {
 			// If there was an error, send it as the last progress update
+			stats.Record(s.ctx, metrics.FailureAddIndexCount.M(1))
 			lastProg = &types.AddIndexProgress{Err: err.Error()}
 		} else if lastUpdateValue != nil {
 			// If there is an outstanding update that hasn't been sent out
@@ -433,6 +516,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 		}
 		updateProgress(1)
 		completeProgress(nil)
+		stats.Record(s.ctx, metrics.SuccessAddIndexCount.M(1))
 	}()
 
 	return progress
@@ -499,16 +583,40 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.is_incomplete_index")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.is_complete_index"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureIsCompleteIndexCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessIsCompleteIndexCount.M(1))
+		}
+	}()
 
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return false, err
 	}
 
+	failureMetrics = false
 	return md.CompleteIndex, nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.is_indexed"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureIsIndexedCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessIsIndexedCount.M(1))
+		}
+	}()
+
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
 		if isNotFoundErr(err) {
@@ -516,12 +624,24 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 		}
 		return false, err
 	}
+	failureMetrics = false
 	return !t.IsZero(), nil
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.indexed_at")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.indexed_at"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureIndexedAtCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessIndexedAtCount.M(1))
+		}
+	}()
 
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
@@ -531,12 +651,24 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 		return time.Time{}, err
 	}
 
+	failureMetrics = false
 	return md.IndexedAt, nil
 }
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.list_pieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureListPiecesCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessListPiecesCount.M(1))
+		}
+	}()
 
 	iter := s.session.Query("SELECT PieceCid FROM PieceMetadata").WithContext(ctx).Iter()
 	var pcids []cid.Cid
@@ -553,6 +685,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 		return nil, fmt.Errorf("getting piece cids: %w", err)
 	}
 
+	failureMetrics = false
 	return pcids, nil
 }
 
@@ -560,6 +693,17 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_deal_for_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureRemoveDealForPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessRemoveDealForPieceCount.M(1))
+		}
+	}()
 
 	qry := `DELETE FROM PieceDeal WHERE DealUuid = ?`
 	err := s.session.Query(qry, dealId).WithContext(ctx).Exec()
@@ -586,6 +730,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 		return fmt.Errorf("removing deal: %w", err)
 	}
 
+	failureMetrics = false
 	return nil
 }
 
@@ -593,6 +738,17 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_piece_metadata"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureRemovePieceMetadataCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessRemovePieceMetadataCount.M(1))
+		}
+	}()
 
 	qry := `DELETE FROM PieceMetadata WHERE PieceCid = ?`
 	err := s.session.Query(qry, pieceCid.String()).WithContext(ctx).Exec()
@@ -600,6 +756,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 		return fmt.Errorf("removing piece metadata for piece %s: %w", pieceCid, err)
 	}
 
+	failureMetrics = false
 	return nil
 }
 
@@ -608,6 +765,17 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_indexes"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureRemoveIndexesCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessRemoveIndexesCount.M(1))
+		}
+	}()
 
 	// Get multihashes for piece
 	recs, err := s.GetIndex(ctx, pieceCid)
@@ -653,6 +821,7 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 		return fmt.Errorf("removing indexes for piece %s: deleting offset / size info: %w", pieceCid, err)
 	}
 
+	failureMetrics = false
 	return nil
 }
 

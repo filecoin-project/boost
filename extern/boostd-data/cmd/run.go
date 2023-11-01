@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/build"
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc"
@@ -15,6 +17,9 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 )
 
 var runCmd = &cli.Command{
@@ -127,7 +132,7 @@ var yugabyteCmd = &cli.Command{
 }
 
 func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
-	ctx := cliutil.ReqContext(cctx)
+	ctxx := cliutil.ReqContext(cctx)
 
 	if cctx.Bool("pprof") {
 		go func() {
@@ -137,6 +142,20 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 			}
 		}()
 	}
+
+	ctx, _ := tag.New(ctxx,
+		tag.Insert(metrics.Version, build.BuildVersion),
+		tag.Insert(metrics.Commit, build.CurrentCommit),
+		tag.Insert(metrics.NodeType, "boostd-data"),
+	)
+	// Register all metric views
+	if err := view.Register(
+		metrics.DefaultViews...,
+	); err != nil {
+		log.Fatalf("Cannot register the view: %v", err)
+	}
+	// Set the metric to one so, it is published to the exporter
+	stats.Record(ctx, metrics.BoostInfo.M(1))
 
 	// Instantiate the tracer and exporter
 	enableTracing := cctx.Bool("tracing")

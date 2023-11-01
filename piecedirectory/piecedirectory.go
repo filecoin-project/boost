@@ -262,6 +262,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	// Get a reader over the piece data
 	log.Debugw("add index: get index", "pieceCid", pieceCid)
 	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.MinerAddr, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+	log.Debugf("got the piece reader for piece %s and deal %s", pieceCid, dealInfo.DealUuid)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}

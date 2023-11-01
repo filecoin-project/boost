@@ -8,7 +8,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
@@ -24,6 +26,9 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 )
 
 const (
@@ -153,6 +158,10 @@ var runCmd = &cli.Command{
 			Hidden: true,
 			Value:  true,
 		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
@@ -171,8 +180,26 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the local index directory service
 		ctx := lcli.ReqContext(cctx)
+
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "booster-http"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err := view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		}
+
+		// Connect to the local index directory service
 		cl := bdclient.NewStore()
 		defer cl.Close(ctx)
 		err := cl.Dial(ctx, cctx.String("api-lid"))
