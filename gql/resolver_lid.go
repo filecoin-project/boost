@@ -82,7 +82,8 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 	var fpHasUnsealed int
 	var fpNoUnsealed int
 	var ap int
-	// var scanProgress int
+	var scanProgress float64
+	var tlastScan time.Time
 
 	for _, maddr := range r.ssm.Maddrs {
 		// TODO: pass in miner id explicitly from the UI
@@ -110,25 +111,29 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		}
 		ap += tap
 
-		// tscanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// scanProgress += int(tscanProgress.Progress)
+		tscanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
+		if err != nil {
+			return nil, err
+		}
+		if tlastScan.IsZero() || tscanProgress.LastScan.After(tlastScan) {
+			tlastScan = tscanProgress.LastScan
+		}
+
+		scanProgress += tscanProgress.Progress
 	}
 
 	flaggedPiecesCount := fpHasUnsealed + fpNoUnsealed
 
-	// var lastScan *graphql.Time
-	// if !scanProgress.LastScan.IsZero() {
-	// 	lastScan = &graphql.Time{Time: scanProgress.LastScan}
-	// }
+	var lastScan *graphql.Time
+	if !tlastScan.IsZero() {
+		lastScan = &graphql.Time{Time: tlastScan}
+	}
 
 	ls := &lidState{
-		// ScanProgress: resolverScanProgress{
-		// 	Progress: scanProgress.Progress,
-		// 	LastScan: lastScan,
-		// },
+		ScanProgress: resolverScanProgress{
+			Progress: scanProgress,
+			LastScan: lastScan,
+		},
 		FlaggedPieces: int32(flaggedPiecesCount),
 		Pieces: pieces{
 			Indexed:         int32(ap - flaggedPiecesCount),
