@@ -32,7 +32,7 @@ func TestTrustlessGateway(t *testing.T) {
 	framework.SetLogLevel()
 
 	boostAndMiner := framework.NewTestFramework(ctx, t, framework.EnableLegacyDeals(true))
-	req.NoError(boostAndMiner.Start(framework.WithMaxStagingDealsBytes(40000000)))
+	req.NoError(boostAndMiner.Start(framework.WithMaxStagingDealsBytes(100000000)))
 	defer boostAndMiner.Stop()
 
 	req.NoError(boostAndMiner.AddClientProviderBalance(abi.NewTokenAmount(1e15)))
