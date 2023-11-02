@@ -37,6 +37,8 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
@@ -47,7 +49,6 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -1079,7 +1080,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 
-				return h.newDealBuilder(t, 1, withEpochs(10, market.DealMaxDuration+11)).withNoOpMinerStub().build()
+				return h.newDealBuilder(t, 1, withEpochs(10, abi.ChainEpoch(1278*builtin.EpochsInDay)+11)).withNoOpMinerStub().build() // TODO: Use v12 value from package when Lotus has updated the API package to use market v12
 			},
 			expectedErr: "deal duration out of bounds",
 		},

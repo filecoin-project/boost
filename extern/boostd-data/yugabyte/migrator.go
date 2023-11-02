@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/cassmigrate"
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
@@ -49,6 +51,7 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 
 	// Create a cassandra connection to be used only for running migrations.
 	cluster := gocql.NewCluster(m.settings.Hosts...)
+	cluster.Timeout = time.Duration(m.settings.CQLTimeout) * time.Second
 	cluster.Keyspace = m.CassandraKeyspace
 	session, err := cluster.CreateSession()
 	if err != nil {

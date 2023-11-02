@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -64,6 +65,7 @@ func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
 	server.Register("boostddata", s.Impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
+	router.Handle("/metrics", metrics.Exporter("boostd_data")) // metrics
 
 	srv := &http.Server{Handler: router}
 	log.Infow("local index directory server is listening", "addr", ln.Addr())

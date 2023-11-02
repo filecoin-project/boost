@@ -12,16 +12,15 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin"
 	markettypes "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
-	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
-
-	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
@@ -110,7 +109,7 @@ func (c *ClientNodeAdapter) AddFunds(ctx context.Context, addr address.Address, 
 		To:     marketactor.Address,
 		From:   addr,
 		Value:  amount,
-		Method: builtin6.MethodsMarket.AddBalance,
+		Method: builtin.MethodsMarket.AddBalance,
 	}, nil)
 	if err != nil {
 		return cid.Undef, err
@@ -179,7 +178,7 @@ func (c *ClientNodeAdapter) ValidatePublishedDeal(ctx context.Context, deal stor
 		return 0, xerrors.Errorf("deal publish message wasn't set to StorageMarket actor (to=%s)", pubmsg.To)
 	}
 
-	if pubmsg.Method != builtin6.MethodsMarket.PublishStorageDeals {
+	if pubmsg.Method != builtin.MethodsMarket.PublishStorageDeals {
 		return 0, xerrors.Errorf("deal publish message called incorrect method (method=%s)", pubmsg.Method)
 	}
 

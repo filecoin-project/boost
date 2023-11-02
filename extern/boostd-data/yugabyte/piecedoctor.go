@@ -6,12 +6,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
@@ -36,6 +39,18 @@ type pieceCreated struct {
 func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.next_piece_to_check"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureNextPiecesToCheckCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessNextPiecesToCheckCount.M(1))
+		}
+	}()
 
 	//
 	// 1. Get any new pieces that have been added to the PieceMetadata
@@ -174,6 +189,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 
 	log.Debugw("got tracker pieces", "count", len(pcids),
 		"last updated", lastCopied.String(), "now", now.String(), "piece-check-period", pieceCheckPeriod.String())
+	failureMetrics = false
 	return pcids, nil
 }
 
@@ -242,6 +258,17 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.piece_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailurePiecesCountCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessPiecesCountCount.M(1))
+		}
+	}()
 
 	var count int
 	qry := `SELECT COUNT(*) FROM PieceTracker WHERE MinerAddr = $1`
@@ -250,6 +277,7 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 		return 0, fmt.Errorf("getting pieces count: %w", err)
 	}
 
+	failureMetrics = false
 	return count, nil
 }
 
@@ -257,6 +285,17 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.scan_progress"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureScanProgressCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessScanProgressCount.M(1))
+		}
+	}()
 
 	// Get the total rows scanned so far
 	var scanned int
@@ -297,6 +336,7 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 		progress = 1
 	}
 
+	failureMetrics = false
 	return &types.ScanProgress{Progress: progress, LastScan: lastScanRes.Time}, nil
 }
 
@@ -304,6 +344,17 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureFlagPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessFlagPieceCount.M(1))
+		}
+	}()
 
 	now := time.Now()
 	qry := `INSERT INTO PieceFlagged (MinerAddr, PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy) ` +
@@ -313,6 +364,7 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	if err != nil {
 		return fmt.Errorf("flagging piece %s: %w", pieceCid, err)
 	}
+	failureMetrics = false
 	return nil
 }
 
@@ -320,6 +372,17 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.unflag_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureUnflagPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessUnflagPieceCount.M(1))
+		}
+	}()
 
 	qry := `DELETE FROM PieceFlagged WHERE MinerAddr = $1 AND PieceCid = $2`
 	_, err := s.db.Exec(ctx, qry, maddr.String(), pieceCid.String())
@@ -327,6 +390,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address
 		return fmt.Errorf("unflagging piece %s %s: %w", maddr, pieceCid, err)
 	}
 
+	failureMetrics = false
 	return nil
 }
 
@@ -340,6 +404,17 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	span.SetAttributes(attribute.Int("offset", offset))
 	span.SetAttributes(attribute.Int("limit", limit))
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flagged_pieces_list"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureFlaggedPiecesListCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessFlaggedPiecesListCount.M(1))
+		}
+	}()
 
 	var args []interface{}
 	idx := 0
@@ -413,12 +488,24 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 		return nil, fmt.Errorf("getting flagged pieces: %w", err)
 	}
 
+	failureMetrics = false
 	return pieces, nil
 }
 
 func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.flagged_pieces_count"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureFlaggedPiecesCountCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessFlaggedPiecesCountCount.M(1))
+		}
+	}()
 
 	var args []interface{}
 	var count int
@@ -437,5 +524,6 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 		return 0, fmt.Errorf("getting flagged pieces count: %w", err)
 	}
 
+	failureMetrics = false
 	return count, nil
 }

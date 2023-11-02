@@ -96,23 +96,39 @@ func (ps *PieceDirectory) Start(ctx context.Context) {
 }
 
 func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; FlaggedPiecesList span", "took", time.Since(start))
+	}(time.Now())
+
 	return ps.store.FlaggedPiecesList(ctx, filter, cursor, offset, limit)
 }
 
 func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter) (int, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; FlaggedPiecesCount span", "took", time.Since(start))
+	}(time.Now())
+
 	return ps.store.FlaggedPiecesCount(ctx, filter)
 }
 
 func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
+	defer func(start time.Time) { log.Debugw("piece directory ; PiecesCount span", "took", time.Since(start)) }(time.Now())
+
 	return ps.store.PiecesCount(ctx, maddr)
 }
 
 func (ps *PieceDirectory) ScanProgress(ctx context.Context, maddr address.Address) (*bdtypes.ScanProgress, error) {
+	defer func(start time.Time) { log.Debugw("piece directory ; ScanProgress span", "took", time.Since(start)) }(time.Now())
+
 	return ps.store.ScanProgress(ctx, maddr)
 }
 
 // Get all metadata about a particular piece
 func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (types.PieceDirMetadata, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; GetPieceMetadata span", "took", time.Since(start))
+	}(time.Now())
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
 	defer span.End()
 
@@ -137,6 +153,10 @@ func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid
 
 // Get the list of deals (and the sector the data is in) for a particular piece
 func (ps *PieceDirectory) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; GetPieceDeals span", "took", time.Since(start))
+	}(time.Now())
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_deals")
 	defer span.End()
 
@@ -149,6 +169,10 @@ func (ps *PieceDirectory) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) (
 }
 
 func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; GetOffsetSize span", "took", time.Since(start))
+	}(time.Now())
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_offset")
 	defer span.End()
 
@@ -156,7 +180,9 @@ func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, h
 }
 
 func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	log.Debugw("add deal for piece", "piececid", pieceCid, "uuid", dealInfo.DealUuid)
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; AddDealForPiece span", "piececid", pieceCid, "uuid", dealInfo.DealUuid, "took", time.Since(start))
+	}(time.Now())
 
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
@@ -242,6 +268,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	// Get a reader over the piece data
 	log.Debugw("add index: get index", "pieceCid", pieceCid)
 	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.MinerAddr, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+	log.Debugf("got the piece reader for piece %s and deal %s", pieceCid, dealInfo.DealUuid)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
@@ -341,6 +368,10 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 // corresponding to an unsealed sector for this method to work. It will try to build index
 // using all available deals and will exit as soon as it succeeds for one of the deals
 func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; BuildIndexForPiece span", "took", time.Since(start))
+	}(time.Now())
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
 	defer span.End()
 
@@ -532,6 +563,10 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
 func (ps *PieceDirectory) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
+	defer func(start time.Time) {
+		log.Debugw("piece directory ; PiecesContainingMultihash span", "took", time.Since(start))
+	}(time.Now())
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.pieces_containing_multihash")
 	defer span.End()
 

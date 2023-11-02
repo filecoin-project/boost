@@ -2,10 +2,18 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"time"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/build"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -15,9 +23,6 @@ import (
 
 	lcliutil "github.com/filecoin-project/lotus/cli/util"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-
-	"net/http"
-	_ "net/http/pprof"
 
 	"github.com/urfave/cli/v2"
 )
@@ -34,6 +39,10 @@ var runCmd = &cli.Command{
 		&cli.BoolFlag{
 			Name:  "nosync",
 			Usage: "dont wait for the full node to sync with the chain",
+		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -54,6 +63,23 @@ var runCmd = &cli.Command{
 		defer ncloser()
 
 		ctx := lcli.ReqContext(cctx)
+
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "boostd"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err = view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		}
 
 		log.Debug("Checking full node version")
 

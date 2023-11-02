@@ -14,7 +14,7 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.20.0)
 endif
 
-ALLOWED_NODE_VERSIONS := 16 18
+ALLOWED_NODE_VERSIONS := 16 18 20
 validate-node-version:
 ifeq ($(filter $(shell node -v | cut -c2-3),$(ALLOWED_NODE_VERSIONS)),)
 	@echo "Unsupported Node.js version. Please install one of the following versions: $(ALLOWED_NODE_VERSIONS)"
@@ -217,11 +217,11 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.23.4-rc1
+lotus_version?=v1.25.0-rc1
 ffi_from_source?=0
 build_lotus?=0
 build_boost?=1
-boost_version?=v2.1.0-rc1
+boost_version?=v2.1.0-rc2
 ifeq ($(build_boost),1)
 #v1: build boost images currently checked out branch
 	boost_build_cmd=docker/boost

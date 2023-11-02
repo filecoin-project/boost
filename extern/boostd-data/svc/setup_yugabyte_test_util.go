@@ -20,6 +20,7 @@ var tlog = logging.Logger("ybtest")
 var TestYugabyteSettings = yugabyte.DBSettings{
 	Hosts:         []string{"yugabyte"},
 	ConnectString: "postgresql://postgres:postgres@yugabyte:5433?sslmode=disable",
+	CQLTimeout:    yugabyte.CqlTimeout,
 }
 
 // Used when testing against a local yugabyte instance.
@@ -95,6 +96,7 @@ func dropTestSchema(ctx context.Context) error {
 	// For the cassandra interface, we need to drop all the objects in the
 	// keyspace before we can drop the keyspace itself
 	cluster := gocql.NewCluster(TestYugabyteSettings.Hosts...)
+	cluster.Timeout = time.Duration(TestYugabyteSettings.CQLTimeout) * time.Second
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return err
@@ -144,6 +146,7 @@ func dropTestSchema(ctx context.Context) error {
 func awaitYugabyteUp(t *testing.T, duration time.Duration) {
 	start := time.Now()
 	cluster := gocql.NewCluster(TestYugabyteSettings.Hosts[0])
+	cluster.Timeout = time.Duration(TestYugabyteSettings.CQLTimeout) * time.Second
 	for {
 		_, err := cluster.CreateSession()
 		if err == nil {

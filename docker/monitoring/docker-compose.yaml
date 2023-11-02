@@ -12,7 +12,7 @@ services:
     volumes:
       - ./tempo-local.yaml:/etc/tempo.yaml
       - ./overrides.yaml:/etc/overrides.yaml
-      - ./tempo-data:/tmp/tempo
+      - ${MONITORING_DATA}/tempo-data:/tmp/tempo
     ports:
       - "14268:14268"  # jaeger ingest
     restart: unless-stopped
@@ -44,6 +44,7 @@ services:
     command: [ "--config.file=/etc/prometheus.yaml" ]
     volumes:
       - ./${PROMETHEUS_CONFIG_FILE:-prometheus.yaml}:/etc/prometheus.yaml
+      - ${MONITORING_DATA}/prometheus-data:/prometheus
     restart: unless-stopped
     ports:
       - "9190:9090"
@@ -56,6 +57,7 @@ services:
       #- "booster-http:host-gateway"
       #- "booster-bitswap:host-gateway"
       #- "lotus-miner:host-gateway"
+      #- "boostd-data:host-gateway"
 
     logging:
       driver: loki
@@ -76,7 +78,7 @@ services:
       #- GF_AUTH_DISABLE_LOGIN_FORM=true
       GF_AUTH_SIGV4_AUTH_ENABLED: true
       AWS_SDK_LOAD_CONFIG: true
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/exported_dashboard.json"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/boostd.json"
     ports:
       - "3333:3000"
     restart: unless-stopped

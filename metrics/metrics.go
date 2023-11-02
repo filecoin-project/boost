@@ -17,15 +17,18 @@ var defaultMillisecondsDistribution = view.Distribution(0.01, 0.05, 0.1, 0.3, 0.
 // Global Tags
 var (
 	// common
-	Version, _ = tag.NewKey("version")
-	Commit, _  = tag.NewKey("commit")
+	Version, _   = tag.NewKey("version")
+	Commit, _    = tag.NewKey("commit")
+	NodeType, _  = tag.NewKey("node_type")
+	StartedAt, _ = tag.NewKey("started_at")
 
 	Endpoint, _     = tag.NewKey("endpoint")
-	APIInterface, _ = tag.NewKey("api") // to distinguish between gateway api and full node api endpoint calls
+	APIInterface, _ = tag.NewKey("api")
 )
 
 // Measures
 var (
+	BoostInfo          = stats.Int64("info", "Arbitrary counter to tag boost info to", stats.UnitDimensionless)
 	APIRequestDuration = stats.Float64("api/request_duration_ms", "Duration of API requests", stats.UnitMilliseconds)
 
 	// http
@@ -87,6 +90,18 @@ var (
 )
 
 var (
+	InfoView = &view.View{
+		Name:        "info",
+		Description: "Boost service information",
+		Measure:     BoostInfo,
+		Aggregation: view.LastValue(),
+		TagKeys:     []tag.Key{Version, Commit, NodeType, StartedAt},
+	}
+	APIRequestDurationView = &view.View{
+		Measure:     APIRequestDuration,
+		Aggregation: defaultMillisecondsDistribution,
+		TagKeys:     []tag.Key{APIInterface, Endpoint},
+	}
 	// http
 	HttpPieceByCidRequestCountView = &view.View{
 		Measure:     HttpPieceByCidRequestCount,
@@ -294,6 +309,8 @@ var (
 // DefaultViews is an array of OpenCensus views for metric gathering purposes
 var DefaultViews = func() []*view.View {
 	views := []*view.View{
+		InfoView,
+		APIRequestDurationView,
 		HttpPieceByCidRequestCountView,
 		HttpPieceByCidRequestDurationView,
 		HttpPieceByCid200ResponseCountView,

@@ -1,14 +1,16 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strings"
+	"time"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
@@ -24,6 +26,18 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+)
+
+const (
+	trustlessMessage = "booster-http only supports trustless HTTP. For " +
+		"trusted HTTP use https://github.com/ipfs/bifrost-gateway to translate " +
+		"trustless responses. Run bifrost-gateway with the environment variable " +
+		"PROXY_GATEWAY_URL=http://localhost:7777 to point to booster-http, and " +
+		"GRAPH_BACKEND=true to efficiently translate booster-http's trustless " +
+		"responses."
 )
 
 var runCmd = &cli.Command{
@@ -77,19 +91,43 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "serve-blocks",
-			Usage: "serve blocks with the ipfs gateway API",
-			Value: true,
+			Name:   "serve-blocks",
+			Usage:  "(removed option)",
+			Hidden: true,
+			Action: func(ctx *cli.Context, _ bool) error {
+				if _, err := fmt.Fprintf(ctx.App.ErrWriter, "--serve-blocks is no longer supported.\n\n%s\n\n", trustlessMessage); err != nil {
+					return err
+				}
+				return errors.New("--serve-blocks is no longer supported, use bifrost-gateway instead")
+			},
 		},
 		&cli.BoolFlag{
 			Name:  "serve-cars",
-			Usage: "serve CAR files with the ipfs gateway API",
+			Usage: "serve CAR files with the Trustless IPFS Gateway API",
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "serve-files",
-			Usage: "serve original files (eg jpg, mov) with the ipfs gateway API",
-			Value: false,
+			Name:   "serve-files",
+			Usage:  "(removed option)",
+			Hidden: true,
+			Action: func(ctx *cli.Context, _ bool) error {
+				if _, err := fmt.Fprintf(ctx.App.ErrWriter, "--serve-files is no longer supported.\n\n%s\n\n", trustlessMessage); err != nil {
+					return err
+				}
+				return errors.New("--serve-files is no longer supported, use bifrost-gateway instead")
+			},
+		},
+		&cli.IntFlag{
+			Name: "compression-level",
+			Usage: "compression level to use for responses, 0-9, 0 is no " +
+				"compression, 9 is maximum compression; set to 0 to disable if using " +
+				"a reverse proxy with compression",
+			Value: gzip.BestSpeed,
+		},
+		&cli.StringFlag{
+			Name:  "log-file",
+			Usage: "path to file to append HTTP request and error logs to, defaults to stdout (-)",
+			Value: "-",
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
@@ -120,13 +158,17 @@ var runCmd = &cli.Command{
 			Hidden: true,
 			Value:  true,
 		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
-		responseFormats := parseSupportedResponseFormats(cctx)
-		enableIpfsGateway := len(responseFormats) > 0
-		if !servePieces && !enableIpfsGateway {
-			return errors.New("one of --serve-pieces, --serve-blocks, etc must be enabled")
+		serveTrustless := cctx.Bool("serve-cars")
+
+		if !servePieces && !serveTrustless {
+			return errors.New("one of --serve-pieces, --serve-cars must be enabled")
 		}
 
 		if cctx.Bool("pprof") {
@@ -138,8 +180,26 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the local index directory service
 		ctx := lcli.ReqContext(cctx)
+
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "booster-http"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err := view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		}
+
+		// Connect to the local index directory service
 		cl := bdclient.NewStore()
 		defer cl.Close(ctx)
 		err := cl.Dial(ctx, cctx.String("api-lid"))
@@ -185,10 +245,12 @@ var runCmd = &cli.Command{
 		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
 
 		opts := &HttpServerOptions{
-			ServePieces:              servePieces,
-			SupportedResponseFormats: responseFormats,
+			ServePieces:      servePieces,
+			ServeTrustless:   serveTrustless,
+			CompressionLevel: cctx.Int("compression-level"),
 		}
-		if enableIpfsGateway {
+
+		if serveTrustless {
 			repoDir, err := createRepoDir(cctx.String(FlagRepo.Name))
 			if err != nil {
 				return err
@@ -217,6 +279,18 @@ var runCmd = &cli.Command{
 			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
 			opts.Blockstore = filtered
 		}
+
+		switch cctx.String("log-file") {
+		case "":
+		case "-":
+			opts.LogWriter = cctx.App.Writer
+		default:
+			opts.LogWriter, err = os.OpenFile(cctx.String("log-file"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			if err != nil {
+				return err
+			}
+		}
+
 		sapi := serverApi{ctx: ctx, piecedirectory: pd, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
@@ -237,11 +311,15 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("starting http server: %w", err)
 		}
 
-		log.Infof(ipfsGatewayMsg(cctx, server.ipfsBasePath()))
 		if servePieces {
 			log.Infof("serving raw pieces at " + server.pieceBasePath())
 		} else {
 			log.Infof("serving raw pieces is disabled")
+		}
+		if serveTrustless {
+			log.Infof("serving IPFS Trustless Gateway CARs at " + server.ipfsBasePath())
+		} else {
+			log.Infof("serving IPFS Trustless Gateway CARs is disabled")
 		}
 
 		// Monitor for shutdown.
@@ -269,42 +347,6 @@ var runCmd = &cli.Command{
 	},
 }
 
-func parseSupportedResponseFormats(cctx *cli.Context) []string {
-	fmts := []string{}
-	if cctx.Bool("serve-blocks") {
-		fmts = append(fmts, "application/vnd.ipld.raw")
-	}
-	if cctx.Bool("serve-cars") {
-		fmts = append(fmts, "application/vnd.ipld.car")
-	}
-	if cctx.Bool("serve-files") {
-		// Allow the user to not specify a specific response format.
-		// In that case the gateway will respond with any kind of file
-		// (eg jpg, mov etc)
-		fmts = append(fmts, "")
-	}
-	return fmts
-}
-
-func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
-	fmts := []string{}
-	if cctx.Bool("serve-blocks") {
-		fmts = append(fmts, "blocks")
-	}
-	if cctx.Bool("serve-cars") {
-		fmts = append(fmts, "CARs")
-	}
-	if cctx.Bool("serve-files") {
-		fmts = append(fmts, "files")
-	}
-
-	if len(fmts) == 0 {
-		return "IPFS gateway is disabled"
-	}
-
-	return "serving IPFS gateway at " + ipfsBasePath + " (serving " + strings.Join(fmts, ", ") + ")"
-}
-
 func createRepoDir(repoDir string) (string, error) {
 	repoDir, err := homedir.Expand(repoDir)
 	if err != nil {
@@ -313,7 +355,7 @@ func createRepoDir(repoDir string) (string, error) {
 	if repoDir == "" {
 		return "", fmt.Errorf("%s is a required flag", FlagRepo.Name)
 	}
-	return repoDir, os.MkdirAll(repoDir, 0744)
+	return repoDir, os.MkdirAll(repoDir, 0o744)
 }
 
 type serverApi struct {
