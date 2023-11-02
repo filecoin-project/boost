@@ -32,4 +32,4 @@ scrape_configs:
     static_configs:
       - targets: [ 'boostd-data:8042' ]
         labels:
-        host: 'local'
+          host: 'local'
