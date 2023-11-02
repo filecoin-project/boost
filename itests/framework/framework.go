@@ -195,12 +195,6 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 
 type ConfigOpt func(cfg *config.Boost)
 
-func WithMaxStagingDealsBytes(maxBytes int64) ConfigOpt {
-	return func(cfg *config.Boost) {
-		cfg.Dealmaking.MaxStagingDealsBytes = maxBytes
-	}
-}
-
 func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	lapi.RunningNodeType = lapi.NodeMiner
 
