@@ -208,6 +208,12 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) ([]*SectorStateUpdate
 func (m *SectorStateMgr) refreshMinerState(ctx context.Context, maddr address.Address, minerApi sectorstatemgr_types.StorageAPI) (*SectorStateUpdates, error) {
 	defer func(start time.Time) { log.Debugw("refreshState", "took", time.Since(start)) }(time.Now())
 
+	mid, err := address.IDFromAddress(maddr)
+	if err != nil {
+		return nil, fmt.Errorf("getting miner id from miner address %s: %w", maddr.String(), err)
+	}
+	aid := abi.ActorID(mid)
+
 	// Tell lotus to update it's storage list and remove any removed sectors
 	if m.cfg.RedeclareOnStorageListRefresh {
 		log.Info("redeclaring storage")
@@ -248,7 +254,7 @@ func (m *SectorStateMgr) refreshMinerState(ctx context.Context, maddr address.Ad
 	}
 
 	// Get the previously known state of all sectors in the database
-	previousSectorStates, err := m.sdb.List(ctx)
+	previousSectorStates, err := m.sdb.List(ctx, aid)
 	if err != nil {
 		return nil, fmt.Errorf("getting sectors state from database: %w", err)
 	}
@@ -287,11 +293,6 @@ func (m *SectorStateMgr) refreshMinerState(ctx context.Context, maddr address.Ad
 	}
 
 	allSet, err := m.fullnodeApi.StateMinerSectors(ctx, maddr, nil, head.Key())
-	if err != nil {
-		return nil, err
-	}
-
-	mid, err := address.IDFromAddress(maddr)
 	if err != nil {
 		return nil, err
 	}

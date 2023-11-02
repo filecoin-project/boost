@@ -34,21 +34,28 @@ func TestRefreshState(t *testing.T) {
 
 	// setup mocks
 	fullnodeApi := lotusmocks.NewMockFullNode(ctrl)
-	minerApi := mock.NewMockStorageAPI(ctrl)
+	minerApi1 := mock.NewMockStorageAPI(ctrl)
+	minerApi2 := mock.NewMockStorageAPI(ctrl)
 
-	maddr, _ := address.NewIDAddress(1)
-	mid, _ := address.IDFromAddress(maddr)
-	aid := abi.ActorID(mid)
+	maddr1, _ := address.NewIDAddress(1)
+	maddr2, _ := address.NewIDAddress(2)
+
+	mid1, _ := address.IDFromAddress(maddr1)
+	mid2, _ := address.IDFromAddress(maddr2)
+
+	aid1 := abi.ActorID(mid1)
+	aid2 := abi.ActorID(mid2)
 
 	mus := make(map[address.Address]*sync.Mutex)
-	mus[maddr] = &sync.Mutex{}
+	mus[maddr1] = &sync.Mutex{}
+	mus[maddr2] = &sync.Mutex{}
 
 	// setup sectorstatemgr
 	mgr := &SectorStateMgr{
 		cfg:             cfg,
-		minerApis:       []sectorstatemgr_types.StorageAPI{minerApi},
+		minerApis:       []sectorstatemgr_types.StorageAPI{minerApi1, minerApi2},
 		fullnodeApi:     fullnodeApi,
-		Maddrs:          []address.Address{maddr},
+		Maddrs:          []address.Address{maddr1, maddr2},
 		LatestUpdates:   make(map[address.Address]*SectorStateUpdates),
 		LatestUpdateMus: mus,
 
@@ -74,10 +81,10 @@ func TestRefreshState(t *testing.T) {
 
 				deals, err := db.GenerateNDeals(4)
 				require.NoError(t, err)
-				sid3 := abi.SectorID{Miner: aid, Number: deals[0].SectorID}
-				sid4 := abi.SectorID{Miner: aid, Number: deals[1].SectorID}
-				sid5 := abi.SectorID{Miner: aid, Number: deals[2].SectorID}
-				sid6 := abi.SectorID{Miner: aid, Number: deals[3].SectorID}
+				sid3 := abi.SectorID{Miner: aid1, Number: deals[0].SectorID}
+				sid4 := abi.SectorID{Miner: aid1, Number: deals[1].SectorID}
+				sid5 := abi.SectorID{Miner: aid1, Number: deals[2].SectorID}
+				sid6 := abi.SectorID{Miner: aid1, Number: deals[3].SectorID}
 
 				input_StorageList1 := map[storiface.ID][]storiface.Decl{
 					"storage-location-uuid1": {
@@ -115,19 +122,23 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				mockExpectations := func() {
-					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList1, nil)
-					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors1, nil)
-					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+					minerApi1.EXPECT().StorageList(gomock.Any()).Return(input_StorageList1, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any()).Return(input_StateMinerActiveSectors1, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any(), gomock.Any()).Return(nil, nil)
 
-					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList2, nil)
-					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors2, nil)
-					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+					minerApi1.EXPECT().StorageList(gomock.Any()).Return(input_StorageList2, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any()).Return(input_StateMinerActiveSectors2, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any(), gomock.Any()).Return(nil, nil)
 
-					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(2)
+					minerApi2.EXPECT().StorageList(gomock.Any()).Return(nil, nil).Times(2)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any()).Return(nil, nil).Times(2)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any(), gomock.Any()).Return(nil, nil).Times(2)
+
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(4)
 				}
 
-				expected2 := &SectorStateUpdates{
-					Maddr: maddr,
+				expected1 := &SectorStateUpdates{
+					Maddr: maddr1,
 					Updates: map[abi.SectorID]db.SealState{
 						sid3: db.SealStateUnsealed,
 						sid4: db.SealStateSealed,
@@ -145,25 +156,47 @@ func TestRefreshState(t *testing.T) {
 					SectorWithDeals: map[abi.SectorID]struct{}{},
 				}
 
+				// miner2's update should be empty
+				expected2 := &SectorStateUpdates{
+					Maddr:           maddr2,
+					Updates:         map[abi.SectorID]db.SealState{},
+					ActiveSectors:   map[abi.SectorID]struct{}{},
+					SectorStates:    map[abi.SectorID]db.SealState{},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
+				}
+
 				exerciseAndVerify := func() {
 					// setup initial state of db
 					err := mgr.checkForUpdates(ctx)
 					require.NoError(t, err)
 
 					// trigger refreshState and later verify resulting struct
-					got2s, err := mgr.refreshState(ctx)
+					ssus, err := mgr.refreshState(ctx)
 					require.NoError(t, err)
-					// we know that there is just one update given that there is just one miner
-					require.Equal(t, 1, len(got2s))
-					got2 := got2s[0]
+
+					require.Equal(t, 2, len(ssus))
+
+					var got1 *SectorStateUpdates
+					var got2 *SectorStateUpdates
+					for _, ssu := range ssus {
+						switch ssu.Maddr {
+						case maddr1:
+							got1 = ssu
+						case maddr2:
+							got2 = ssu
+						}
+					}
 
 					zero := time.Time{}
 
+					require.NotEqual(t, got1.UpdatedAt, zero)
 					require.NotEqual(t, got2.UpdatedAt, zero)
 
 					//null timestamp, so that we can do deep equal
+					got1.UpdatedAt = zero
 					got2.UpdatedAt = zero
 
+					require.True(t, reflect.DeepEqual(expected1, got1), "expected: %s, got: %s", spew.Sdump(expected1), spew.Sdump(got1))
 					require.True(t, reflect.DeepEqual(expected2, got2), "expected: %s, got: %s", spew.Sdump(expected2), spew.Sdump(got2))
 				}
 
@@ -183,9 +216,9 @@ func TestRefreshState(t *testing.T) {
 
 				deals, err := db.GenerateNDeals(3)
 				require.NoError(t, err)
-				sid1 := abi.SectorID{Miner: aid, Number: deals[0].SectorID}
-				sid2 := abi.SectorID{Miner: aid, Number: deals[1].SectorID}
-				sid3 := abi.SectorID{Miner: aid, Number: deals[2].SectorID}
+				sid1 := abi.SectorID{Miner: aid1, Number: deals[0].SectorID}
+				sid2 := abi.SectorID{Miner: aid1, Number: deals[1].SectorID}
+				sid3 := abi.SectorID{Miner: aid1, Number: deals[2].SectorID}
 
 				input_StorageList := map[storiface.ID][]storiface.Decl{
 					"storage-location-uuid1": {
@@ -205,14 +238,19 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				mockExpectations := func() {
-					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList, nil)
-					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
-					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors, nil)
+					minerApi1.EXPECT().StorageList(gomock.Any()).Return(input_StorageList, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any(), gomock.Any()).Return(nil, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any()).Return(input_StateMinerActiveSectors, nil)
+
+					minerApi2.EXPECT().StorageList(gomock.Any()).Return(nil, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any(), gomock.Any()).Return(nil, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any()).Return(nil, nil)
+
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(2)
 				}
 
-				expected := &SectorStateUpdates{
-					Maddr: maddr,
+				expected1 := &SectorStateUpdates{
+					Maddr: maddr1,
 					Updates: map[abi.SectorID]db.SealState{
 						sid1: db.SealStateUnsealed,
 						sid2: db.SealStateSealed,
@@ -230,20 +268,150 @@ func TestRefreshState(t *testing.T) {
 					SectorWithDeals: map[abi.SectorID]struct{}{},
 				}
 
+				// miner2's update should be empty
+				expected2 := &SectorStateUpdates{
+					Maddr:           maddr2,
+					Updates:         map[abi.SectorID]db.SealState{},
+					ActiveSectors:   map[abi.SectorID]struct{}{},
+					SectorStates:    map[abi.SectorID]db.SealState{},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
+				}
+
 				exerciseAndVerify := func() {
-					gots, err := mgr.refreshState(ctx)
+					ssus, err := mgr.refreshState(ctx)
 					require.NoError(t, err)
-					// we know that there is just one update as there is just one miner
-					require.Equal(t, 1, len(gots))
-					got := gots[0]
+					require.Equal(t, 2, len(ssus))
+					var got1 *SectorStateUpdates
+					var got2 *SectorStateUpdates
+					for _, ssu := range ssus {
+						switch ssu.Maddr {
+						case maddr1:
+							got1 = ssu
+						case maddr2:
+							got2 = ssu
+						}
+					}
 
 					zero := time.Time{}
-					require.NotEqual(t, got.UpdatedAt, zero)
+					require.NotEqual(t, got1.UpdatedAt, zero)
+					require.NotEqual(t, got2.UpdatedAt, zero)
 
 					//null timestamp, so that we can do deep equal
-					got.UpdatedAt = zero
+					got1.UpdatedAt = zero
+					got2.UpdatedAt = zero
 
-					require.True(t, reflect.DeepEqual(expected, got), "expected: %s, got: %s", spew.Sdump(expected), spew.Sdump(got))
+					require.True(t, reflect.DeepEqual(expected1, got1), "expected: %s, got: %s", spew.Sdump(expected1), spew.Sdump(got1))
+					require.True(t, reflect.DeepEqual(expected2, got2), "expected: %s, got: %s", spew.Sdump(expected2), spew.Sdump(got2))
+				}
+
+				return fixtures{
+					mockExpectations:  mockExpectations,
+					exerciseAndVerify: exerciseAndVerify,
+				}
+			},
+		},
+		{
+			description: "different sectors, different miners",
+			f: func() fixtures {
+				sqldb := db.CreateTestTmpDB(t)
+				require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
+				require.NoError(t, migrations.Migrate(sqldb))
+				mgr.sdb = db.NewSectorStateDB(sqldb)
+
+				deals, err := db.GenerateNDeals(3)
+				require.NoError(t, err)
+				sid1 := abi.SectorID{Miner: aid1, Number: deals[0].SectorID}
+				sid2 := abi.SectorID{Miner: aid2, Number: deals[1].SectorID}
+
+				input_StorageList1 := map[storiface.ID][]storiface.Decl{
+					"storage-location-uuid1": {
+						{SectorID: sid1, SectorFileType: storiface.FTUnsealed},
+						{SectorID: sid1, SectorFileType: storiface.FTSealed},
+						{SectorID: sid1, SectorFileType: storiface.FTCache},
+					},
+				}
+				input_StorageList2 := map[storiface.ID][]storiface.Decl{
+					"storage-location-uuid2": {
+						{SectorID: sid2, SectorFileType: storiface.FTSealed},
+						{SectorID: sid2, SectorFileType: storiface.FTCache},
+					},
+				}
+
+				input_StateMinerActiveSectors1 := []*miner.SectorOnChainInfo{
+					{SectorNumber: sid1.Number},
+				}
+
+				input_StateMinerActiveSectors2 := []*miner.SectorOnChainInfo{
+					{SectorNumber: sid2.Number},
+				}
+
+				mockExpectations := func() {
+					minerApi1.EXPECT().StorageList(gomock.Any()).Return(input_StorageList1, nil)
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any(), gomock.Any()).Return(nil, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr1), gomock.Any()).Return(input_StateMinerActiveSectors1, nil)
+
+					minerApi2.EXPECT().StorageList(gomock.Any()).Return(input_StorageList2, nil)
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any(), gomock.Any()).Return(nil, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Eq(maddr2), gomock.Any()).Return(input_StateMinerActiveSectors2, nil)
+				}
+
+				expected1 := &SectorStateUpdates{
+					Maddr: maddr1,
+					Updates: map[abi.SectorID]db.SealState{
+						sid1: db.SealStateUnsealed,
+					},
+					ActiveSectors: map[abi.SectorID]struct{}{
+						sid1: struct{}{},
+					},
+					SectorStates: map[abi.SectorID]db.SealState{
+						sid1: db.SealStateUnsealed,
+					},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
+				}
+
+				expected2 := &SectorStateUpdates{
+					Maddr: maddr2,
+					Updates: map[abi.SectorID]db.SealState{
+						sid2: db.SealStateSealed,
+					},
+					ActiveSectors: map[abi.SectorID]struct{}{
+						sid2: struct{}{},
+					},
+					SectorStates: map[abi.SectorID]db.SealState{
+						sid2: db.SealStateSealed,
+					},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
+				}
+
+				exerciseAndVerify := func() {
+					ssus, err := mgr.refreshState(ctx)
+					require.NoError(t, err)
+					require.Equal(t, 2, len(ssus))
+					var got1 *SectorStateUpdates
+					var got2 *SectorStateUpdates
+					for _, ssu := range ssus {
+						switch ssu.Maddr {
+						case maddr1:
+							got1 = ssu
+						case maddr2:
+							got2 = ssu
+						default:
+							require.Fail(t, "unknown miner")
+						}
+					}
+
+					zero := time.Time{}
+					require.NotEqual(t, got1.UpdatedAt, zero)
+					require.NotEqual(t, got2.UpdatedAt, zero)
+
+					//null timestamp, so that we can do deep equal
+					got1.UpdatedAt = zero
+					got2.UpdatedAt = zero
+
+					require.True(t, reflect.DeepEqual(expected1, got1), "expected: %s, got: %s", spew.Sdump(expected1), spew.Sdump(got1))
+					require.True(t, reflect.DeepEqual(expected2, got2), "expected: %s, got: %s", spew.Sdump(expected2), spew.Sdump(got2))
 				}
 
 				return fixtures{

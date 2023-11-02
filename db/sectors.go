@@ -29,9 +29,9 @@ func NewSectorStateDB(db *sql.DB) *SectorStateDB {
 	return &SectorStateDB{db}
 }
 
-func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
-	qry := "SELECT MinerID, SectorID, UpdatedAt, SealState FROM SectorState"
-	rows, err := sdb.db.QueryContext(ctx, qry)
+func (sdb *SectorStateDB) List(ctx context.Context, mid abi.ActorID) ([]SectorState, error) {
+	qry := "SELECT MinerID, SectorID, UpdatedAt, SealState FROM SectorState WHERE MinerID = ?"
+	rows, err := sdb.db.QueryContext(ctx, qry, mid)
 	if err != nil {
 		return nil, err
 	}
