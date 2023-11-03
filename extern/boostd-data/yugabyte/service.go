@@ -36,6 +36,8 @@ const CqlTimeout = 60
 // batch size small makes sure we're under the limit.
 const InsertBatchSize = 10000
 
+const InsertConcurrency = 4
+
 type DBSettings struct {
 	// The cassandra hosts to connect to
 	Hosts []string
@@ -47,6 +49,8 @@ type DBSettings struct {
 	CQLTimeout int
 	// Number of records per insert batch
 	InsertBatchSize int
+	// Number of concurrent inserts to split AddIndex calls too
+	InsertConcurrency int
 }
 
 type StoreOpt func(*Store)
@@ -76,6 +80,9 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 	}
 	if settings.InsertBatchSize == 0 {
 		settings.InsertBatchSize = InsertBatchSize
+	}
+	if settings.InsertConcurrency == 0 {
+		settings.InsertConcurrency = InsertConcurrency
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
@@ -537,7 +544,7 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 	insertPieceOffsetsQry := `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
 	pieceCidBytes := pieceCid.Bytes()
 
-	threadBatch := len(recs) / 32 // split the slice into go-routine batches for ~32 workers
+	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
 
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
@@ -596,7 +603,7 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 	insertPieceOffsetsQry := `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
 	pieceCidBytes := pieceCid.Bytes()
 
-	threadBatch := len(recs) / 32 // split the slice into go-routine batches for ~32 workers
+	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
 
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
