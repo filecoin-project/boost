@@ -31,11 +31,13 @@ import (
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/sync/errgroup"
 )
 
 var log = logging.Logger("piecedirectory")
 
 var MaxCachedReaders = 128
+var AddIndexConcurrency = 8
 
 type PieceDirectory struct {
 	store       *bdclient.Store
@@ -292,12 +294,35 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if !errors.Is(err, io.EOF) {
 		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
 	}
+	concurrency := AddIndexConcurrency
+	// in an unlikely case if there are less than 8 indexes
+	if concurrency > len(recs) {
+		concurrency = len(recs)
+	}
 
-	// Add mh => piece index to store: "which piece contains the multihash?"
-	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
-	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
-	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
-		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	chunkSize := len(recs) / concurrency
+	eg := errgroup.Group{}
+
+	for i := 0; i < concurrency; i++ {
+		idx := i
+		eg.Go(func() error {
+			start := idx * chunkSize
+			end := start + chunkSize
+			if idx == concurrency-1 {
+				end = len(recs)
+			}
+			// Add mh => piece index to store: "which piece contains the multihash?"
+			// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
+			log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid, "chunk", idx, "chunksTotal", concurrency)
+			if err := ps.store.AddIndex(ctx, pieceCid, recs[start:end], true); err != nil {
+				return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	return nil

@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"testing"
+
 	"github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc"
@@ -18,9 +22,6 @@ import (
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/stretchr/testify/require"
-	"io"
-	"os"
-	"testing"
 )
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
