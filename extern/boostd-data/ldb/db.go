@@ -118,7 +118,7 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 }
 
 func KeyCursorPrefix(cursor uint64) string {
-	return fmt.Sprintf("%d", cursor) + "/"
+	return fmt.Sprintf("%d/", cursor)
 }
 
 // SetNextCursor
