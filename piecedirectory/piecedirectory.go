@@ -307,7 +307,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	}
 
 	rangeLen := len(recs) / concurrency
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 
 	for i := 0; i < concurrency; i++ {
 		i := i
