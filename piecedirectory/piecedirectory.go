@@ -37,6 +37,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("piecedirectory")
@@ -390,18 +391,39 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
-	dataSegments, err := datasegment.ParseDataSegmentIndex(r)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+	results := make(chan *datasegment.SegmentDesc)
+	var parseIndexErr error
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(ctx, r, results)
+		close(results)
+	}()
+
+	var segments []datasegment.SegmentDesc
+	cnt := -1
+	for res := range results {
+		cnt++
+		if err := res.Validate(); err != nil {
+			if errors.Is(err, datasegment.ErrValidation) {
+				continue
+			} else {
+				cancel()
+				return nil, xerrors.Errorf("could not calculate valid entries: got unknown error for entry %d: %w", cnt, err)
+			}
+		}
+		segments = append(segments, *res)
 	}
-	segments, err := dataSegments.ValidEntries()
-	if err != nil {
-		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
+
+	cancel()
+
+	if parseIndexErr != nil {
+		return nil, fmt.Errorf("could not parse data segment index: %w", parseIndexErr)
 	}
+
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("no data segments found")
 	}
-	
+
 	recs := make([]model.Record, 0)
 	for _, s := range segments {
 		segOffset := s.UnpaddedOffest()
@@ -421,6 +443,96 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 
 	return recs, nil
 }
+
+// func parsePieceWithDataSegmentIndex2(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+// 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
+// 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
+// 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
+// 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
+// 	}
+
+// 	dataSegments, err := datasegment.ParseDataSegmentIndex(r)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+// 	}
+// 	now := time.Now()
+// 	segments, err := dataSegments.ValidEntries()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
+// 	}
+
+// 	fmt.Printf("Total validation time: %.2f\n", time.Since(now).Seconds())
+// 	if len(segments) == 0 {
+// 		return nil, fmt.Errorf("no data segments found")
+// 	}
+
+// 	recs := make([]model.Record, 0)
+// 	for _, s := range segments {
+// 		segOffset := s.UnpaddedOffest()
+// 		segSize := s.UnpaddedLength()
+
+// 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
+// 		subRecs, err := parseRecordsFromCar(lr)
+// 		if err != nil {
+// 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
+// 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
+// 		}
+// 		for i := range subRecs {
+// 			subRecs[i].Offset += segOffset
+// 		}
+// 		recs = append(recs, subRecs...)
+// 	}
+
+// 	return recs, nil
+// }
+
+// func parsePieceWithDataSegmentIndex3(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+// 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
+// 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
+// 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
+// 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
+// 	}
+// 	results := make(chan *datasegment.SegmentDesc)
+// 	var parseIndexErr error
+// 	go func() {
+// 		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(context.Background(), r, results)
+// 		close(results)
+// 	}()
+
+// 	var segments []*datasegment.SegmentDesc
+// 	for res := range results {
+// 		segments = append(segments, res)
+// 	}
+
+// 	validSegments := make([]datasegment.SegmentDesc, 0, len(segments))
+
+// 	if parseIndexErr != nil {
+// 		return nil, fmt.Errorf("could not parse data segment index: %w", parseIndexErr)
+// 	}
+
+// 	if len(segments) == 0 {
+// 		return nil, fmt.Errorf("no data segments found")
+// 	}
+
+// 	recs := make([]model.Record, 0)
+// 	for _, s := range segments {
+// 		segOffset := s.UnpaddedOffest()
+// 		segSize := s.UnpaddedLength()
+
+// 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
+// 		subRecs, err := parseRecordsFromCar(lr)
+// 		if err != nil {
+// 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
+// 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
+// 		}
+// 		for i := range subRecs {
+// 			subRecs[i].Offset += segOffset
+// 		}
+// 		recs = append(recs, subRecs...)
+// 	}
+
+// 	return recs, nil
+// }
 
 // BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
 // corresponding to an unsealed sector for this method to work. It will try to build index
@@ -849,7 +961,7 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		bsR = carutil.NewMultiReaderAt(
 			bytes.NewReader(headerBuf.Bytes()),        // payload (CARv1) header
 			bytes.NewReader(make([]byte, dataOffset)), // padding to account for the CARv2 wrapper
-			sectionReader,                             // payload (CARv1) data
+			sectionReader, // payload (CARv1) data
 		)
 	} else {
 		bsR = reader

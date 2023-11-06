@@ -377,3 +377,7 @@ require (
 	gonum.org/v1/gonum v0.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )
+
+
+// replace github.com/filecoin-project/go-data-segment => /Users/ivan/Dev/go-data-segment
+
