@@ -33,7 +33,6 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/jellydator/ttlcache/v2"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
@@ -43,7 +42,8 @@ import (
 var log = logging.Logger("piecedirectory")
 
 const (
-	MaxCachedReaders = 128
+	MaxCachedReaders            = 128
+	DataSegmentReaderBufferSize = 4 << 20 // 4MiB
 )
 
 type settings struct {
@@ -387,15 +387,20 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
+
 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
+
+	now := time.Now()
+
 	results := make(chan *datasegment.SegmentDesc)
 	var parseIndexErr error
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(ctx, r, results)
+		br := bufio.NewReaderSize(r, DataSegmentReaderBufferSize)
+		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(ctx, br, results)
 		close(results)
 	}()
 
@@ -424,6 +429,10 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		return nil, fmt.Errorf("no data segments found")
 	}
 
+	log.Debugf("parsing and validating data segment index of %d segments took %.2f seconds", len(segments), time.Since(now).Seconds())
+
+	now = time.Now()
+
 	recs := make([]model.Record, 0)
 	for _, s := range segments {
 		segOffset := s.UnpaddedOffest()
@@ -440,6 +449,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		}
 		recs = append(recs, subRecs...)
 	}
+
+	log.Debugf("parsing data segments of %d records took %.2f seconds", len(recs), time.Since(now).Seconds())
 
 	return recs, nil
 }
@@ -1005,11 +1016,11 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr a
 }
 
 func isIdentity(c cid.Cid) (digest []byte, ok bool, err error) {
-	dmh, err := multihash.Decode(c.Hash())
+	dmh, err := mh.Decode(c.Hash())
 	if err != nil {
 		return nil, false, err
 	}
-	ok = dmh.Code == multihash.IDENTITY
+	ok = dmh.Code == mh.IDENTITY
 	digest = dmh.Digest
 	return digest, ok, nil
 }

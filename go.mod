@@ -378,6 +378,4 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )
 
-
-// replace github.com/filecoin-project/go-data-segment => /Users/ivan/Dev/go-data-segment
-
+replace github.com/filecoin-project/go-data-segment v0.0.1 => github.com/ischasny/go-data-segment v0.0.0-20231107120541-53b3ec9a7c69
