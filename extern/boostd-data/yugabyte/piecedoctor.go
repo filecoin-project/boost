@@ -227,7 +227,7 @@ func (s *Store) execWithConcurrency(ctx context.Context, pcids []pieceCreated, c
 }
 
 // The minimum frequency with which to check pieces for errors (eg bad index)
-var MinPieceCheckPeriod = 5 * time.Minute
+var MinPieceCheckPeriod = 60 * time.Minute
 
 // Work out how frequently to check each piece, based on how many pieces
 // there are: if there are many pieces, each piece will be checked
@@ -240,10 +240,10 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	}
 
 	// Check period:
-	// - 1k pieces;   every 100s (5 minutes because of MinPieceCheckPeriod)
-	// - 100k pieces; every 150m
-	// - 1m pieces;   every 20 hours
-	period := time.Duration(count*100) * time.Millisecond
+	// - 1k pieces;   every 1000s (~17 minutes)
+	// - 100k pieces; every 1667m (~27h45m)
+	// - 1m pieces;   every 277h45m hours (~11d12h)
+	period := time.Duration(count) * time.Second
 	if period < MinPieceCheckPeriod {
 		period = MinPieceCheckPeriod
 	}
