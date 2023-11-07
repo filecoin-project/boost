@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/cassmigrate"
@@ -44,7 +45,11 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 	// Note that the migration library requires a *sql.DB, but there's no way
 	// to go from a pgxpool connection to a *sql.DB so we need to open a new
 	// connection.
-	sqldb, err := sql.Open("postgres", m.settings.ConnectString)
+	c, err := StripLoadBalance(m.settings.ConnectString)
+	if err != nil {
+		return err
+	}
+	sqldb, err := sql.Open("postgres", c)
 	if err != nil {
 		return fmt.Errorf("opening postgres connection to %s: %w", m.settings.ConnectString, err)
 	}
@@ -77,4 +82,16 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 	log.Infow("cassandra migrations complete")
 
 	return nil
+}
+
+// StripLoadBalance is used as a workaround to pass YGB-PGX formatted string to SQL formatted string
+func StripLoadBalance(connectString string) (string, error) {
+	u, err := url.Parse(connectString)
+	if err != nil {
+		return "", fmt.Errorf("parsing connect-string for migrator: %w", err)
+	}
+	q := u.Query()
+	q.Del("load_balance")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }

@@ -19,14 +19,14 @@ var tlog = logging.Logger("ybtest")
 
 var TestYugabyteSettings = yugabyte.DBSettings{
 	Hosts:         []string{"yugabyte"},
-	ConnectString: "postgresql://postgres:postgres@yugabyte:5433?sslmode=disable",
+	ConnectString: "postgresql://postgres:postgres@yugabyte:5433?sslmode=disable&load_balance=true",
 	CQLTimeout:    yugabyte.CqlTimeout,
 }
 
 // Used when testing against a local yugabyte instance.
 var TestYugabyteSettingsLocal = yugabyte.DBSettings{
 	Hosts:         []string{"localhost"},
-	ConnectString: "postgresql://postgres:postgres@localhost:5433?sslmode=disable",
+	ConnectString: "postgresql://postgres:postgres@localhost:5433?sslmode=disable&load_balance=true",
 }
 
 func init() {
@@ -74,7 +74,11 @@ func RecreateTables(ctx context.Context, t *testing.T, store *yugabyte.Store) {
 }
 
 func createTestSchema(ctx context.Context) error {
-	db, err := sql.Open("postgres", TestYugabyteSettings.ConnectString)
+	c, err := yugabyte.StripLoadBalance(TestYugabyteSettings.ConnectString)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("postgres", c)
 	if err != nil {
 		return err
 	}
@@ -84,7 +88,11 @@ func createTestSchema(ctx context.Context) error {
 }
 
 func dropTestSchema(ctx context.Context) error {
-	db, err := sql.Open("postgres", TestYugabyteSettings.ConnectString)
+	c, err := yugabyte.StripLoadBalance(TestYugabyteSettings.ConnectString)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("postgres", c)
 	if err != nil {
 		return err
 	}
