@@ -43,7 +43,7 @@ var log = logging.Logger("piecedirectory")
 
 const (
 	MaxCachedReaders            = 128
-	DataSegmentReaderBufferSize = 4 << 20 // 4MiB
+	DataSegmentReaderBufferSize = 100 << 20 // 4MiB
 )
 
 type settings struct {
@@ -388,12 +388,14 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 
+	now := time.Now()
 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
+	log.Debugf("podsi: took %s to seek to the start offset", time.Since(now).String())
 
-	now := time.Now()
+	now = time.Now()
 
 	results := make(chan *datasegment.SegmentDesc)
 	var parseIndexErr error
@@ -429,7 +431,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		return nil, fmt.Errorf("no data segments found")
 	}
 
-	log.Debugf("parsing and validating data segment index of %d segments took %.2f seconds", len(segments), time.Since(now).Seconds())
+	log.Debugf("podsi: parsing and validating data segment index of %d segments took %s", len(segments), time.Since(now).String())
 
 	now = time.Now()
 
@@ -439,7 +441,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		segSize := s.UnpaddedLength()
 
 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
-		subRecs, err := parseRecordsFromCar(lr)
+		br := bufio.NewReaderSize(lr, DataSegmentReaderBufferSize)
+		subRecs, err := parseRecordsFromCar(br)
 		if err != nil {
 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
@@ -450,7 +453,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		recs = append(recs, subRecs...)
 	}
 
-	log.Debugf("parsing data segments of %d records took %.2f seconds", len(recs), time.Since(now).Seconds())
+	log.Debugf("podsi: parsing data segments of %d records took %.2f seconds", len(recs), time.Since(now).String())
 
 	return recs, nil
 }
