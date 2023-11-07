@@ -92,6 +92,10 @@ func StripLoadBalance(connectString string) (string, error) {
 	}
 	q := u.Query()
 	q.Del("load_balance")
+	q.Del("statement_cache_capacity")
+	q.Del("statement_cache_mode")
+	q.Del("prefer_simple_protocol")
+	q.Del("topology_keys")
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
