@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
@@ -203,6 +204,8 @@ var walletList = &cli.Command{
 					wallet[dataCapKey] = dcap
 					if !cctx.Bool("json") && dcap == nil {
 						wallet[dataCapKey] = "X"
+					} else if dcap != nil {
+						wallet[dataCapKey] = humanize.IBytes(dcap.Int.Uint64())
 					}
 				} else {
 					wallet[dataCapKey] = "n/a"
