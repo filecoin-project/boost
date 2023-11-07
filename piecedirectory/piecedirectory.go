@@ -43,7 +43,7 @@ var log = logging.Logger("piecedirectory")
 
 const (
 	MaxCachedReaders            = 128
-	DataSegmentReaderBufferSize = 100 << 20 // 4MiB
+	DataSegmentReaderBufferSize = 10 << 20 // 4MiB
 )
 
 type settings struct {
