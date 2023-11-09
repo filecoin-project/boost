@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	carutil "github.com/filecoin-project/boost/car"
@@ -43,11 +44,12 @@ var log = logging.Logger("piecedirectory")
 
 const (
 	MaxCachedReaders            = 128
-	DataSegmentReaderBufferSize = 10 << 20 // 4MiB
+	DataSegmentReaderBufferSize = 4e6 // 4MiB
 )
 
 type settings struct {
-	addIndexConcurrency int
+	addIndexConcurrency         int
+	dataSegmentReaderBufferSize int
 }
 
 type Option func(*settings)
@@ -55,6 +57,12 @@ type Option func(*settings)
 func WithAddIndexConcurrency(c int) Option {
 	return func(s *settings) {
 		s.addIndexConcurrency = c
+	}
+}
+
+func WithDataSegmentReaderBufferSize(size int) Option {
+	return func(s *settings) {
+		s.dataSegmentReaderBufferSize = size
 	}
 }
 
@@ -85,7 +93,8 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 		addIdxThrottleSize: addIndexThrottleSize,
 		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 		settings: &settings{
-			addIndexConcurrency: config.DefaultAddIndexConcurrency,
+			addIndexConcurrency:         config.DefaultAddIndexConcurrency,
+			dataSegmentReaderBufferSize: DataSegmentReaderBufferSize,
 		},
 	}
 
@@ -307,7 +316,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
-	recs, err := parsePieceWithDataSegmentIndex(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader)
+	recs, err := parsePieceWithDataSegmentIndexCustom(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader, ps.settings.dataSegmentReaderBufferSize)
 	if err != nil {
 		log.Infow("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
 		// Iterate over all the blocks in the piece to extract the index records
@@ -386,6 +395,11 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 }
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+	return parsePieceWithDataSegmentIndexCustom(pieceCid, unpaddedSize, r, DataSegmentReaderBufferSize)
+}
+
+func parsePieceWithDataSegmentIndexCustom(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader, dataSegmentReaderBufferSize int) ([]model.Record, error) {
+	var readCount int32
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 
 	now := time.Now()
@@ -401,7 +415,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	var parseIndexErr error
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		br := bufio.NewReaderSize(r, DataSegmentReaderBufferSize)
+		cr := countingReader{Reader: r, cnt: &readCount}
+		br := bufio.NewReaderSize(&cr, dataSegmentReaderBufferSize)
 		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(ctx, br, results)
 		close(results)
 	}()
@@ -436,16 +451,23 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	now = time.Now()
 
 	recs := make([]model.Record, 0)
-	for _, s := range segments {
+
+	// this can't be parallelised because reader needs to be used at different offsets
+	for i, s := range segments {
 		segOffset := s.UnpaddedOffest()
 		segSize := s.UnpaddedLength()
 
-		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
-		br := bufio.NewReaderSize(lr, DataSegmentReaderBufferSize)
-		subRecs, err := parseRecordsFromCar(br)
+		_, err := r.Seek(int64(segOffset), io.SeekStart)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", i, segOffset, err)
+		}
+		cr := countingReader{Reader: r, cnt: &readCount}
+		br := bufio.NewReaderSize(&cr, dataSegmentReaderBufferSize)
+		lr := io.LimitReader(br, int64(segSize))
+		subRecs, err := parseRecordsFromCar(lr)
 		if err != nil {
 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
-			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
+			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", i, segOffset, err)
 		}
 		for i := range subRecs {
 			subRecs[i].Offset += segOffset
@@ -453,100 +475,21 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		recs = append(recs, subRecs...)
 	}
 
-	log.Debugf("podsi: parsing data segments of %d records took %.2f seconds", len(recs), time.Since(now).String())
+	log.Debugf("podsi: parsing data segments of %d records took %.2f seconds and resulted into %d read operations", len(recs), time.Since(now).String(), readCount)
 
 	return recs, nil
 }
 
-// func parsePieceWithDataSegmentIndex2(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
-// 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
-// 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
-// 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
-// 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
-// 	}
+type countingReader struct {
+	io.Reader
 
-// 	dataSegments, err := datasegment.ParseDataSegmentIndex(r)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
-// 	}
-// 	now := time.Now()
-// 	segments, err := dataSegments.ValidEntries()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
-// 	}
+	cnt *int32
+}
 
-// 	fmt.Printf("Total validation time: %.2f\n", time.Since(now).Seconds())
-// 	if len(segments) == 0 {
-// 		return nil, fmt.Errorf("no data segments found")
-// 	}
-
-// 	recs := make([]model.Record, 0)
-// 	for _, s := range segments {
-// 		segOffset := s.UnpaddedOffest()
-// 		segSize := s.UnpaddedLength()
-
-// 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
-// 		subRecs, err := parseRecordsFromCar(lr)
-// 		if err != nil {
-// 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
-// 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
-// 		}
-// 		for i := range subRecs {
-// 			subRecs[i].Offset += segOffset
-// 		}
-// 		recs = append(recs, subRecs...)
-// 	}
-
-// 	return recs, nil
-// }
-
-// func parsePieceWithDataSegmentIndex3(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
-// 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
-// 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
-// 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
-// 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
-// 	}
-// 	results := make(chan *datasegment.SegmentDesc)
-// 	var parseIndexErr error
-// 	go func() {
-// 		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(context.Background(), r, results)
-// 		close(results)
-// 	}()
-
-// 	var segments []*datasegment.SegmentDesc
-// 	for res := range results {
-// 		segments = append(segments, res)
-// 	}
-
-// 	validSegments := make([]datasegment.SegmentDesc, 0, len(segments))
-
-// 	if parseIndexErr != nil {
-// 		return nil, fmt.Errorf("could not parse data segment index: %w", parseIndexErr)
-// 	}
-
-// 	if len(segments) == 0 {
-// 		return nil, fmt.Errorf("no data segments found")
-// 	}
-
-// 	recs := make([]model.Record, 0)
-// 	for _, s := range segments {
-// 		segOffset := s.UnpaddedOffest()
-// 		segSize := s.UnpaddedLength()
-
-// 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
-// 		subRecs, err := parseRecordsFromCar(lr)
-// 		if err != nil {
-// 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
-// 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
-// 		}
-// 		for i := range subRecs {
-// 			subRecs[i].Offset += segOffset
-// 		}
-// 		recs = append(recs, subRecs...)
-// 	}
-
-// 	return recs, nil
-// }
+func (cr *countingReader) Read(p []byte) (n int, err error) {
+	atomic.AddInt32(cr.cnt, 1)
+	return cr.Reader.Read(p)
+}
 
 // BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
 // corresponding to an unsealed sector for this method to work. It will try to build index
