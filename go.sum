@@ -313,8 +313,8 @@ github.com/filecoin-project/boost-gfm v1.26.7 h1:ENJEqx1OzY072QnUP37YrGVmUiCewRw
 github.com/filecoin-project/boost-gfm v1.26.7/go.mod h1:OhG2y7WeDx3KU9DPjgWllS+3/ospPjm8/XDrvN6uOfk=
 github.com/filecoin-project/boost-graphsync v0.13.9 h1:RQepfTlffLGUmp3Ff7VosYrWUKPLiz++GGV2D/gIfuw=
 github.com/filecoin-project/boost-graphsync v0.13.9/go.mod h1:bc2M5ZLZJtXHl8kjnqtn4L1MsdEqpJErDaIeY0bJ9wk=
-github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3 h1:TBGSXb9eXvJcoVNmoE1dmqL4UtJSyItjx8xjhBb8ols=
-github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3/go.mod h1:vHUM62fb82DpsBSXptQjpvcysjoV2Guc1MVJiIYccfQ=
+github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231101173716-1622d0ce2581 h1:a2rhYL8QBTxmP1/E2VhfsvUB6CoCuS4/jEvSpOl68tU=
+github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231101173716-1622d0ce2581/go.mod h1:/d9yXj2CqhPPtM+m8GiH7rQHSGRqXYFg3V82Qsk34NA=
 github.com/filecoin-project/dagstore v0.7.0 h1:IS0R+69za8dguYWeqz/MI+nb7ONpk03tAkxPCBXEKm0=
 github.com/filecoin-project/dagstore v0.7.0/go.mod h1:YKn4qXih+/2xQWpfJsaKGOi4POw5vH5grDmfPCCnx8g=
 github.com/filecoin-project/filecoin-ffi v0.30.4-0.20200910194244-f640612a1a1f/go.mod h1:+If3s2VxyjZn+KGGZIoRXBDSFQ9xL404JBJGf4WhEj0=
