@@ -186,11 +186,13 @@ func (mm *MpoolMonitor) MsgExecElapsedEpochs(ctx context.Context, msgCid cid.Cid
 		return found, 0, nil
 	}
 	x, err := mm.fullNode.StateSearchMsg(ctx, types.EmptyTSK, msgCid, abi.ChainEpoch(20), true)
-	if err != nil {
+	// check for nil is required as the StateSearchMsg / ChainHead sometimes return a nil pointer
+	// without an error (TODO: investigate) that has caused panics in boost
+	if x == nil || err != nil {
 		return found, 0, fmt.Errorf("searching message: %w", err)
 	}
 	c, err := mm.fullNode.ChainHead(ctx)
-	if err != nil {
+	if c == nil || err != nil {
 		return found, 0, fmt.Errorf("getting chain head: %w", err)
 	}
 	return found, c.Height() - x.Height, nil
