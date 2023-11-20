@@ -364,7 +364,7 @@ func withSearchFilter(filter FilterOptions) (string, []interface{}) {
 	return where, whereArgs
 }
 
-var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID"}
+var searchFields = []string{"ID", "PieceCID", "ChainDealID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID"}
 
 func withSearchQuery(fields []string, query string, searchLabel bool) (string, []interface{}) {
 	query = strings.Trim(query, " \t\n")
