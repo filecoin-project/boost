@@ -25,7 +25,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.12.5
+	github.com/filecoin-project/go-state-types v0.12.8
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15 // indirect
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -323,7 +323,7 @@ require (
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231101173716-1622d0ce2581
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.25.0-rc1
+	github.com/filecoin-project/lotus v1.25.0
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
 	github.com/ipld/frisbii v0.4.1
