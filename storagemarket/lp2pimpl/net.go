@@ -12,6 +12,7 @@ import (
 	gfm_network "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -199,16 +200,16 @@ func (p *DealProvider) Start(ctx context.Context) {
 	// set to false, which maintains the previous behaviour:
 	// - SkipIPNIAnnounce=false:    announce deal to IPNI
 	// - RemoveUnsealedCopy=false:  keep unsealed copy of deal data
-	p.host.SetStreamHandler(DealProtocolv121ID, p.handleNewDealStream)
-	p.host.SetStreamHandler(DealProtocolv120ID, p.handleNewDealStream)
+	p.host.SetStreamHandler(DealProtocolv121ID, safe.Handle(p.handleNewDealStream))
+	p.host.SetStreamHandler(DealProtocolv120ID, safe.Handle(p.handleNewDealStream))
 
-	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
+	p.host.SetStreamHandler(DealStatusV12ProtocolID, safe.Handle(p.handleNewDealStatusStream))
 
 	// Handle legacy deal stream here and reject all legacy deals
 	if !p.enableLegacyDeals {
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, p.handleLegacyDealStream)
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, safe.Handle(p.handleLegacyDealStream))
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, safe.Handle(p.handleLegacyDealStream))
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, safe.Handle(p.handleLegacyDealStream))
 	}
 }
 

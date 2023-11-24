@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost/protocolproxy/messages"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -30,7 +31,7 @@ func NewForwardingHost(h host.Host, proxy peer.AddrInfo) host.Host {
 		proxy:    proxy.ID,
 		handlers: make(map[protocol.ID]network.StreamHandler),
 	}
-	fh.Host.SetStreamHandler(ForwardingProtocolID, fh.handleForwarding)
+	fh.Host.SetStreamHandler(ForwardingProtocolID, safe.Handle(fh.handleForwarding))
 	return fh
 }
 
@@ -45,7 +46,7 @@ func (fh *ForwardingHost) Close() error {
 // protocol will go through the forwarding handshake with the proxy, then the native
 // handler will be called
 func (fh *ForwardingHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
-	fh.Host.SetStreamHandler(pid, handler)
+	fh.Host.SetStreamHandler(pid, safe.Handle(handler))
 
 	// Save the handler so it can be invoked from the forwarding protocol's handler
 	// only set the handler if we are successful in registering the route

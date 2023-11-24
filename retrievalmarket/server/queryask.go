@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
@@ -13,7 +16,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"time"
 )
 
 // The time limit to read a message from the client when the client opens a stream
@@ -46,7 +48,7 @@ func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirector
 }
 
 func (qa *QueryAskHandler) Start() {
-	qa.host.SetStreamHandler(retrievalmarket.QueryProtocolID, qa.HandleQueryStream)
+	qa.host.SetStreamHandler(retrievalmarket.QueryProtocolID, safe.Handle(qa.HandleQueryStream))
 }
 
 func (qa *QueryAskHandler) Stop() {
