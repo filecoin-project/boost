@@ -15,6 +15,28 @@ import (
 
 // query: sealingpipeline: [SealingPipeline]
 func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, error) {
+	var combined sealingPipelineState
+	combined.SectorStates = sectorStates{}
+	for _, addr := range r.provider.Addresses {
+		state, err := r.minerSealingPipiline(ctx, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		combined.WaitDealsSectors = append(combined.WaitDealsSectors, state.WaitDealsSectors...)
+		combined.SnapDealsWaitDealsSectors = append(combined.SnapDealsWaitDealsSectors, state.SnapDealsWaitDealsSectors...)
+		combined.Workers = append(combined.Workers, state.Workers...)
+		combined.SectorStates.Regular = append(combined.SectorStates.Regular, state.SectorStates.Regular...)
+		combined.SectorStates.RegularError = append(combined.SectorStates.RegularError, state.SectorStates.RegularError...)
+		combined.SectorStates.SnapDeals = append(combined.SectorStates.SnapDeals, state.SectorStates.SnapDeals...)
+		combined.SectorStates.SnapDealsError = append(combined.SectorStates.SnapDealsError, state.SectorStates.SnapDealsError...)
+	}
+
+	return &combined, nil
+
+}
+
+func (r *resolver) minerSealingPipiline(ctx context.Context, addr address.Address) (*sealingPipelineState, error) {
 	// TODO: pass miner id as a parameter
 	spApi, err := r.me.SealingPipilineAPI(r.provider.Addresses[0])
 	if err != nil {
