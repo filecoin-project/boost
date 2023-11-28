@@ -115,6 +115,12 @@ your node if metadata log is disabled`,
 
 			Comment: ``,
 		},
+		{
+			Name: "ExperimentalConfig",
+			Type: "ExperimentalConfig",
+
+			Comment: `Experimental config`,
+		},
 	},
 	"Common": []DocField{
 		{
@@ -450,6 +456,15 @@ ignored, and deals will remain in the pending state until manually published.`,
 sector data from when serving graphsync retrievals.
 If this parameter is not set, boost will serve data from the endpoint
 configured in SectorIndexApiInfo.`,
+		},
+	},
+	"ExperimentalConfig": []DocField{
+		{
+			Name: "PodsiDataSegmentReaderBufferSize",
+			Type: "int",
+
+			Comment: `DataSegmentReaderBufferSize sets the size of the read buffer to use for podsi deal index parsing.
+Default is 4 MiB.`,
 		},
 	},
 	"FeeConfig": []DocField{

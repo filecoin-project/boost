@@ -54,6 +54,9 @@ type Boost struct {
 	LotusFees       FeeConfig
 	DAGStore        lotus_config.DAGStoreConfig
 	IndexProvider   IndexProviderConfig
+
+	// Experimental config
+	ExperimentalConfig ExperimentalConfig
 }
 
 func (b *Boost) GetDealmakingConfig() lotus_config.DealmakingConfig {
@@ -444,4 +447,10 @@ type HttpDownloadConfig struct {
 	// AllowPrivateIPs defines whether boost should allow HTTP downloads from private IPs as per https://en.wikipedia.org/wiki/Private_network.
 	// The default is false.
 	AllowPrivateIPs bool
+}
+
+type ExperimentalConfig struct {
+	// DataSegmentReaderBufferSize sets the size of the read buffer to use for podsi deal index parsing.
+	// Default is 4 MiB.
+	PodsiDataSegmentReaderBufferSize int
 }

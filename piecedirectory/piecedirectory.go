@@ -43,8 +43,7 @@ import (
 var log = logging.Logger("piecedirectory")
 
 const (
-	MaxCachedReaders            = 128
-	DataSegmentReaderBufferSize = 4e6 // 4MiB
+	MaxCachedReaders = 128
 )
 
 type settings struct {
@@ -316,7 +315,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
-	recs, err := parsePieceWithDataSegmentIndexCustom(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader, ps.settings.dataSegmentReaderBufferSize)
+	recs, err := parsePieceWithDataSegmentIndex(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader, ps.settings.dataSegmentReaderBufferSize)
 	if err != nil {
 		log.Infow("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
 		// Iterate over all the blocks in the piece to extract the index records
@@ -394,11 +393,7 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 	return recs, nil
 }
 
-func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
-	return parsePieceWithDataSegmentIndexCustom(pieceCid, unpaddedSize, r, DataSegmentReaderBufferSize)
-}
-
-func parsePieceWithDataSegmentIndexCustom(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader, dataSegmentReaderBufferSize int) ([]model.Record, error) {
+func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader, dataSegmentReaderBufferSize int) ([]model.Record, error) {
 	var readCount int32
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 
@@ -407,7 +402,7 @@ func parsePieceWithDataSegmentIndexCustom(pieceCid cid.Cid, unpaddedSize int64, 
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
-	log.Debugf("podsi: took %s to seek to the start offset", time.Since(now).String())
+	log.Infof("podsi: took %s to seek to the start offset", time.Since(now).String())
 
 	now = time.Now()
 
@@ -446,7 +441,9 @@ func parsePieceWithDataSegmentIndexCustom(pieceCid cid.Cid, unpaddedSize int64, 
 		return nil, fmt.Errorf("no data segments found")
 	}
 
-	log.Debugf("podsi: parsing and validating data segment index of %d segments took %s", len(segments), time.Since(now).String())
+	log.Infow("podsi: parsing and validating data segment index", "buffer_mib", dataSegmentReaderBufferSize/1e6, "segments", len(segments), "time", time.Since(now).String(), "reads", readCount)
+
+	readCount = 0
 
 	now = time.Now()
 
@@ -475,7 +472,7 @@ func parsePieceWithDataSegmentIndexCustom(pieceCid cid.Cid, unpaddedSize int64, 
 		recs = append(recs, subRecs...)
 	}
 
-	log.Debugf("podsi: parsing data segments of %d records took %.2f seconds and resulted into %d read operations", len(recs), time.Since(now).String(), readCount)
+	log.Infow("podsi: parsing data segments", "buffer_mib", dataSegmentReaderBufferSize/1e6, "records", len(recs), "time", time.Since(now).String(), "reads", readCount)
 
 	return recs, nil
 }

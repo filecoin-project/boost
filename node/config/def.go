@@ -225,6 +225,9 @@ func DefaultBoost() *Boost {
 			NChunks:         5,
 			AllowPrivateIPs: false,
 		},
+		ExperimentalConfig: ExperimentalConfig{
+			PodsiDataSegmentReaderBufferSize: 4e6, // 4MiB
+		},
 	}
 	return cfg
 }
