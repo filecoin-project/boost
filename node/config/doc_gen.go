@@ -460,10 +460,10 @@ configured in SectorIndexApiInfo.`,
 	},
 	"ExperimentalConfig": []DocField{
 		{
-			Name: "PodsiDataSegmentReaderBufferSize",
-			Type: "int",
+			Name: "PodsiDataSegmentReaderBufferSizeBytes",
+			Type: "int64",
 
-			Comment: `DataSegmentReaderBufferSize sets the size of the read buffer to use for podsi deal index parsing.
+			Comment: `PodsiDataSegmentReaderBufferSizeBytes sets the size of the read buffer to use for podsi deal index parsing.
 Default is 4 MiB.`,
 		},
 	},

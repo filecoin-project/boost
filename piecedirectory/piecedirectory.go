@@ -48,7 +48,7 @@ const (
 
 type settings struct {
 	addIndexConcurrency         int
-	dataSegmentReaderBufferSize int
+	dataSegmentReaderBufferSize int64
 }
 
 type Option func(*settings)
@@ -59,7 +59,7 @@ func WithAddIndexConcurrency(c int) Option {
 	}
 }
 
-func WithDataSegmentReaderBufferSize(size int) Option {
+func WithDataSegmentReaderBufferSize(size int64) Option {
 	return func(s *settings) {
 		s.dataSegmentReaderBufferSize = size
 	}
@@ -393,7 +393,7 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 	return recs, nil
 }
 
-func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader, dataSegmentReaderBufferSize int) ([]model.Record, error) {
+func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader, dataSegmentReaderBufferSize int64) ([]model.Record, error) {
 	var readCount int32
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 
@@ -411,7 +411,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		cr := countingReader{Reader: r, cnt: &readCount}
-		br := bufio.NewReaderSize(&cr, dataSegmentReaderBufferSize)
+		br := bufio.NewReaderSize(&cr, int(dataSegmentReaderBufferSize))
 		parseIndexErr = datasegment.ParseDataSegmentIndexAsync(ctx, br, results)
 		close(results)
 	}()
@@ -459,7 +459,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", i, segOffset, err)
 		}
 		cr := countingReader{Reader: r, cnt: &readCount}
-		br := bufio.NewReaderSize(&cr, dataSegmentReaderBufferSize)
+		br := bufio.NewReaderSize(&cr, int(dataSegmentReaderBufferSize))
 		lr := io.LimitReader(br, int64(segSize))
 		subRecs, err := parseRecordsFromCar(lr)
 		if err != nil {

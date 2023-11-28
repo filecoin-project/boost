@@ -226,7 +226,7 @@ func DefaultBoost() *Boost {
 			AllowPrivateIPs: false,
 		},
 		ExperimentalConfig: ExperimentalConfig{
-			PodsiDataSegmentReaderBufferSize: 4e6, // 4MiB
+			PodsiDataSegmentReaderBufferSizeBytes: 4e6, // 4MiB
 		},
 	}
 	return cfg

@@ -450,7 +450,7 @@ type HttpDownloadConfig struct {
 }
 
 type ExperimentalConfig struct {
-	// DataSegmentReaderBufferSize sets the size of the read buffer to use for podsi deal index parsing.
+	// PodsiDataSegmentReaderBufferSizeBytes sets the size of the read buffer to use for podsi deal index parsing.
 	// Default is 4 MiB.
-	PodsiDataSegmentReaderBufferSize int
+	PodsiDataSegmentReaderBufferSizeBytes int64
 }

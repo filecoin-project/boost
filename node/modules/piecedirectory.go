@@ -139,7 +139,7 @@ func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.Min
 		pd := piecedirectory.NewPieceDirectory(store, sa,
 			cfg.LocalIndexDirectory.ParallelAddIndexLimit,
 			piecedirectory.WithAddIndexConcurrency(cfg.LocalIndexDirectory.AddIndexConcurrency),
-			piecedirectory.WithDataSegmentReaderBufferSize(cfg.ExperimentalConfig.PodsiDataSegmentReaderBufferSize))
+			piecedirectory.WithDataSegmentReaderBufferSize(cfg.ExperimentalConfig.PodsiDataSegmentReaderBufferSizeBytes))
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				err := sa.Start(ctx, log)
