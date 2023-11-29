@@ -50,6 +50,11 @@ var runCmd = &cli.Command{
 			Name:  "pprof",
 			Usage: "run pprof web server on localhost:6070",
 		},
+		&cli.UintFlag{
+			Name:  "pprof-port",
+			Usage: "the http port to serve pprof on",
+			Value: 6070,
+		},
 		&cli.StringFlag{
 			Name:  "base-path",
 			Usage: "the base path at which to run the web server",
@@ -178,8 +183,9 @@ var runCmd = &cli.Command{
 		}
 
 		if cctx.Bool("pprof") {
+			pprofPort := cctx.Int("pprof-port")
 			go func() {
-				err := http.ListenAndServe("localhost:6070", nil)
+				err := http.ListenAndServe(fmt.Sprintf("localhost:%d", pprofPort), nil)
 				if err != nil {
 					log.Error(err)
 				}
