@@ -100,6 +100,7 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 	for _, opt := range opts {
 		opt(pd.settings)
 	}
+	pd.settings.dataSegmentReaderBufferSize = 127 * (pd.settings.dataSegmentReaderBufferSize / 127)
 
 	if pd.settings.addIndexConcurrency == 0 {
 		pd.settings.addIndexConcurrency = config.DefaultAddIndexConcurrency
