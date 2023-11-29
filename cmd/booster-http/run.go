@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
@@ -74,6 +75,11 @@ var runCmd = &cli.Command{
 			Name:  "add-index-throttle",
 			Usage: "the maximum number of add index operations that can run in parallel",
 			Value: 4,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.StringFlag{
 			Name:     "api-fullnode",
@@ -242,7 +248,8 @@ var runCmd = &cli.Command{
 		defer sa.Close()
 
 		// Create the server API
-		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"),
+			piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 
 		opts := &HttpServerOptions{
 			ServePieces:      servePieces,

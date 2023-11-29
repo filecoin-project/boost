@@ -34,7 +34,10 @@ const CqlTimeout = 60
 
 // The Cassandra driver has a 50k limit on batch statements. Keeping
 // batch size small makes sure we're under the limit.
-const InsertBatchSize = 10000
+const InsertBatchSize = 10_000
+const MaxInsertBatchSize = 50_000
+
+const InsertConcurrency = 4
 
 type DBSettings struct {
 	// The cassandra hosts to connect to
@@ -47,6 +50,8 @@ type DBSettings struct {
 	CQLTimeout int
 	// Number of records per insert batch
 	InsertBatchSize int
+	// Number of concurrent inserts to split AddIndex calls too
+	InsertConcurrency int
 }
 
 type StoreOpt func(*Store)
@@ -76,6 +81,12 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 	}
 	if settings.InsertBatchSize == 0 {
 		settings.InsertBatchSize = InsertBatchSize
+	}
+	if settings.InsertBatchSize > MaxInsertBatchSize {
+		settings.InsertBatchSize = MaxInsertBatchSize
+	}
+	if settings.InsertConcurrency == 0 {
+		settings.InsertConcurrency = InsertConcurrency
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
@@ -537,7 +548,13 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 	insertPieceOffsetsQry := `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
 	pieceCidBytes := pieceCid.Bytes()
 
-	threadBatch := len(recs) / 32 // split the slice into go-routine batches for ~32 workers
+	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
+
+	if threadBatch == 0 {
+		threadBatch = len(recs)
+	}
+
+	log.Debugw("addMultihashesToPieces call", "threadBatch", threadBatch, "len(recs)", len(recs))
 
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
@@ -565,9 +582,18 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 				})
 
 				if allIdx == len(recsb)-1 || len(batch.Entries) == s.settings.InsertBatchSize {
-					err := s.session.ExecuteBatch(batch)
+					err := func() error {
+						defer func(start time.Time) {
+							log.Debugw("addMultihashesToPieces executeBatch", "took", time.Since(start), "entries", len(batch.Entries))
+						}(time.Now())
+						err := s.session.ExecuteBatch(batch)
+						if err != nil {
+							return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+						}
+						return nil
+					}()
 					if err != nil {
-						return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+						return err
 					}
 					batch = nil
 
@@ -596,7 +622,13 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 	insertPieceOffsetsQry := `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
 	pieceCidBytes := pieceCid.Bytes()
 
-	threadBatch := len(recs) / 32 // split the slice into go-routine batches for ~32 workers
+	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
+
+	if threadBatch == 0 {
+		threadBatch = len(recs)
+	}
+
+	log.Debugw("addPieceInfos call", "threadBatch", threadBatch, "len(recs)", len(recs))
 
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
@@ -624,9 +656,19 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 				})
 
 				if allIdx == len(recsb)-1 || len(batch.Entries) == s.settings.InsertBatchSize {
-					err := s.session.ExecuteBatch(batch)
+					err := func() error {
+						defer func(start time.Time) {
+							log.Debugw("addPieceInfos executeBatch", "took", time.Since(start), "entries", len(batch.Entries))
+						}(time.Now())
+
+						err := s.session.ExecuteBatch(batch)
+						if err != nil {
+							return fmt.Errorf("executing offset / size batch insert for piece %s: %w", pieceCid, err)
+						}
+						return nil
+					}()
 					if err != nil {
-						return fmt.Errorf("executing offset / size batch insert for piece %s: %w", pieceCid, err)
+						return err
 					}
 					batch = nil
 

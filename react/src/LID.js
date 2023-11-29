@@ -92,7 +92,6 @@ function LIDContent() {
         description: ''
     }]
 
-    const scanPct = Math.round(d.ScanProgress.Progress * 100)
     var lastScanMsg = ''
     var lastScan = d.ScanProgress.LastScan
     const now = new Date()
@@ -107,30 +106,9 @@ function LIDContent() {
         lastScanMsg = moment(lastScan).fromNow() + ' ago'
     }
     return <div className="lid">
-      {d.ScanProgress.Progress < 1 ? (
-          <div className="scan-progress">
-              <p>
-                  Piece Doctor is performing an initial scan for pieces in LID.
-                  This may take several hours.
-                  The graphs below will update as the scan makes progress. <br/>
-              </p>
-              <div className="scan-bar">
-                  <div className="completed" style={{width: scanPct+'%'}}></div>
-              </div>
-              <div className="scan-bar-label">
-                  {scanPct}% complete
-              </div>
-              <p className="last-updated">
-                  {lastScan ? (
-                      <span>Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})</span>
-                  ) : null}
-              </p>
-          </div>
-      ) : (
-          <div className="last-scan">
-              Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})
-          </div>
-      )}
+      <div className="last-scan">
+          Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})
+      </div>
 
       <h3>Pieces<PiecesInfo/></h3>
 

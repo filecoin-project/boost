@@ -639,6 +639,13 @@ the piece from the sealing subsystem, creates an index of where each block
 is in the piece, and adds the index to the local index directory.`,
 		},
 		{
+			Name: "AddIndexConcurrency",
+			Type: "int",
+
+			Comment: `AddIndexConcurrency sets the number of concurrent tasks that each add index operation is split into.
+This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 8.`,
+		},
+		{
 			Name: "EmbeddedServicePort",
 			Type: "uint64",
 

@@ -313,8 +313,8 @@ github.com/filecoin-project/boost-gfm v1.26.7 h1:ENJEqx1OzY072QnUP37YrGVmUiCewRw
 github.com/filecoin-project/boost-gfm v1.26.7/go.mod h1:OhG2y7WeDx3KU9DPjgWllS+3/ospPjm8/XDrvN6uOfk=
 github.com/filecoin-project/boost-graphsync v0.13.9 h1:RQepfTlffLGUmp3Ff7VosYrWUKPLiz++GGV2D/gIfuw=
 github.com/filecoin-project/boost-graphsync v0.13.9/go.mod h1:bc2M5ZLZJtXHl8kjnqtn4L1MsdEqpJErDaIeY0bJ9wk=
-github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3 h1:TBGSXb9eXvJcoVNmoE1dmqL4UtJSyItjx8xjhBb8ols=
-github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3/go.mod h1:vHUM62fb82DpsBSXptQjpvcysjoV2Guc1MVJiIYccfQ=
+github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f h1:8dd0yAadyeOL5Qd42XhEwD60UKvIFkY2MLhef/IaeOk=
+github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f/go.mod h1:MyzvfYWAH0OAyf95TLUWYq3cO3vm/TVzDS57GKQi47o=
 github.com/filecoin-project/dagstore v0.7.0 h1:IS0R+69za8dguYWeqz/MI+nb7ONpk03tAkxPCBXEKm0=
 github.com/filecoin-project/dagstore v0.7.0/go.mod h1:YKn4qXih+/2xQWpfJsaKGOi4POw5vH5grDmfPCCnx8g=
 github.com/filecoin-project/filecoin-ffi v0.30.4-0.20200910194244-f640612a1a1f/go.mod h1:+If3s2VxyjZn+KGGZIoRXBDSFQ9xL404JBJGf4WhEj0=
@@ -385,8 +385,8 @@ github.com/filecoin-project/go-state-types v0.0.0-20201102161440-c8033295a1fc/go
 github.com/filecoin-project/go-state-types v0.1.0/go.mod h1:ezYnPf0bNkTsDibL/psSz5dy4B5awOJ/E7P2Saeep8g=
 github.com/filecoin-project/go-state-types v0.1.6/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.1.10/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
-github.com/filecoin-project/go-state-types v0.12.5 h1:VQ2N2T3JeUDdIHEo/xhjnT7Q218Wl0UYIyglqT7Z9Ck=
-github.com/filecoin-project/go-state-types v0.12.5/go.mod h1:iJTqGdWDvzXhuVf64Lw0hzt4TIoitMo0VgHdxdjNDZI=
+github.com/filecoin-project/go-state-types v0.12.8 h1:W/UObdAsv+LbB9EfyLg92DSYoatzUWmlfV8FGyh30VA=
+github.com/filecoin-project/go-state-types v0.12.8/go.mod h1:gR2NV0CSGSQwopxF+3In9nDh1sqvoYukLcs5vK0AHCA=
 github.com/filecoin-project/go-statemachine v0.0.0-20200925024713-05bd7c71fbfe/go.mod h1:FGwQgZAt2Gh5mjlwJUlVB62JeYdo+if0xWxSEfBD9ig=
 github.com/filecoin-project/go-statemachine v1.0.3 h1:N07o6alys+V1tNoSTi4WuuoeNC4erS/6jE74+NsgQuk=
 github.com/filecoin-project/go-statemachine v1.0.3/go.mod h1:jZdXXiHa61n4NmgWFG4w8tnqgvZVHYbJ3yW7+y8bF54=
@@ -397,8 +397,8 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d h1:KX85N/juToCpFXeYtWKGZ1lGPTjRo1i3QBUhxgOtYck=
 github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d/go.mod h1:6+uTL2U1NwtLg0Dnz+6ksFGhRY1y9CygWFKKC1h/HV0=
-github.com/filecoin-project/lotus v1.25.0-rc1 h1:Hwc6W6lnNX84MK5cSopzAGfbtz3IO0f0AMZN0JpIXuU=
-github.com/filecoin-project/lotus v1.25.0-rc1/go.mod h1:L4HPpbCl0dvIVLW/anT1iBu1/CURDYN9n4ULKkDZ5ps=
+github.com/filecoin-project/lotus v1.25.0 h1:okHySAq5Z2ZCRtooIBmqi5jujFBoXzuay+KkdHGxp1c=
+github.com/filecoin-project/lotus v1.25.0/go.mod h1:7How7BIQEbV/2gHJBjsNQ7ynHb7zXUmtO7QYImo4L3w=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.4/go.mod h1:BStZQzx5x7TmCkLv0Bpa07U6cPKol6fd3w9KjMPZ6Z4=

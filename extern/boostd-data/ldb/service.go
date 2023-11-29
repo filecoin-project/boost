@@ -373,18 +373,40 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		}
 		progress <- types.AddIndexProgress{Progress: 0.45}
 
-		// get and set next cursor (handle synchronization, maybe with CAS)
-		cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
-		if err != nil {
-			progress <- types.AddIndexProgress{Err: err.Error()}
-			return
-		}
+		var cursor uint64
+		var keyCursorPrefix string
 
-		// allocate metadata for pieceCid
-		err = s.db.SetNextCursor(ctx, cursor+1)
+		// get the metadata for the piece
+		// allocate a new cursor only if metadata doesn't exist. This is required to be able
+		// to handle multiple AddIndex calls for the same pieceCid
+		md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 		if err != nil {
-			progress <- types.AddIndexProgress{Err: err.Error()}
-			return
+			if !errors.Is(err, ds.ErrNotFound) {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+			// there isn't yet any metadata, so create new metadata
+			md = newLeveldbMetadata()
+
+			// get and set next cursor (handle synchronization, maybe with CAS)
+			cursor, keyCursorPrefix, err = s.db.NextCursor(ctx)
+			if err != nil {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+
+			// allocate metadata for pieceCid
+			err = s.db.SetNextCursor(ctx, cursor+1)
+			if err != nil {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+
+			md.Cursor = cursor
+			md.CompleteIndex = isCompleteIndex
+		} else {
+			cursor = md.Cursor
+			keyCursorPrefix = KeyCursorPrefix(cursor)
 		}
 
 		// process index and store entries
@@ -397,21 +419,8 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		}
 		progress <- types.AddIndexProgress{Progress: 0.9}
 
-		// get the metadata for the piece
-		md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-		if err != nil {
-			if !errors.Is(err, ds.ErrNotFound) {
-				progress <- types.AddIndexProgress{Err: err.Error()}
-				return
-			}
-			// there isn't yet any metadata, so create new metadata
-			md = newLeveldbMetadata()
-		}
-
 		// mark indexing as complete
-		md.Cursor = cursor
 		md.IndexedAt = time.Now()
-		md.CompleteIndex = isCompleteIndex
 
 		err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 		if err != nil {

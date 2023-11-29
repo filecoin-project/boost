@@ -114,7 +114,11 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 	}
 
 	cursor, _ := binary.Uvarint(b)
-	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because of Query method in go-datastore
+	return cursor, KeyCursorPrefix(cursor), nil // adding "/" because of Query method in go-datastore
+}
+
+func KeyCursorPrefix(cursor uint64) string {
+	return fmt.Sprintf("%d/", cursor)
 }
 
 // SetNextCursor
