@@ -13,6 +13,7 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -70,7 +71,7 @@ var runCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "add-index-concurrency",
 			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
-			Value: 4,
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.StringFlag{
 			Name:  "proxy",

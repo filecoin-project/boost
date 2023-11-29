@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -106,7 +107,7 @@ var lidCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "add-index-concurrency",
 			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
-			Value: 4,
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.BoolFlag{
 			Name:  "ignore-commp",
