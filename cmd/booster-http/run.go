@@ -75,6 +75,11 @@ var runCmd = &cli.Command{
 			Usage: "the maximum number of add index operations that can run in parallel",
 			Value: 4,
 		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: 4,
+		},
 		&cli.StringFlag{
 			Name:     "api-fullnode",
 			Usage:    "the endpoint for the full node API",
@@ -242,7 +247,8 @@ var runCmd = &cli.Command{
 		defer sa.Close()
 
 		// Create the server API
-		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"),
+			piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 
 		opts := &HttpServerOptions{
 			ServePieces:      servePieces,

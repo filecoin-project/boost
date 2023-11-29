@@ -28,6 +28,10 @@ import (
 	"go.opencensus.io/tag"
 )
 
+const (
+	DefaultInsertConcurrency = 4
+)
+
 var runCmd = &cli.Command{
 	Name: "run",
 	Subcommands: []*cli.Command{
@@ -105,6 +109,11 @@ var yugabyteCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
 			Name:     "CQLTimeout",
 			Usage:    "client timeout value in seconds for CQL queries",
 			Required: false,
@@ -115,9 +124,10 @@ var yugabyteCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
-			ConnectString: cctx.String("connect-string"),
-			CQLTimeout:    cctx.Int("CQLTimeout"),
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
 		}
 
 		// One of the migrations requires a miner address. But we don't want to
@@ -224,6 +234,11 @@ var yugabyteMigrateCmd = &cli.Command{
 			Usage: "default miner address eg f1234",
 		},
 		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
 			Name:     "CQLTimeout",
 			Usage:    "client timeout value in seconds for CQL queries",
 			Required: false,
@@ -236,9 +251,10 @@ var yugabyteMigrateCmd = &cli.Command{
 
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
-			ConnectString: cctx.String("connect-string"),
-			CQLTimeout:    cctx.Int("CQLTimeout"),
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
 		}
 
 		maddr := migrations.DisabledMinerAddr
@@ -281,6 +297,11 @@ var yugabyteAddIndexCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
 			Name:     "CQLTimeout",
 			Usage:    "client timeout value in seconds for CQL queries",
 			Required: false,
@@ -292,9 +313,10 @@ var yugabyteAddIndexCmd = &cli.Command{
 
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
-			ConnectString: cctx.String("connect-string"),
-			CQLTimeout:    cctx.Int("CQLTimeout"),
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
 		}
 
 		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)

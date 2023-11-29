@@ -103,6 +103,11 @@ var lidCmd = &cli.Command{
 			Usage: "",
 			Value: 4,
 		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: 4,
+		},
 		&cli.BoolFlag{
 			Name:  "ignore-commp",
 			Usage: "whether we should ignore sanity check of local data vs chain data",
@@ -203,7 +208,7 @@ func action(cctx *cli.Context) error {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd = piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		pd = piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"), piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 		pd.Start(ctx)
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -37,16 +38,23 @@ import (
 var log = logging.Logger("piecedirectory")
 
 const (
-	MaxCachedReaders    = 128
-	AddIndexConcurrency = 8
+	MaxCachedReaders = 128
 )
 
-type Settings struct {
+type settings struct {
 	addIndexConcurrency int
 }
 
+type Option func(*settings)
+
+func WithAddIndexConcurrency(c int) Option {
+	return func(s *settings) {
+		s.addIndexConcurrency = c
+	}
+}
+
 type PieceDirectory struct {
-	settings    *Settings
+	settings    *settings
 	store       *bdclient.Store
 	pieceReader types.PieceReader
 
@@ -60,13 +68,7 @@ type PieceDirectory struct {
 	addIdxOpByCid      sync.Map
 }
 
-func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
-	return NewPieceDirectoryWithSettings(store, pr, addIndexThrottleSize, &Settings{
-		addIndexConcurrency: AddIndexConcurrency,
-	})
-}
-
-func NewPieceDirectoryWithSettings(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int, settings *Settings) *PieceDirectory {
+func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int, opts ...Option) *PieceDirectory {
 	prCache := ttlcache.NewCache()
 	_ = prCache.SetTTL(30 * time.Second)
 	prCache.SetCacheSizeLimit(MaxCachedReaders)
@@ -77,7 +79,13 @@ func NewPieceDirectoryWithSettings(store *bdclient.Store, pr types.PieceReader, 
 		pieceReaderCache:   prCache,
 		addIdxThrottleSize: addIndexThrottleSize,
 		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
-		settings:           settings,
+		settings: &settings{
+			addIndexConcurrency: config.DefaultAddIndexConcurrency,
+		},
+	}
+
+	for _, opt := range opts {
+		opt(pd.settings)
 	}
 
 	expireCallback := func(key string, reason ttlcache.EvictionReason, value interface{}) {
