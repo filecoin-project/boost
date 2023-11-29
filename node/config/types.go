@@ -419,7 +419,7 @@ type LocalIndexDirectoryConfig struct {
 	// is in the piece, and adds the index to the local index directory.
 	ParallelAddIndexLimit int
 	// AddIndexConcurrency sets the number of concurrent tasks that each add index operation is split into.
-	// This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 4.
+	// This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 8.
 	AddIndexConcurrency int
 	// The port that the embedded local index directory data service runs on.
 	// Set this value to zero to disable the embedded local index directory data service
