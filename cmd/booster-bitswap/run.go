@@ -13,6 +13,7 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -66,6 +67,11 @@ var runCmd = &cli.Command{
 			Name:  "add-index-throttle",
 			Usage: "the maximum number of add index operations that can run in parallel",
 			Value: 4,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.StringFlag{
 			Name:  "proxy",
@@ -234,7 +240,8 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"),
+			piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 		remoteStore := remoteblockstore.NewRemoteBlockstore(pd, &bitswapBlockMetrics)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 

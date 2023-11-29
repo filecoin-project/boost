@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -102,6 +103,11 @@ var lidCmd = &cli.Command{
 			Name:  "add-index-throttle",
 			Usage: "",
 			Value: 4,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.BoolFlag{
 			Name:  "ignore-commp",
@@ -203,7 +209,7 @@ func action(cctx *cli.Context) error {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd = piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		pd = piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"), piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 		pd.Start(ctx)
 	}
 
