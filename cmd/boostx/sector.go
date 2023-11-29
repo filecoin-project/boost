@@ -60,7 +60,7 @@ var sectorUnsealCmd = &cli.Command{
 
 		err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
 		if err != nil {
-			return err
+			fmt.Printf("Warning: %s\n", err.Error())
 		}
 
 		// Connect to the storage API and create a sector accessor
