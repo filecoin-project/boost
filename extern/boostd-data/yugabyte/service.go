@@ -34,7 +34,8 @@ const CqlTimeout = 60
 
 // The Cassandra driver has a 50k limit on batch statements. Keeping
 // batch size small makes sure we're under the limit.
-const InsertBatchSize = 10000
+const InsertBatchSize = 10_000
+const MaxInsertBatchSize = 50_000
 
 const InsertConcurrency = 4
 
@@ -80,6 +81,9 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 	}
 	if settings.InsertBatchSize == 0 {
 		settings.InsertBatchSize = InsertBatchSize
+	}
+	if settings.InsertBatchSize > MaxInsertBatchSize {
+		settings.InsertBatchSize = MaxInsertBatchSize
 	}
 	if settings.InsertConcurrency == 0 {
 		settings.InsertConcurrency = InsertConcurrency
