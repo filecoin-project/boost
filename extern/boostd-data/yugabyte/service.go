@@ -550,6 +550,12 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 
 	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
 
+	if threadBatch == 0 {
+		threadBatch = len(recs)
+	}
+
+	log.Debugw("addMultihashesToPieces call", "threadBatch", threadBatch, "len(recs)", len(recs))
+
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
 		i := i
@@ -576,9 +582,18 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 				})
 
 				if allIdx == len(recsb)-1 || len(batch.Entries) == s.settings.InsertBatchSize {
-					err := s.session.ExecuteBatch(batch)
+					err := func() error {
+						defer func(start time.Time) {
+							log.Debugw("addMultihashesToPieces executeBatch", "took", time.Since(start), "entries", len(batch.Entries))
+						}(time.Now())
+						err := s.session.ExecuteBatch(batch)
+						if err != nil {
+							return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+						}
+						return nil
+					}()
 					if err != nil {
-						return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+						return err
 					}
 					batch = nil
 
@@ -609,6 +624,12 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 
 	threadBatch := len(recs) / s.settings.InsertConcurrency // split the slice into go-routine batches
 
+	if threadBatch == 0 {
+		threadBatch = len(recs)
+	}
+
+	log.Debugw("addPieceInfos call", "threadBatch", threadBatch, "len(recs)", len(recs))
+
 	var eg errgroup.Group
 	for i := 0; i < len(recs); i += threadBatch {
 		i := i
@@ -635,9 +656,19 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 				})
 
 				if allIdx == len(recsb)-1 || len(batch.Entries) == s.settings.InsertBatchSize {
-					err := s.session.ExecuteBatch(batch)
+					err := func() error {
+						defer func(start time.Time) {
+							log.Debugw("addPieceInfos executeBatch", "took", time.Since(start), "entries", len(batch.Entries))
+						}(time.Now())
+
+						err := s.session.ExecuteBatch(batch)
+						if err != nil {
+							return fmt.Errorf("executing offset / size batch insert for piece %s: %w", pieceCid, err)
+						}
+						return nil
+					}()
 					if err != nil {
-						return fmt.Errorf("executing offset / size batch insert for piece %s: %w", pieceCid, err)
+						return err
 					}
 					batch = nil
 
