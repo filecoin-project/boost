@@ -24,7 +24,7 @@ const (
 var MaxTraversalLinks uint64 = 32 * (1 << 20)
 
 const (
-	DefaultAddIndexConcurrency = 1
+	DefaultAddIndexConcurrency = 8
 )
 
 func init() {
