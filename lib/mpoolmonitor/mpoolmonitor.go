@@ -188,11 +188,17 @@ func (mm *MpoolMonitor) MsgExecElapsedEpochs(ctx context.Context, msgCid cid.Cid
 	x, err := mm.fullNode.StateSearchMsg(ctx, types.EmptyTSK, msgCid, abi.ChainEpoch(20), true)
 	// check for nil is required as the StateSearchMsg / ChainHead sometimes return a nil pointer
 	// without an error (TODO: investigate) that has caused panics in boost
-	if x == nil || err != nil {
+	if x == nil {
+		return found, 0, fmt.Errorf("searching message is nil")
+	}
+	if err != nil {
 		return found, 0, fmt.Errorf("searching message: %w", err)
 	}
 	c, err := mm.fullNode.ChainHead(ctx)
-	if c == nil || err != nil {
+	if c == nil {
+		return found, 0, fmt.Errorf("chain head is nil")
+	}
+	if err != nil {
 		return found, 0, fmt.Errorf("getting chain head: %w", err)
 	}
 	return found, c.Height() - x.Height, nil
