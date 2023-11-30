@@ -92,15 +92,13 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 		addIdxThrottleSize: addIndexThrottleSize,
 		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 		settings: &settings{
-			addIndexConcurrency:         config.DefaultAddIndexConcurrency,
-			dataSegmentReaderBufferSize: DataSegmentReaderBufferSize,
+			addIndexConcurrency: config.DefaultAddIndexConcurrency,
 		},
 	}
 
 	for _, opt := range opts {
 		opt(pd.settings)
 	}
-	pd.settings.dataSegmentReaderBufferSize = 127 * (pd.settings.dataSegmentReaderBufferSize / 127)
 
 	if pd.settings.addIndexConcurrency == 0 {
 		pd.settings.addIndexConcurrency = config.DefaultAddIndexConcurrency

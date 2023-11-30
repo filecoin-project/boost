@@ -35,7 +35,7 @@ import (
 )
 
 func TestDummyPodsiDealOnline(t *testing.T) {
-	randomFileSize := int(1e6)
+	randomFileSize := int(4e6)
 
 	ctx := context.Background()
 	log := framework.Log
