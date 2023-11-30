@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -40,6 +41,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("piecedirectory")
@@ -403,52 +405,98 @@ func (cr *countingReader) Read(p []byte) (n int, err error) {
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
 
-	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
-	dsis := datasegment.DataSegmentIndexStartOffset(ps)
-
-	var readsCnt int32
-	cr := &countingReader{
-		Reader: r,
-		cnt:    &readsCnt,
-	}
-
 	useBufferedReader := os.Getenv("PODSI_USE_BUFFERED_READER") == "true"
 	bufferSize, err := strconv.Atoi(os.Getenv("PODSI_BUFFER_SIZE"))
 	if err != nil {
 		bufferSize = int(4e6)
 	}
-	log.Infow("podsi: ", "userBufferedReader", useBufferedReader, "bufferSize", bufferSize)
+	concurrency, err := strconv.Atoi(os.Getenv("PODSI_VALIDATION_CONCURRENCY"))
+	if err != nil {
+		concurrency = runtime.NumCPU()
+	}
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > 16 {
+		concurrency = 16
+	}
 
+	log.Infow("podsi: ", "userBufferedReader", useBufferedReader, "bufferSize", bufferSize, "validationConcurrency", concurrency)
+	start := time.Now()
+
+	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
+	dsis := datasegment.DataSegmentIndexStartOffset(ps)
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
 
 	var rr io.Reader
+	var readsCnt int32
+	cr := &countingReader{
+		Reader: r,
+		cnt:    &readsCnt,
+	}
 	if useBufferedReader {
 		rr = bufio.NewReaderSize(cr, bufferSize)
 	} else {
 		rr = cr
 	}
 
-	start := time.Now()
-	dataSegments, err := datasegment.ParseDataSegmentIndex(rr)
+	indexData, err := datasegment.ParseDataSegmentIndex(rr)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
 	}
-	segments, err := dataSegments.ValidEntries()
-	if err != nil {
+
+	log.Infow("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
+	start = time.Now()
+
+	if len(indexData.Entries) < concurrency {
+		concurrency = len(indexData.Entries)
+	}
+
+	chunkSize := len(indexData.Entries) / concurrency
+	results := make([][]datasegment.SegmentDesc, concurrency)
+
+	var eg errgroup.Group
+	for i := 0; i < concurrency; i++ {
+		i := i
+		eg.Go(func() error {
+			start := i * chunkSize
+			end := start + chunkSize
+			if i == concurrency-1 {
+				end = len(indexData.Entries)
+			}
+
+			res, err := validateEntries(indexData.Entries[start:end])
+			if err != nil {
+				return err
+			}
+
+			results[i] = res
+
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
 		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
 	}
-	if len(segments) == 0 {
+
+	validSegments := make([]datasegment.SegmentDesc, 0, len(indexData.Entries))
+	for _, res := range results {
+		validSegments = append(validSegments, res...)
+	}
+
+	if len(validSegments) == 0 {
 		return nil, fmt.Errorf("no data segments found")
 	}
-	log.Infow("podsi: parsed and validated data segment index", "reads", readsCnt, "time", time.Since(start).String())
+
+	log.Infow("podsi: validated data segment index", "validSegments", len(validSegments), "time", time.Since(start).String())
+	start = time.Now()
+	readsCnt = 0
 
 	recs := make([]model.Record, 0)
-
-	readsCnt = 0
-	start = time.Now()
-	for _, s := range segments {
+	for _, s := range validSegments {
 		segOffset := s.UnpaddedOffest()
 		segSize := s.UnpaddedLength()
 
@@ -475,9 +523,25 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		recs = append(recs, subRecs...)
 	}
 
-	log.Infow("podsi: parsed records from data segments", "reads", readsCnt, "time", time.Since(start).String())
+	log.Infow("podsi: parsed records from data segments", "recs", len(recs), "reads", readsCnt, "time", time.Since(start).String())
 
 	return recs, nil
+}
+
+func validateEntries(entries []datasegment.SegmentDesc) ([]datasegment.SegmentDesc, error) {
+	res := make([]datasegment.SegmentDesc, 0, len(entries))
+	for i, e := range entries {
+
+		if err := e.Validate(); err != nil {
+			if errors.Is(err, datasegment.ErrValidation) {
+				continue
+			} else {
+				return nil, xerrors.Errorf("got unknown error for entry %d: %w", i, err)
+			}
+		}
+		res = append(res, e)
+	}
+	return res, nil
 }
 
 // BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
