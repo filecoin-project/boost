@@ -77,9 +77,10 @@ import (
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
-	Ensemble        *kit.Ensemble
-	EnableLegacy    bool
-	MaxStagingBytes int64
+	Ensemble                  *kit.Ensemble
+	EnableLegacy              bool
+	MaxStagingBytes           int64
+	ProvisionalWalletBalances int64
 }
 
 type TestFramework struct {
@@ -117,8 +118,17 @@ func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	}
 }
 
+func SetProvisionalWalletBalances(balance int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.ProvisionalWalletBalances = balance
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fmc := &TestFrameworkConfig{}
+	fmc := &TestFrameworkConfig{
+		// default provisional balance
+		ProvisionalWalletBalances: 1e18,
+	}
 	for _, opt := range opts {
 		opt(fmc)
 	}
@@ -224,7 +234,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		Log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
@@ -239,7 +249,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating publish storage deals wallet")
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
@@ -248,7 +258,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating deal collateral wallet")
 		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
 		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
