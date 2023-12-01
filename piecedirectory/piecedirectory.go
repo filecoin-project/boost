@@ -433,6 +433,11 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	}
 
 	log.Debugw("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
+
+	if len(indexData.Entries) == 0 {
+		return nil, fmt.Errorf("no data segments found")
+	}
+
 	start = time.Now()
 
 	if len(indexData.Entries) < concurrency {

@@ -103,11 +103,11 @@ func makeDataSegmentPiece(t *testing.T, dataSegmentFile string, subPieces []stri
 
 		readers = append(readers, arg)
 		cp := new(commp.Calc)
-		io.Copy(cp, arg)
+		_, _ = io.Copy(cp, arg)
 		rawCommP, size, err := cp.Digest()
 		require.NoError(t, err)
 
-		arg.Seek(0, io.SeekStart)
+		_, _ = arg.Seek(0, io.SeekStart)
 		c, _ := commcid.DataCommitmentV1ToCID(rawCommP)
 		subdeal := abi.PieceInfo{
 			Size:     abi.PaddedPieceSize(size),
@@ -198,7 +198,7 @@ func writeFiles(ctx context.Context, noWrap bool, bs *blockstore.ReadWrite, path
 			if err != nil {
 				return err
 			}
-			bs.Put(ctx, blk)
+			_ = bs.Put(ctx, blk)
 			return nil
 		}, nil
 	}
