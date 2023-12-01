@@ -707,6 +707,16 @@ const SealingPipelineQuery = gql`
     }
 `;
 
+const SectorStatusQuery = gql`
+    query AppSectorStatusQuery($sectorNumber: Uint64!) {
+        sectorStatus(sectorNumber: $sectorNumber) {
+            Number
+            State
+            DealIDs
+        }
+    }
+`;
+
 const FundsQuery = gql`
     query AppFundsQuery {
         funds {
@@ -921,6 +931,7 @@ export {
     TransferStatsQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    SectorStatusQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
     PublishPendingDealsMutation,

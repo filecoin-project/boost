@@ -568,28 +568,22 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 }
 
 func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser, error) {
+	st, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
+	}
+	size := uint64(st.Size())
+
 	// Open a reader against the CAR file with the deal data
 	v2r, err := carv2.OpenReader(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open CAR reader over %s: %w", filePath, err)
 	}
+	v2r.Close()
 
-	var size uint64
-	switch v2r.Version {
-	case 1:
-		st, err := os.Stat(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
-		}
-		size = uint64(st.Size())
-	case 2:
-		size = v2r.Header.DataSize
-	}
-
-	// Inflate the deal size so that it exactly fills a piece
-	r, err := v2r.DataReader()
+	r, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open CAR data reader over %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
 	}
 
 	reader, err := padreader.NewInflator(r, size, pieceSize)
@@ -602,7 +596,7 @@ func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser
 		io.Closer
 	}{
 		Reader: reader,
-		Closer: v2r,
+		Closer: r,
 	}, nil
 }
 

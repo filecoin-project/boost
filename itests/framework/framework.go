@@ -77,8 +77,10 @@ import (
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
-	Ensemble     *kit.Ensemble
-	EnableLegacy bool
+	Ensemble                  *kit.Ensemble
+	EnableLegacy              bool
+	MaxStagingBytes           int64
+	ProvisionalWalletBalances int64
 }
 
 type TestFramework struct {
@@ -104,14 +106,29 @@ func EnableLegacyDeals(enable bool) FrameworkOpts {
 	}
 }
 
+func SetMaxStagingBytes(max int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MaxStagingBytes = max
+	}
+}
+
 func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.Ensemble = e
 	}
 }
 
+func SetProvisionalWalletBalances(balance int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.ProvisionalWalletBalances = balance
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fmc := &TestFrameworkConfig{}
+	fmc := &TestFrameworkConfig{
+		// default provisional balance
+		ProvisionalWalletBalances: 1e18,
+	}
 	for _, opt := range opts {
 		opt(fmc)
 	}
@@ -188,12 +205,6 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 
 type ConfigOpt func(cfg *config.Boost)
 
-func WithMaxStagingDealsBytes(maxBytes int64) ConfigOpt {
-	return func(cfg *config.Boost) {
-		cfg.Dealmaking.MaxStagingDealsBytes = maxBytes
-	}
-}
-
 func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	lapi.RunningNodeType = lapi.NodeMiner
 
@@ -223,7 +234,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		Log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
@@ -238,7 +249,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating publish storage deals wallet")
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
@@ -247,7 +258,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating deal collateral wallet")
 		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
 		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
@@ -333,7 +344,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 	cfg.LotusFees.MaxPublishDealsFee = val
-	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
@@ -344,6 +355,12 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	for _, o := range opts {
 		o(cfg)
+	}
+
+	if f.config.MaxStagingBytes > 0 {
+		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingBytes
+	} else {
+		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	}
 
 	cfg.Dealmaking.ExpectedSealDuration = 10

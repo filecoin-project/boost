@@ -1,7 +1,7 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
-    DealsListQuery, LegacyDealsCountQuery,
+    DealsListQuery, LegacyDealsCountQuery, SectorStatusQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -16,6 +16,7 @@ import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import './Deals.css'
+import warningImg from './bootstrap-icons/icons/exclamation-circle.svg'
 import {Pagination} from "./Pagination";
 import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
@@ -290,9 +291,11 @@ function DealRow(props) {
         }
     }
 
-    const showActions = (IsPaused(deal) || IsTransferring(deal) || IsOfflineWaitingForData(deal))
+    // Show deal action buttons if the deal can be retried / cancelled
+    var showActions = (IsPaused(deal) || IsTransferring(deal) || IsOfflineWaitingForData(deal))
+    const hasAnnounceError = deal.Err && deal.Checkpoint === 'AddedPiece' && (deal.Sector || {}).ID
     var rowClassName = ''
-    if (showActions) {
+    if (showActions || hasAnnounceError) {
         rowClassName = 'show-actions'
     }
 
@@ -310,15 +313,79 @@ function DealRow(props) {
             </td>
             <td className="message">
                 <div className="message-content">
-                    <span className="message-text">
-                        {deal.Message}
-                        <TransferRate deal={deal} />
-                    </span>
-                    {showActions ? <DealActions deal={props.deal} refetchQueries={[DealsListQuery]} compact={true} /> : null}
+                    { hasAnnounceError ? (
+                        <DealRowAnnounceError deal={deal} />
+                    ) : (
+                        <>
+                            <span className="message-text">
+                                {deal.Message}
+                                <TransferRate deal={deal} />
+                            </span>
+                            {showActions ? <DealActions deal={props.deal} refetchQueries={[DealsListQuery]} compact={true} /> : null}
+                        </>
+                    ) }
                 </div>
             </td>
         </tr>
     )
+}
+
+// DealRowAnnounceError shows a row with the sealing status, and a warning icon.
+// When the user hovers on the warning icon it shows a box with the warning and
+// action buttons to retry / pause
+function DealRowAnnounceError({deal}) {
+    const warningMsgElId = "message-"+deal.ID
+    const warningImgElId = "img-warn-"+deal.ID
+    const messageBoxId = "message-box-"+deal.ID
+    useEffect(() => {
+        const warningImg = document.getElementById(warningImgElId)
+        const warningMsg = document.getElementById(warningMsgElId)
+        const messageBox = document.getElementById(messageBoxId)
+        if(!warningImg || !warningMsg || !messageBox) {
+            return
+        }
+
+        warningImg.addEventListener("mouseover", () => {
+            warningMsg.classList.add('showing')
+        })
+        messageBox.addEventListener("mouseleave", () => {
+            warningMsg.classList.remove('showing')
+        })
+
+        return function () {
+            warningImg.removeEventListener("mouseover")
+            messageBox.removeEventListener("mouseleave")
+        }
+    })
+
+    const {data, loading, error} = useQuery(SectorStatusQuery, {
+        pollInterval: 10000,
+        fetchPolicy: 'network-only',
+        variables: {
+            sectorNumber: deal.Sector.ID
+        }
+    })
+
+    if (error) {
+        return <span>Sealer: {error.message}</span>
+    }
+    if (loading) {
+        return null
+    }
+
+    return <div id={messageBoxId}>
+        <span>
+            <img id={warningImgElId} className="warning" src={warningImg} />
+            <span>Sealer: {data.sectorStatus.State}</span>
+        </span>
+        <span id={warningMsgElId} className="warning-msg">
+            <span className="message-text">
+                <img className="warning" src={warningImg} />
+                <span id={warningMsgElId}>{deal.Message}</span>
+            </span>
+            <DealActions deal={deal} refetchQueries={[DealsListQuery]} compact={true} />
+        </span>
+    </div>
 }
 
 function TransferRate({deal}) {
