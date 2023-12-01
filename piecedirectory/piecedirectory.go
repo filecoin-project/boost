@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +46,12 @@ var log = logging.Logger("piecedirectory")
 
 const (
 	MaxCachedReaders = 128
+	// 20 MiB x 4 parallel deals is just 80MiB RAM overhead required
+	PodsiBuffesrSize = 20e6
+	// Concurrency is driven by the number of available cores. Set reasonable max and mins
+	// to support multiple concurrent AddIndex operations
+	PodsiMaxConcurrency = 32
+	PodsiMinConcurrency = 4
 )
 
 type settings struct {
@@ -396,32 +400,20 @@ type countingReader struct {
 }
 
 func (cr *countingReader) Read(p []byte) (n int, err error) {
-	ncnt := atomic.AddInt32(cr.cnt, 1)
-	if ncnt%10000 == 0 {
-		log.Infof("podsi: performed %d read operations", ncnt)
-	}
+	atomic.AddInt32(cr.cnt, 1)
 	return cr.Reader.Read(p)
 }
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
-
-	useBufferedReader := os.Getenv("PODSI_USE_BUFFERED_READER") == "true"
-	bufferSize, err := strconv.Atoi(os.Getenv("PODSI_BUFFER_SIZE"))
-	if err != nil {
-		bufferSize = int(4e6)
+	concurrency := runtime.NumCPU()
+	if concurrency < PodsiMinConcurrency {
+		concurrency = PodsiMinConcurrency
 	}
-	concurrency, err := strconv.Atoi(os.Getenv("PODSI_VALIDATION_CONCURRENCY"))
-	if err != nil {
-		concurrency = runtime.NumCPU()
-	}
-	if concurrency < 1 {
-		concurrency = 1
-	}
-	if concurrency > 16 {
-		concurrency = 16
+	if concurrency > PodsiMaxConcurrency {
+		concurrency = PodsiMaxConcurrency
 	}
 
-	log.Infow("podsi: ", "userBufferedReader", useBufferedReader, "bufferSize", bufferSize, "validationConcurrency", concurrency)
+	log.Debugw("podsi: ", "bufferSize", PodsiBuffesrSize, "validationConcurrency", concurrency)
 	start := time.Now()
 
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
@@ -430,24 +422,17 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
 
-	var rr io.Reader
 	var readsCnt int32
 	cr := &countingReader{
 		Reader: r,
 		cnt:    &readsCnt,
 	}
-	if useBufferedReader {
-		rr = bufio.NewReaderSize(cr, bufferSize)
-	} else {
-		rr = cr
-	}
-
-	indexData, err := datasegment.ParseDataSegmentIndex(rr)
+	indexData, err := datasegment.ParseDataSegmentIndex(bufio.NewReaderSize(cr, PodsiBuffesrSize))
 	if err != nil {
 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
 	}
 
-	log.Infow("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
+	log.Debugw("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
 	start = time.Now()
 
 	if len(indexData.Entries) < concurrency {
@@ -491,7 +476,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		return nil, fmt.Errorf("no data segments found")
 	}
 
-	log.Infow("podsi: validated data segment index", "validSegments", len(validSegments), "time", time.Since(start).String())
+	log.Debugw("podsi: validated data segment index", "validSegments", len(validSegments), "time", time.Since(start).String())
 	start = time.Now()
 	readsCnt = 0
 
@@ -507,12 +492,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 			cnt:    &readsCnt,
 		}
 
-		if useBufferedReader {
-			rr = bufio.NewReaderSize(cr, bufferSize)
-		} else {
-			rr = cr
-		}
-		subRecs, err := parseRecordsFromCar(rr)
+		subRecs, err := parseRecordsFromCar(bufio.NewReaderSize(cr, PodsiBuffesrSize))
 		if err != nil {
 			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
@@ -523,7 +503,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		recs = append(recs, subRecs...)
 	}
 
-	log.Infow("podsi: parsed records from data segments", "recs", len(recs), "reads", readsCnt, "time", time.Since(start).String())
+	log.Debugw("podsi: parsed records from data segments", "recs", len(recs), "reads", readsCnt, "time", time.Since(start).String())
 
 	return recs, nil
 }

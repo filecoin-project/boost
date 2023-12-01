@@ -35,10 +35,6 @@ import (
 )
 
 func TestDummyPodsiDealOnline(t *testing.T) {
-	os.Setenv("PODSI_USE_BUFFERED_READER", "true")
-	os.Setenv("PODSI_BUFFER_SIZE", "10000")
-	os.Setenv("PODSI_VALIDATION_CONCURRENCY", "4")
-
 	randomFileSize := int(1e6)
 
 	ctx := context.Background()
