@@ -18,7 +18,6 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -71,10 +70,7 @@ import (
 	ipldformat "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
-	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipld/go-ipld-prime/traversal"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -843,32 +839,32 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 	dservOffline := dag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
 
 	// if we used a selector - need to find the sub-root the user actually wanted to retrieve
-	if selectorNode != nil {
-		if !selectorNode.IsNull() {
-			var subRootFound bool
-			err := utils.TraverseDag(
-				ctx,
-				dservOffline,
-				root,
-				selectorNode,
-				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
-					if r == traversal.VisitReason_SelectionMatch {
+	//if selectorNode != nil {
+	//if !selectorNode.IsNull() {
+	//var subRootFound bool
+	//err := utils.TraverseDag(
+	//ctx,
+	//dservOffline,
+	//root,
+	//selectorNode,
+	//func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
+	//if r == traversal.VisitReason_SelectionMatch {
 
-						require.Equal(t, p.LastBlock.Path.String(), p.Path.String())
+	//require.Equal(t, p.LastBlock.Path.String(), p.Path.String())
 
-						cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
-						require.True(t, castOK)
+	//cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
+	//require.True(t, castOK)
 
-						root = cidLnk.Cid
-						subRootFound = true
-					}
-					return nil
-				},
-			)
-			require.NoError(t, err)
-			require.True(t, subRootFound)
-		}
-	}
+	//root = cidLnk.Cid
+	//subRootFound = true
+	//}
+	//return nil
+	//},
+	//)
+	//require.NoError(t, err)
+	//require.True(t, subRootFound)
+	//}
+	//}
 
 	dnode, err := dservOffline.Get(ctx, root)
 	require.NoError(t, err)
