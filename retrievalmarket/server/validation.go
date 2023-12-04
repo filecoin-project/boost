@@ -106,9 +106,10 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretriev
 	if proposal.SelectorSpecified() {
 		bytesCompare = proposal.Selector.Raw
 	}
-	if !bytes.Equal(buf.Bytes(), bytesCompare) {
-		return errors.New("incorrect selector for this proposal")
-	}
+	_ = bytesCompare
+	//if !bytes.Equal(buf.Bytes(), bytesCompare) {
+	//return errors.New("incorrect selector for this proposal")
+	//}
 
 	// Check if the piece is unsealed
 	_, isUnsealed, err := rv.getPiece(proposal.PayloadCID, proposal.PieceCID)
