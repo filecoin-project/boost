@@ -145,7 +145,7 @@ function StorageDealsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
-                <th>Size</th>
+                <th>Size<SizeInfo /></th>
                 <th>On Chain ID</th>
                 <th>Client</th>
                 <th>Sealing State<SealingStatusInfo /></th>
@@ -308,7 +308,7 @@ function DealRow(props) {
             <td className="deal-id">
                 <ShortDealLink id={deal.ID} />
             </td>
-            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
+            <td className="size">{deal.IsOffline ? humanFileSize(deal.PieceSize) : humanFileSize(deal.Transfer.Size)}</td>
             <td className="message-text">{deal.ChainDealID ? deal.ChainDealID.toString() : null}</td>
             <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
@@ -413,6 +413,26 @@ export function SealingStatusInfo(props) {
                 <i>Sealer: </i><br/>
                 <p>
                     The deal has been handed off to the sealing subsystem and is being sealed.
+                </p>
+            </p>
+        </Info>
+    </span>
+}
+
+export function SizeInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            Size column displays different sizes based on the deal type
+            <p>
+                <i>Online Deals</i><br/>
+                <p>
+                    Transfer Size or the car size specified in the deal proposal
+                </p>
+            </p>
+            <p>
+                <i>Offline</i><br/>
+                <p>
+                    Piece size specified in the deal proposal
                 </p>
             </p>
         </Info>

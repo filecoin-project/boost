@@ -109,8 +109,6 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 			}
 		}
 		deal.NBytesReceived = fi.Size()
-		// To display correct size for offline deals
-		deal.Transfer.Size = uint64(fi.Size())
 		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
 	} else if !deal.IsOffline {
 		// For online deals where the deal has already been handed to the sealer,

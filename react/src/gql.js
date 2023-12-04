@@ -99,6 +99,7 @@ const DealsListQuery = gql`
                 Message
                 SealingState
                 ChainDealID
+                PieceSize
                 Transfer {
                     Type
                     Size
