@@ -11,7 +11,7 @@
 .deals th {
     white-space: nowrap;
     text-align: left;
-    opacity: 0.6;
+    color: #888888;
 }
 
 .deals td.start, .deals th.start {
@@ -27,7 +27,7 @@
 .deals td.deal-id {
     cursor: pointer;
     color: #465298;
-    width: 7em;
+    white-space: nowrap;
 }
 
 .deals td.client {
@@ -43,6 +43,10 @@
 
 .deals td.message {
     width: 100%;
+}
+
+.deals td.sealing {
+    white-space: nowrap;
 }
 
 .deals tr.error {
@@ -184,4 +188,8 @@
 .search-filters hr {
     border: 1px solid #DDD;
     margin: 1em 0em;
+}
+
+.info-box {
+    opacity: 1;
 }

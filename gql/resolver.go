@@ -629,9 +629,9 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
-		return "Announcing"
+		return "Indexing"
 	case dealcheckpoints.IndexedAndAnnounced:
-		return dr.sealingState(ctx)
+		return "Indexed and Announced"
 	case dealcheckpoints.Complete:
 		switch dr.Err {
 		case "":
@@ -642,6 +642,13 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 		return "Error: " + dr.Err
 	}
 	return checkpoint.String()
+}
+
+func (dr *dealResolver) SealingState(ctx context.Context) string {
+	if dr.ProviderDealState.Checkpoint < dealcheckpoints.AddedPiece {
+		return "To be sealed"
+	}
+	return dr.sealingState(ctx)
 }
 
 func (dr *dealResolver) TransferSamples() []*transferPoint {

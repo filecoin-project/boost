@@ -29,7 +29,7 @@
 }
 
 .logs td.deal-id {
-    min-width: 7em;
+    white-space: nowrap;
 }
 
 .logs td.deal-id.accepted {

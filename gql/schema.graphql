@@ -82,6 +82,7 @@ type Deal {
   Sector: Sector!
   Message: String!
   Logs: [DealLog]!
+  SealingState: String!
 }
 
 type DirectDeal {

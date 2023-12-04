@@ -115,12 +115,12 @@ export function LegacyDealDetail(props) {
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
-                    <td>{currentEpoch ? addCommas(currentEpoch) : null}</td>
+                    <td>{currentEpoch ? currentEpoch.toString() : null}</td>
                 </tr>
                 <tr>
                     <th>Start Epoch</th>
                     <td>
-                        {addCommas(deal.StartEpoch)}
+                        {deal.StartEpoch.toString()}
                         <span className="aux">
                             {startEpochTime ? ' (' + moment(startEpochTime).fromNow() + ')' : null}
                         </span>
@@ -129,7 +129,7 @@ export function LegacyDealDetail(props) {
                 <tr>
                     <th>End Epoch</th>
                     <td>
-                        {addCommas(deal.EndEpoch)}
+                        {deal.EndEpoch.toString()}
                         <span className="aux">
                             {endEpochTime ? ' (' + moment(endEpochTime).fromNow() + ')' : null}
                         </span>

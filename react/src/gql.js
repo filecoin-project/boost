@@ -97,6 +97,9 @@ const DealsListQuery = gql`
                 Err
                 Retry
                 Message
+                SealingState
+                ChainDealID
+                PieceSize
                 Transfer {
                     Type
                     Size
@@ -138,6 +141,7 @@ const LegacyDealsListQuery = gql`
                 Status
                 Message
                 SectorNumber
+                ChainDealID
             }
             totalCount
             more

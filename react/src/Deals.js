@@ -18,9 +18,10 @@ import xImg from './bootstrap-icons/icons/x-lg.svg'
 import './Deals.css'
 import warningImg from './bootstrap-icons/icons/exclamation-circle.svg'
 import {Pagination} from "./Pagination";
-import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
+import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData, DealStatusInfo} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
 import {DirectDealsCount} from "./DirectDeals";
+import {Info} from "./Info";
 
 const dealsBasePath = '/storage-deals'
 
@@ -145,9 +146,12 @@ function StorageDealsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
-                <th>Size</th>
+                <th>Size<SizeInfo /></th>
+                <th>On Chain ID</th>
                 <th>Client</th>
-                <th>State</th>
+                <th>Sealing State<SealingStatusInfo /></th>
+                <th>Deal State<DealStatusInfo /></th>
+
             </tr>
 
             {deals.map(deal => (
@@ -307,9 +311,17 @@ function DealRow(props) {
             <td className="deal-id">
                 <ShortDealLink id={deal.ID} />
             </td>
-            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
+            <td className="size">{deal.IsOffline ? humanFileSize(deal.PieceSize) : humanFileSize(deal.Transfer.Size)}</td>
+            <td className="message-text">{deal.ChainDealID ? deal.ChainDealID.toString() : null}</td>
             <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
+            </td>
+            <td className="sealing">
+                <div className="message-content">
+                    <span className="message-text">
+                        {deal.SealingState}
+                    </span>
+                </div>
             </td>
             <td className="message">
                 <div className="message-content">
@@ -450,4 +462,46 @@ export function StorageDealsMenuItem(props) {
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+
+export function SealingStatusInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            The deal can be in one of the following sealing states:
+            <p>
+                <i>To be Sealed</i><br/>
+                <p>
+                    The storage deal is being processed by Boost before being handed off
+                    to the sealer.
+                </p>
+            </p>
+            <p>
+                <i>Sealer: </i><br/>
+                <p>
+                    The deal has been handed off to the sealing subsystem and is being sealed.
+                </p>
+            </p>
+        </Info>
+    </span>
+}
+
+export function SizeInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            Size column displays different sizes based on the deal type
+            <p>
+                <i>Online Deals</i><br/>
+                <p>
+                    Transfer Size or the car size specified in the deal proposal
+                </p>
+            </p>
+            <p>
+                <i>Offline</i><br/>
+                <p>
+                    Piece size specified in the deal proposal
+                </p>
+            </p>
+        </Info>
+    </span>
 }
