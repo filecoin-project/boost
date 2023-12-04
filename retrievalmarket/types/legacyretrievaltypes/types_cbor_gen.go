@@ -8,13 +8,13 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/markets/piecestore"
-	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
+	datatransfer "github.com/filecoin-project/boost/datatransfer"
+	piecestore "github.com/filecoin-project/boost/markets/piecestore"
+	paych "github.com/filecoin-project/go-state-types/builtin/v8/paych"
+	cid "github.com/ipfs/go-cid"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf
@@ -832,7 +832,7 @@ func (t *Params) MarshalCBOR(w io.Writer) error {
 		}
 	}
 
-	// t.Selector (typegen.Deferred) (struct)
+	// t.Selector (legacyretrievaltypes.CborGenCompatibleNode) (struct)
 	if len("Selector") > cbg.MaxLength {
 		return xerrors.Errorf("Value in field \"Selector\" was too long")
 	}
@@ -976,16 +976,15 @@ func (t *Params) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 
 			}
-			// t.Selector (typegen.Deferred) (struct)
+			// t.Selector (legacyretrievaltypes.CborGenCompatibleNode) (struct)
 		case "Selector":
 
 			{
 
-				t.Selector = new(cbg.Deferred)
-
 				if err := t.Selector.UnmarshalCBOR(cr); err != nil {
-					return xerrors.Errorf("failed to read deferred field: %w", err)
+					return xerrors.Errorf("unmarshaling t.Selector: %w", err)
 				}
+
 			}
 			// t.UnsealPrice (big.Int) (struct)
 		case "UnsealPrice":

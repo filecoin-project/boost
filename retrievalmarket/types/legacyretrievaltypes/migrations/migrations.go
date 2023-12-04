@@ -194,7 +194,7 @@ func MigrateQueryResponse0To1(oldQr QueryResponse0) legacyretrievaltypes.QueryRe
 // MigrateParams0To1 migrates tuple encoded deal params to map encoded deal params
 func MigrateParams0To1(oldParams Params0) legacyretrievaltypes.Params {
 	return legacyretrievaltypes.Params{
-		Selector:                oldParams.Selector,
+		Selector:                legacyretrievaltypes.CborGenCompatibleNode{Node: nil},
 		PieceCID:                oldParams.PieceCID,
 		PricePerByte:            oldParams.PricePerByte,
 		PaymentInterval:         oldParams.PaymentInterval,

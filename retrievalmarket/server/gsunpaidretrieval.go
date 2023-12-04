@@ -280,11 +280,11 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 		proposal := *v
 		log.Debugw("intercepting retrieval deal", "proposal", proposal)
 		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
-	case *migrations.DealProposal0:
-		// This is a retrieval deal with an older format
-		proposal := migrations.MigrateDealProposal0To1(*v)
-		log.Debugw("intercepting retrieval deal v1", "proposal", proposal)
-		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
+		//case *migrations.DealProposal0:
+		//	// This is a retrieval deal with an older format
+		//	proposal := migrations.MigrateDealProposal0To1(*v)
+		//	log.Debugw("intercepting retrieval deal v1", "proposal", proposal)
+		//	return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
 	}
 
 	log.Debugw("ignoring request", "request", request)

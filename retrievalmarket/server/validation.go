@@ -9,7 +9,6 @@ import (
 	"github.com/filecoin-project/boost/datatransfer"
 
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
 	"github.com/hannahhoward/go-pubsub"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
@@ -43,13 +42,14 @@ func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID
 	proposal, ok := voucher.(*legacyretrievaltypes.DealProposal)
 	var legacyProtocol bool
 	if !ok {
-		legacyProposal, ok := voucher.(*migrations.DealProposal0)
-		if !ok {
-			return nil, errors.New("wrong voucher type")
-		}
-		newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
-		proposal = &newProposal
-		legacyProtocol = true
+		return nil, errors.New("wrong voucher type")
+		//legacyProposal, ok := voucher.(*migrations.DealProposal0)
+		//if !ok {
+		//	return nil, errors.New("wrong voucher type")
+		//}
+		//newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
+		//proposal = &newProposal
+		//legacyProtocol = true
 	}
 	response, err := rv.validatePull(receiver, proposal, legacyProtocol, baseCid, selector)
 	_ = rv.psub.Publish(legacyretrievaltypes.ProviderValidationEvent{
@@ -61,15 +61,15 @@ func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID
 		Response:  &response,
 		Error:     err,
 	})
-	if legacyProtocol {
-		downgradedResponse := migrations.DealResponse0{
-			Status:      response.Status,
-			ID:          response.ID,
-			Message:     response.Message,
-			PaymentOwed: response.PaymentOwed,
-		}
-		return &downgradedResponse, err
-	}
+	//if legacyProtocol {
+	//	downgradedResponse := migrations.DealResponse0{
+	//		Status:      response.Status,
+	//		ID:          response.ID,
+	//		Message:     response.Message,
+	//		PaymentOwed: response.PaymentOwed,
+	//	}
+	//	return &downgradedResponse, err
+	//}
 	return &response, err
 }
 
@@ -104,7 +104,12 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretriev
 	}
 	bytesCompare := allSelectorBytes
 	if proposal.SelectorSpecified() {
-		bytesCompare = proposal.Selector.Raw
+		w := new(bytes.Buffer)
+		err = proposal.Selector.MarshalCBOR(w)
+		if err != nil {
+			return err
+		}
+		bytesCompare = w.Bytes()
 	}
 	if !bytes.Equal(buf.Bytes(), bytesCompare) {
 		return errors.New("incorrect selector for this proposal")
