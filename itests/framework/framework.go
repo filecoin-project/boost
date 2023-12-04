@@ -83,7 +83,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
-	"golang.org/x/xerrors"
 )
 
 var Log = logging.Logger("boosttest")
@@ -855,14 +854,10 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
 					if r == traversal.VisitReason_SelectionMatch {
 
-						if p.LastBlock.Path.String() != p.Path.String() {
-							return xerrors.Errorf("unsupported selection path '%s' does not correspond to a node boundary (a.k.a. CID link)", p.Path.String())
-						}
+						require.Equal(t, p.LastBlock.Path.String(), p.Path.String())
 
 						cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
-						if !castOK {
-							return xerrors.Errorf("cidlink cast unexpectedly failed on '%s'", p.LastBlock.Link.String())
-						}
+						require.True(t, castOK)
 
 						root = cidLnk.Cid
 						subRootFound = true
