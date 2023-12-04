@@ -547,8 +547,8 @@ export function DealStatusInfo(props) {
             <p>
                 <i>Indexing</i>
                 <p>
-                    Boost is indexing the deal in Local Index Directory(LID)
-                    and will be announcing the deal to the network so that clients know where to retrieve it.
+                    Boost is indexing the deal in the Local Index Directory(LID)
+                    and will be announcing the deal to the network so that clients know where to retrieve it from.
                 </p>
             </p>
             <p>
