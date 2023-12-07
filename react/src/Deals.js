@@ -482,6 +482,12 @@ export function SealingStatusInfo(props) {
                     The deal has been handed off to the sealing subsystem and is being sealed.
                 </p>
             </p>
+            <p>
+                <i>Complete</i><br/>
+                <p>
+                    The sector containing the deal has expired or the deal errored out.
+                </p>
+            </p>
         </Info>
     </span>
 }

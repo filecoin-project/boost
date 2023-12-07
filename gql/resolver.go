@@ -648,6 +648,9 @@ func (dr *dealResolver) SealingState(ctx context.Context) string {
 	if dr.ProviderDealState.Checkpoint < dealcheckpoints.AddedPiece {
 		return "To be sealed"
 	}
+	if dr.ProviderDealState.Checkpoint == dealcheckpoints.Complete {
+		return "Complete"
+	}
 	return dr.sealingState(ctx)
 }
 
