@@ -948,6 +948,8 @@ github.com/ipni/go-libipni v0.5.2 h1:9vaYOnR4dskd8p88NOboqI6yVqBwYPNCQ/zOaRSr59I
 github.com/ipni/go-libipni v0.5.2/go.mod h1:UnrhEqjVI2Z2HXlaieOBONJmtW557nZkYpB4IIsMD+s=
 github.com/ipni/index-provider v0.14.2 h1:daA3IFnI2n2x/mL0K91SQHNLq6Vvfp5q4uFX9G4glvE=
 github.com/ipni/index-provider v0.14.2/go.mod h1:mArx7Ou3Y62fIDSj9a1Neh5G14xQcwXGbfEbf47vyuM=
+github.com/ipni/index-provider v0.14.3-0.20231208131100-e11dffd1d360 h1:G2IxByl66yF/ZJWFm/6VzBe0KYvrqLipwzlv6bqUB0M=
+github.com/ipni/index-provider v0.14.3-0.20231208131100-e11dffd1d360/go.mod h1:mArx7Ou3Y62fIDSj9a1Neh5G14xQcwXGbfEbf47vyuM=
 github.com/ipni/ipni-cli v0.1.1 h1:TjYAf5CrVx/loQtWQnwEnIYjW7hvRJDRyIibT7WbHjE=
 github.com/ipni/ipni-cli v0.1.1/go.mod h1:TAOkJwc9OBsx5gRy8iyoWgb8AbtJcT482cJUGDTxnHg=
 github.com/ipni/storetheindex v0.8.1 h1:3uHclkcQWlIXQx+We4tbGF/XzoZYERz3so34xQbUmZE=

@@ -3,6 +3,8 @@ package modules
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
@@ -19,14 +21,22 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/dagsync/dtsync"
+	"github.com/ipni/go-libipni/metadata"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
+)
+
+const (
+	// maxAdPublishRetries defines the maximum number of retries to republish an ad in the case of multihash mismatch error
+	maxAdPublishRetries = 1
 )
 
 type IdxProv struct {
@@ -62,6 +72,14 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			marketHostAddrsStr = append(marketHostAddrsStr, a.String())
 		}
 
+		type engineHolder struct {
+			e *engine.Engine
+		}
+
+		eholder := &engineHolder{}
+		mretries := make(map[cid.Cid]int)
+		var elock sync.RWMutex
+
 		ipds := namespace.Wrap(args.Datastore, datastore.NewKey("/index-provider"))
 		var opts = []engine.Option{
 			engine.WithDatastore(ipds),
@@ -71,6 +89,60 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			engine.WithChainedEntries(cfg.EntriesChunkSize),
 			engine.WithTopicName(topicName),
 			engine.WithPurgeCacheOnStart(cfg.PurgeCacheOnStart),
+			engine.WithStorageReadOpenerErrorHook(func(lc ipld.LinkContext, l ipld.Link, err error) error {
+				if err != engine.ErrEntriesLinkMismatch {
+					return err
+				}
+				errNotExists := ipld.ErrNotExists{}
+				c := l.(cidlink.Link).Cid
+				elock.RLock()
+				retries := mretries[c]
+				elock.RUnlock()
+				if retries > maxAdPublishRetries {
+					log.Warnw("mmismatch: max number of ad publish retries has been reached", "cid", c)
+					return errNotExists
+				}
+				ctx := lc.Ctx
+				adv, err := eholder.e.GetAdv(ctx, c)
+				if err != nil || adv == nil {
+					log.Warnw("mmismatch: can't find an ad to republish in the engine", "cid", c, "err", err)
+					return errNotExists
+				}
+				prov := peer.ID(adv.Provider)
+				if rcid, err := eholder.e.NotifyRemove(ctx, prov, adv.ContextID); err != nil {
+					log.Warnw("mmismatch: error calling NotifyRemove", "cid", c, "err", err)
+					return errNotExists
+				} else {
+					log.Info("mmismatch: successfully published a removal advertisement", "cid", c, "removalCid", rcid)
+				}
+
+				maddrs := make([]multiaddr.Multiaddr, 0, len(adv.Addresses))
+				for _, addr := range adv.Addresses {
+					if ma, err := multiaddr.NewMultiaddr(addr); err != nil {
+						log.Warnw("mmismatch: error decoding multiaddress", "cid", c, "err", err)
+						return errNotExists
+					} else {
+						maddrs = append(maddrs, ma)
+					}
+				}
+				md := metadata.Metadata{}
+				if err = md.UnmarshalBinary(adv.Metadata); err != nil {
+					log.Warnw("mmismatch: error decoding metadata", "cid", c, "err", err)
+					return errNotExists
+				}
+
+				if acid, err := eholder.e.NotifyPut(ctx, &peer.AddrInfo{ID: prov, Addrs: maddrs}, adv.ContextID, md); err != nil {
+					log.Warnw("mmismatch: error calling NotifyPut", "cid", c, "err", err)
+					return errNotExists
+				} else {
+					log.Info("mmismatch: successfully published a new advertisement", "cid", c, "newCid", acid)
+				}
+
+				elock.Lock()
+				mretries[c] = mretries[c] + 1
+				elock.Unlock()
+				return errNotExists
+			}),
 		}
 
 		llog := log.With(
@@ -165,6 +237,8 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 				return nil
 			},
 		})
+
+		eholder.e = e
 		return e, nil
 	}
 }

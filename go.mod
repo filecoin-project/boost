@@ -60,7 +60,7 @@ require (
 	github.com/ipld/go-car/v2 v2.13.1
 	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.14.2
+	github.com/ipni/index-provider v0.14.3-0.20231208131100-e11dffd1d360
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
