@@ -53,21 +53,21 @@ func TestOnDealSectorPreCommitted(t *testing.T) {
 	}
 	unfinishedDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: -1,
 			LastUpdatedEpoch: 2,
 		},
 	}
 	activeDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: 1,
 			LastUpdatedEpoch: 2,
 		},
 	}
 	slashedDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: 1,
 			LastUpdatedEpoch: 2,
 			SlashEpoch:       2,
@@ -275,21 +275,21 @@ func TestOnDealSectorCommitted(t *testing.T) {
 	}
 	unfinishedDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: -1,
 			LastUpdatedEpoch: 2,
 		},
 	}
 	activeDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: 1,
 			LastUpdatedEpoch: 2,
 		},
 	}
 	slashedDeal := &api.MarketDeal{
 		Proposal: proposal,
-		State: market.DealState{
+		State: api.MarketDealState{
 			SectorStartEpoch: 1,
 			LastUpdatedEpoch: 2,
 			SlashEpoch:       2,

@@ -3,6 +3,8 @@ package itests
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -15,7 +17,6 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestDirectDeal(t *testing.T) {
@@ -98,6 +99,6 @@ func TestDirectDeal(t *testing.T) {
 	t.Log("Direct data import scheduled for execution")
 
 	// TODO: uncomment once lotus has updated actors bundle and sealing works
-	//err = f.WaitForDealAddedToSector(dealUuid)
-	//require.NoError(t, err)
+	err = f.WaitForDealAddedToSector(dealUuid)
+	require.NoError(t, err)
 }

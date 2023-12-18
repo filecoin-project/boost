@@ -21,6 +21,7 @@ ENV SECTOR_SIZE=8388608
 
 VOLUME /var/tmp/filecoin-proof-parameters
 VOLUME /var/lib/genesis
+VOLUME /var/lib/builtin-actors
 
 WORKDIR /app
 RUN mkdir -p /app

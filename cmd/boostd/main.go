@@ -46,7 +46,7 @@ func main() {
 			retrievalDealsCmd,
 			indexProvCmd,
 			importDataCmd,
-			//importDirectDataCmd,
+			importDirectDataCmd,
 			logCmd,
 			dagstoreCmd,
 			netCmd,

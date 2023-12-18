@@ -22,6 +22,8 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
+	"github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
@@ -168,8 +170,25 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 		return nil, err
 	}
 
+	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	idaddr, err := address.NewIDAddress(uint64(allocation.Provider))
+	if err != nil {
+		return nil, fmt.Errorf("new id address for allocation %s: %w", allocation.Provider, err)
+	}
+
+	maddr, err := ddp.fullnodeApi.StateLookupID(ctx, idaddr, ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("looking up %s: %w", idaddr, err)
+	}
+
 	if res.Accepted {
-		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", params.FilePath)
+		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "maddr", maddr, "filepath", params.FilePath)
+
+		entry.Provider = maddr
 
 		err := ddp.directDealsDB.Insert(ctx, entry)
 		if err != nil {
@@ -345,17 +364,16 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 			// Direct Data Onboarding
 			// When PieceActivationManifest is set, builtin-market deal info must not be set
-			//TODO: enable PieceActivationManifest when DDO ends up in a network upgrade
-			//PieceActivationManifest: &miner.PieceActivationManifest{
-			//CID:  entry.PieceCID,
-			//Size: entry.PieceSize,
-			//VerifiedAllocationKey: &miner.VerifiedAllocationKey{
-			//Client: abi.ActorID(clientId),
-			//ID:     verifreg.AllocationId(uint64(entry.AllocationID)), // TODO: fix verifreg v9 or v12
-			//},
-			////Notify                []DataActivationNotification
-			//Notify: nil,
-			//},
+			PieceActivationManifest: &miner.PieceActivationManifest{
+				CID:  entry.PieceCID,
+				Size: entry.PieceSize,
+				VerifiedAllocationKey: &miner.VerifiedAllocationKey{
+					Client: abi.ActorID(clientId),
+					ID:     verifreg.AllocationId(uint64(entry.AllocationID)),
+				},
+				//Notify                []DataActivationNotification
+				Notify: nil,
+			},
 
 			// Best-effort deal asks
 			KeepUnsealed: entry.KeepUnsealedCopy,

@@ -900,6 +900,22 @@ Must be a control or worker address of the miner.`,
 			Comment: ``,
 		},
 	},
+	"lotus_config.ApisConfig": []DocField{
+		{
+			Name: "ChainApiInfo",
+			Type: "[]string",
+
+			Comment: `ChainApiInfo is the API endpoint for the Lotus daemon.`,
+		},
+		{
+			Name: "StorageRPCSecret",
+			Type: "string",
+
+			Comment: `RPC Secret for the storage subsystem.
+If integrating with lotus-miner this must match the value from
+cat ~/.lotusminer/keystore/MF2XI2BNNJ3XILLQOJUXMYLUMU | jq -r .PrivateKey`,
+		},
+	},
 	"lotus_config.Backup": []DocField{
 		{
 			Name: "DisableMetadataLog",
@@ -1371,6 +1387,39 @@ Set to 0 to keep all mappings`,
 			Comment: ``,
 		},
 	},
+	"lotus_config.HarmonyDB": []DocField{
+		{
+			Name: "Hosts",
+			Type: "[]string",
+
+			Comment: `HOSTS is a list of hostnames to nodes running YugabyteDB
+in a cluster. Only 1 is required`,
+		},
+		{
+			Name: "Username",
+			Type: "string",
+
+			Comment: `The Yugabyte server's username with full credentials to operate on Lotus' Database. Blank for default.`,
+		},
+		{
+			Name: "Password",
+			Type: "string",
+
+			Comment: `The password for the related username. Blank for default.`,
+		},
+		{
+			Name: "Database",
+			Type: "string",
+
+			Comment: `The database (logical partition) within Yugabyte. Blank for default.`,
+		},
+		{
+			Name: "Port",
+			Type: "string",
+
+			Comment: `The port to find Yugabyte. Blank for default.`,
+		},
+	},
 	"lotus_config.IndexConfig": []DocField{
 		{
 			Name: "EnableMsgIndex",
@@ -1423,6 +1472,20 @@ Defaults to empty, which implies the topic name is inferred from network name.`,
 			Comment: `PurgeCacheOnStart sets whether to clear any cached entries chunks when the provider engine
 starts. By default, the cache is rehydrated from previously cached entries stored in
 datastore if any is present.`,
+		},
+	},
+	"lotus_config.JournalConfig": []DocField{
+		{
+			Name: "//Events",
+			Type: "of",
+
+			Comment: ``,
+		},
+		{
+			Name: "DisabledEvents",
+			Type: "string",
+
+			Comment: ``,
 		},
 	},
 	"lotus_config.Libp2p": []DocField{
@@ -1498,6 +1561,136 @@ closed by the connection manager.`,
 			Type: "map[string]string",
 
 			Comment: `SubsystemLevels specify per-subsystem log levels`,
+		},
+	},
+	"lotus_config.LotusProviderAddresses": []DocField{
+		{
+			Name: "PreCommitControl",
+			Type: "[]string",
+
+			Comment: `Addresses to send PreCommit messages from`,
+		},
+		{
+			Name: "CommitControl",
+			Type: "[]string",
+
+			Comment: `Addresses to send Commit messages from`,
+		},
+		{
+			Name: "TerminateControl",
+			Type: "[]string",
+
+			Comment: ``,
+		},
+		{
+			Name: "DisableOwnerFallback",
+			Type: "bool",
+
+			Comment: `DisableOwnerFallback disables usage of the owner address for messages
+sent automatically`,
+		},
+		{
+			Name: "DisableWorkerFallback",
+			Type: "bool",
+
+			Comment: `DisableWorkerFallback disables usage of the worker address for messages
+sent automatically, if control addresses are configured.
+A control address that doesn't have enough funds will still be chosen
+over the worker address if this flag is set.`,
+		},
+		{
+			Name: "MinerAddresses",
+			Type: "[]string",
+
+			Comment: `MinerAddresses are the addresses of the miner actors to use for sending messages`,
+		},
+	},
+	"lotus_config.LotusProviderConfig": []DocField{
+		{
+			Name: "Subsystems",
+			Type: "ProviderSubsystemsConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Fees",
+			Type: "LotusProviderFees",
+
+			Comment: ``,
+		},
+		{
+			Name: "Addresses",
+			Type: "LotusProviderAddresses",
+
+			Comment: ``,
+		},
+		{
+			Name: "Proving",
+			Type: "ProvingConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Journal",
+			Type: "JournalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Apis",
+			Type: "ApisConfig",
+
+			Comment: ``,
+		},
+	},
+	"lotus_config.LotusProviderFees": []DocField{
+		{
+			Name: "DefaultMaxFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxPreCommitGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxCommitGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxPreCommitBatchGasFee",
+			Type: "BatchFeeConfig",
+
+			Comment: `maxBatchFee = maxBase + maxPerSector * nSectors`,
+		},
+		{
+			Name: "MaxCommitBatchGasFee",
+			Type: "BatchFeeConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxTerminateGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxWindowPoStGasFee",
+			Type: "types.FIL",
+
+			Comment: `WindowPoSt is a high-value operation, so the default fee should be high.`,
+		},
+		{
+			Name: "MaxPublishDealsFee",
+			Type: "types.FIL",
+
+			Comment: ``,
 		},
 	},
 	"lotus_config.MinerAddressConfig": []DocField{
@@ -1591,6 +1784,12 @@ over the worker address if this flag is set.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "MaximizeWindowPoStFeeCap",
+			Type: "bool",
+
+			Comment: ``,
+		},
 	},
 	"lotus_config.MinerSubsystemConfig": []DocField{
 		{
@@ -1618,6 +1817,14 @@ over the worker address if this flag is set.`,
 			Comment: ``,
 		},
 		{
+			Name: "EnableSectorIndexDB",
+			Type: "bool",
+
+			Comment: `When enabled, the sector index will reside in an external database
+as opposed to the local KV store in the miner process
+This is useful to allow workers to bypass the lotus miner to access sector information`,
+		},
+		{
 			Name: "SealerApiInfo",
 			Type: "string",
 
@@ -1626,6 +1833,57 @@ over the worker address if this flag is set.`,
 		{
 			Name: "SectorIndexApiInfo",
 			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "DisableWindowPoSt",
+			Type: "bool",
+
+			Comment: `When window post is enabled, the miner will automatically submit window post proofs
+for all sectors that are eligible for window post
+IF WINDOW POST IS DISABLED, THE MINER WILL NOT SUBMIT WINDOW POST PROOFS
+THIS WILL RESULT IN FAULTS AND PENALTIES IF NO OTHER MECHANISM IS RUNNING
+TO SUBMIT WINDOW POST PROOFS.
+Note: This option is entirely disabling the window post scheduler,
+not just the builtin PoSt computation like Proving.DisableBuiltinWindowPoSt.
+This option will stop lotus-miner from performing any actions related
+to window post, including scheduling, submitting proofs, and recovering
+sectors.`,
+		},
+		{
+			Name: "DisableWinningPoSt",
+			Type: "bool",
+
+			Comment: `When winning post is disabled, the miner process will NOT attempt to mine
+blocks. This should only be set when there's an external process mining
+blocks on behalf of the miner.
+When disabled and no external block producers are configured, all potential
+block rewards will be missed!`,
+		},
+	},
+	"lotus_config.ProviderSubsystemsConfig": []DocField{
+		{
+			Name: "EnableWindowPost",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "WindowPostMaxTasks",
+			Type: "int",
+
+			Comment: ``,
+		},
+		{
+			Name: "EnableWinningPost",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "WinningPostMaxTasks",
+			Type: "int",
 
 			Comment: ``,
 		},
@@ -2123,7 +2381,7 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 			Type: "string",
 
 			Comment: `ColdStoreType specifies the type of the coldstore.
-It can be "messages" (default) to store only messages, "universal" to store all chain state or "discard" for discarding cold blocks.`,
+It can be "discard" (default) for discarding cold blocks, "messages" to store only messages or "universal" to store all chain state..`,
 		},
 		{
 			Name: "HotStoreType",
@@ -2236,6 +2494,12 @@ HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 		{
 			Name: "DAGStore",
 			Type: "DAGStoreConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "HarmonyDB",
+			Type: "HarmonyDB",
 
 			Comment: ``,
 		},
