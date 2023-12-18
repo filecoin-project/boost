@@ -65,11 +65,12 @@ type testCase struct {
 }
 
 var providerCancelled = errors.New("provider cancelled")
-var clientCancelled = errors.New("client cancelled")
-var clientRejected = errors.New("client received reject response")
+
+//var clientCancelled = errors.New("client cancelled")
+//var clientRejected = errors.New("client received reject response")
 
 func TestGS(t *testing.T) {
-	//t.Skip("refactor tests to use boost client")
+	t.Skip("refactor tests to use boost client")
 	//_ = logging.SetLogLevel("testgs", "debug")
 	_ = logging.SetLogLevel("testgs", "info")
 	_ = logging.SetLogLevel("dt-impl", "debug")

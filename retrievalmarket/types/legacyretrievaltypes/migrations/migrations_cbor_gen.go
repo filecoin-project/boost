@@ -8,13 +8,13 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/markets/piecestore/migrations"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
+	migrations "github.com/filecoin-project/boost/markets/piecestore/migrations"
+	legacyretrievaltypes "github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	paych "github.com/filecoin-project/go-state-types/builtin/v8/paych"
+	cid "github.com/ipfs/go-cid"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf

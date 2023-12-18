@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
 
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/hannahhoward/go-pubsub"
@@ -61,15 +62,15 @@ func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID
 		Response:  &response,
 		Error:     err,
 	})
-	//if legacyProtocol {
-	//	downgradedResponse := migrations.DealResponse0{
-	//		Status:      response.Status,
-	//		ID:          response.ID,
-	//		Message:     response.Message,
-	//		PaymentOwed: response.PaymentOwed,
-	//	}
-	//	return &downgradedResponse, err
-	//}
+	if legacyProtocol {
+		downgradedResponse := migrations.DealResponse0{
+			Status:      response.Status,
+			ID:          response.ID,
+			Message:     response.Message,
+			PaymentOwed: response.PaymentOwed,
+		}
+		return &downgradedResponse, err
+	}
 	return &response, err
 }
 
@@ -104,12 +105,7 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretriev
 	}
 	bytesCompare := allSelectorBytes
 	if proposal.SelectorSpecified() {
-		w := new(bytes.Buffer)
-		err = proposal.Selector.MarshalCBOR(w)
-		if err != nil {
-			return err
-		}
-		bytesCompare = w.Bytes()
+		bytesCompare = proposal.Selector.Raw
 	}
 	if !bytes.Equal(buf.Bytes(), bytesCompare) {
 		return errors.New("incorrect selector for this proposal")

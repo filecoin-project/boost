@@ -17,6 +17,7 @@ import (
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 
@@ -266,8 +267,8 @@ func IsTerminalStatus(status DealStatus) bool {
 
 // Params are the parameters requested for a retrieval deal proposal
 type Params struct {
-	Selector CborGenCompatibleNode // V1
-	//Selector                *cbg.Deferred
+	//Selector CborGenCompatibleNode // V1
+	Selector                *cbg.Deferred
 	PieceCID                *cid.Cid
 	PricePerByte            abi.TokenAmount
 	PaymentInterval         uint64 // when to request payment
@@ -283,7 +284,7 @@ var paramsBindnodeOptions = []bindnode.Option{
 }
 
 func (p Params) SelectorSpecified() bool {
-	return !p.Selector.IsNull()
+	return p.Selector != nil && !bytes.Equal(p.Selector.Raw, cbg.CborNull)
 }
 
 func (p Params) IntervalLowerBound(currentInterval uint64) uint64 {
@@ -332,9 +333,7 @@ func NewParamsV1(pricePerByte abi.TokenAmount, paymentInterval uint64, paymentIn
 	}
 
 	return Params{
-		Selector: CborGenCompatibleNode{
-			Node: sel,
-		},
+		Selector:                &cbg.Deferred{Raw: buffer.Bytes()},
 		PieceCID:                pieceCid,
 		PricePerByte:            pricePerByte,
 		PaymentInterval:         paymentInterval,
@@ -565,19 +564,19 @@ var dealPaymentBindnodeOptions = []bindnode.Option{
 	TokenAmountBindnodeOption,
 }
 
-func init() {
-	for _, r := range []struct {
-		typ     interface{}
-		typName string
-		opts    []bindnode.Option
-	}{
-		{(*Params)(nil), "Params", paramsBindnodeOptions},
-		{(*DealProposal)(nil), "DealProposal", dealProposalBindnodeOptions},
-		{(*DealResponse)(nil), "DealResponse", dealResponseBindnodeOptions},
-		{(*DealPayment)(nil), "DealPayment", dealPaymentBindnodeOptions},
-	} {
-		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, r.opts...); err != nil {
-			panic(err.Error())
-		}
-	}
-}
+//func init() {
+//	for _, r := range []struct {
+//		typ     interface{}
+//		typName string
+//		opts    []bindnode.Option
+//	}{
+//		{(*Params)(nil), "Params", paramsBindnodeOptions},
+//		{(*DealProposal)(nil), "DealProposal", dealProposalBindnodeOptions},
+//		{(*DealResponse)(nil), "DealResponse", dealResponseBindnodeOptions},
+//		{(*DealPayment)(nil), "DealPayment", dealPaymentBindnodeOptions},
+//	} {
+//		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, r.opts...); err != nil {
+//			panic(err.Error())
+//		}
+//	}
+//}

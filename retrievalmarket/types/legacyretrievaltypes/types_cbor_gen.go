@@ -832,7 +832,7 @@ func (t *Params) MarshalCBOR(w io.Writer) error {
 		}
 	}
 
-	// t.Selector (legacyretrievaltypes.CborGenCompatibleNode) (struct)
+	// t.Selector (typegen.Deferred) (struct)
 	if len("Selector") > cbg.MaxLength {
 		return xerrors.Errorf("Value in field \"Selector\" was too long")
 	}
@@ -976,15 +976,16 @@ func (t *Params) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 
 			}
-			// t.Selector (legacyretrievaltypes.CborGenCompatibleNode) (struct)
+			// t.Selector (typegen.Deferred) (struct)
 		case "Selector":
 
 			{
 
-				if err := t.Selector.UnmarshalCBOR(cr); err != nil {
-					return xerrors.Errorf("unmarshaling t.Selector: %w", err)
-				}
+				t.Selector = new(cbg.Deferred)
 
+				if err := t.Selector.UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("failed to read deferred field: %w", err)
+				}
 			}
 			// t.UnsealPrice (big.Int) (struct)
 		case "UnsealPrice":

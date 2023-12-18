@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -85,9 +84,9 @@ func NewLibp2pTestData(ctx context.Context, t *testing.T) *Libp2pTestData {
 	testData.DTStore1 = namespace.Wrap(testData.Ds1, datastore.NewKey("DataTransfer1"))
 	testData.DTStore2 = namespace.Wrap(testData.Ds1, datastore.NewKey("DataTransfer2"))
 
-	testData.DTTmpDir1, err = ioutil.TempDir("", "dt-tmp-1")
+	testData.DTTmpDir1, err = os.MkdirTemp("", "dt-tmp-1")
 	require.NoError(t, err)
-	testData.DTTmpDir2, err = ioutil.TempDir("", "dt-tmp-2")
+	testData.DTTmpDir2, err = os.MkdirTemp("", "dt-tmp-2")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(testData.DTTmpDir1)
