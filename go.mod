@@ -317,7 +317,6 @@ require (
 )
 
 require (
-	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
@@ -340,7 +339,6 @@ require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/filecoin-project/go-data-transfer v1.15.4-boost // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7 // indirect
 	github.com/filecoin-project/go-fil-markets v1.28.3 // indirect
 	github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d // indirect
