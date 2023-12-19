@@ -161,7 +161,24 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		}
 	}
 
+	errCh := make(chan error)
+	startedCh := make(chan struct{})
+
+	mgr.OnReady(func(err error) {
+		if err != nil {
+			errCh <- err
+			return
+		}
+		close(startedCh)
+	})
+
 	if err := mgr.Start(context.Background()); err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-startedCh:
+	case err := <-errCh:
 		return nil, err
 	}
 
