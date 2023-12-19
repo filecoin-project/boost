@@ -208,6 +208,10 @@ func (p *DealProvider) Start(ctx context.Context) {
 	p.host.SetStreamHandler(legacytypes.DealProtocolID101, p.handleLegacyDealStream)
 	p.host.SetStreamHandler(legacytypes.DealProtocolID110, p.handleLegacyDealStream)
 	p.host.SetStreamHandler(legacytypes.DealProtocolID111, p.handleLegacyDealStream)
+
+	// Handle Query Ask
+	p.host.SetStreamHandler(legacytypes.AskProtocolID, p.handleNewAskStream)
+	p.host.SetStreamHandler(legacytypes.OldAskProtocolID, p.handleOldAskStream)
 }
 
 func (p *DealProvider) Stop() {
@@ -529,4 +533,102 @@ func (p *DealProvider) signLegacyResponse(resp typegen.CBORMarshaler) (*crypto.S
 	}
 
 	return localSignature, err
+}
+
+func (p *DealProvider) handleNewAskStream(s network.Stream) {
+	start := time.Now()
+	reqLog := log.With("client-peer", s.Conn().RemotePeer())
+	reqLog.Debugw("new queryAsk request")
+
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
+		reqLog.Debugw("handled queryAsk request", "duration", time.Since(start).String())
+	}()
+
+	// Read the deal status request from the stream
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	var req gfm_network.AskRequest
+	err := req.UnmarshalCBOR(s)
+	_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+	if err != nil {
+		reqLog.Warnw("reading queryAsk request from stream", "err", err)
+		return
+	}
+
+	var resp gfm_network.AskResponse
+
+	if req.Miner.String() == p.prov.Address.String() {
+		resp.Ask = p.prov.GetAsk()
+	} else {
+		reqLog.Warnw("storage provider for address %s receive ask for miner with address %s", p.prov.Address, req.Miner)
+	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		reqLog.Errorw("failed to write queryAsk response", "err", err)
+	}
+}
+
+func (p *DealProvider) handleOldAskStream(s network.Stream) {
+	start := time.Now()
+	reqLog := log.With("client-peer", s.Conn().RemotePeer())
+	reqLog.Debugw("new queryAsk request")
+
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
+		reqLog.Debugw("handled queryAsk request", "duration", time.Since(start).String())
+	}()
+
+	// Read the deal status request from the stream
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	var req mig.AskRequest0
+	err := req.UnmarshalCBOR(s)
+	_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+	if err != nil {
+		reqLog.Warnw("reading queryAsk request from stream", "err", err)
+		return
+	}
+
+	var resp mig.AskResponse0
+
+	if req.Miner.String() == p.prov.Address.String() {
+		ask := p.prov.GetAsk()
+
+		newAsk := ask.Ask
+		resp.Ask.Ask = &mig.StorageAsk0{
+			Price:         newAsk.Price,
+			VerifiedPrice: newAsk.VerifiedPrice,
+			MinPieceSize:  newAsk.MinPieceSize,
+			MaxPieceSize:  newAsk.MaxPieceSize,
+			Miner:         newAsk.Miner,
+			Timestamp:     newAsk.Timestamp,
+			Expiry:        newAsk.Expiry,
+			SeqNo:         newAsk.SeqNo,
+		}
+		oldSig, err := p.signLegacyResponse(&resp)
+		if err != nil {
+			reqLog.Errorf("getting signed response: %s", err)
+		}
+
+		resp.Ask.Signature = oldSig
+	} else {
+		reqLog.Warnw("storage provider for address %s receive ask for miner with address %s", p.prov.Address, req.Miner)
+	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		reqLog.Errorw("failed to write queryAsk response", "err", err)
+	}
 }
