@@ -1,10 +1,12 @@
 package framework
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -71,10 +73,15 @@ import (
 	ipldformat "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
+	carv2 "github.com/ipld/go-car/v2"
+	storagecar "github.com/ipld/go-car/v2/storage"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/ipld/go-ipld-prime/linking"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipld/go-ipld-prime/traversal"
+	trustless "github.com/ipld/go-trustless-utils"
+	traversal "github.com/ipld/go-trustless-utils/traversal"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -798,9 +805,15 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	return tmpFile
 }
 
-func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir string, root cid.Cid, pieceCid cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
+func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, request trustless.Request, extractCar bool) string {
+	tempdir := t.TempDir()
+
+	var out string
+	retPath := path.Join(tempdir, "retrievals")
+	require.NoError(t, os.Mkdir(retPath, 0755))
+
 	clientPath := path.Join(tempdir, "client")
-	_ = os.Mkdir(clientPath, 0755)
+	require.NoError(t, os.Mkdir(clientPath, 0755))
 
 	clientNode, err := clinode.Setup(clientPath)
 	require.NoError(t, err)
@@ -812,8 +825,7 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 	bstore := blockstore.NewBlockstore(bstoreDatastore, blockstore.NoPrefix())
 	require.NoError(t, err)
 
-	//ds, err := levelds.NewDatastore(path.Join(clientPath, "dstore"), nil)
-	ds, err := levelds.NewDatastore("", nil)
+	ds, err := levelds.NewDatastore(path.Join(clientPath, "dstore"), nil)
 	require.NoError(t, err)
 
 	// Create the retrieval client
@@ -823,11 +835,18 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 	baddrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
 
-	query, err := RetrievalQuery(ctx, t, clientNode, &baddrs, pieceCid)
+	// Query the remote to find out the retrieval parameters
+	query, err := RetrievalQuery(ctx, t, clientNode, &baddrs, request.Root)
 	require.NoError(t, err)
 
-	proposal, err := rc.RetrievalProposalForAsk(query, root, selectorNode)
+	// Create a matching proposal for the query
+	proposal, err := rc.RetrievalProposalForAsk(query, request.Root, request.Selector())
 	require.NoError(t, err)
+
+	// Let's see the selector we're working with
+	encoded, err := ipld.Encode(request.Selector(), dagjson.Encode)
+	require.NoError(t, err)
+	t.Logf("Retrieving with selector: %s", string(encoded))
 
 	// Retrieve the data
 	_, err = fc.RetrieveContentWithProgressCallback(
@@ -840,56 +859,52 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, tempdir stri
 	)
 	require.NoError(t, err)
 
+	// Validate the data
+
 	dservOffline := dag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
+	lsys := utils.CreateLinkSystem(dservOffline)
 
-	// if we used a selector - need to find the sub-root the user actually wanted to retrieve
-	if selectorNode != nil {
-		if !selectorNode.IsNull() {
-			var subRootFound bool
-			err := utils.TraverseDag(
-				ctx,
-				dservOffline,
-				root,
-				selectorNode,
-				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
-					if r == traversal.VisitReason_SelectionMatch {
-
-						require.Equal(t, p.LastBlock.Path.String(), p.Path.String())
-
-						cidLnk, castOK := p.LastBlock.Link.(cidlink.Link)
-						require.True(t, castOK)
-
-						root = cidLnk.Cid
-						subRootFound = true
-					}
-					return nil
-				},
-			)
-			require.NoError(t, err)
-			require.True(t, subRootFound)
+	if !extractCar {
+		// If the caller wants a CAR, we create it and then when we run our check traversal over the DAG
+		// each load will trigger a write to the CAR
+		file, err := os.CreateTemp(retPath, "*"+request.Root.String()+".car")
+		require.NoError(t, err)
+		out = file.Name()
+		storage, err := storagecar.NewWritable(file, []cid.Cid{request.Root}, carv2.WriteAsCarV1(true))
+		require.NoError(t, err)
+		sro := lsys.StorageReadOpener
+		lsys.StorageReadOpener = func(lc linking.LinkContext, l datamodel.Link) (io.Reader, error) {
+			r, err := sro(lc, l)
+			if err != nil {
+				return nil, err
+			}
+			buf, err := io.ReadAll(r)
+			if err != nil {
+				return nil, err
+			}
+			if err := storage.Put(lc.Ctx, l.(cidlink.Link).Cid.KeyString(), buf); err != nil {
+				return nil, err
+			}
+			return bytes.NewReader(buf), nil
 		}
 	}
 
-	dnode, err := dservOffline.Get(ctx, root)
+	// Check that we got what we expected by executing the same selector over our
+	// retrieved DAG
+	_, err = traversal.Config{
+		Root:     request.Root,
+		Selector: request.Selector(),
+	}.Traverse(ctx, lsys, nil)
 	require.NoError(t, err)
 
-	var out string
-	retPath := path.Join(tempdir, "retrievals")
-	_ = os.Mkdir(retPath, 0755)
-
-	if !extractCar {
-		// Write file as car file
-		file, err := os.CreateTemp(retPath, "*"+root.String()+".car")
+	if extractCar {
+		// Caller doesn't want the raw blocks, so extract the file as UnixFS and
+		// assume that we've fetched the right blocks to be able to do this.
+		dnode, err := dservOffline.Get(ctx, request.Root)
 		require.NoError(t, err)
-		out = file.Name()
-		err = car.WriteCar(ctx, dservOffline, []cid.Cid{root}, file)
-		require.NoError(t, err)
-
-	} else {
-		// Otherwise write file as UnixFS File
 		ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
 		require.NoError(t, err)
-		file, err := os.CreateTemp(retPath, "*"+root.String())
+		file, err := os.CreateTemp(retPath, "*"+request.Root.String())
 		require.NoError(t, err)
 		err = file.Close()
 		require.NoError(t, err)
