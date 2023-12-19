@@ -333,6 +333,7 @@ require (
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/ipni/storetheindex v0.8.1
 	github.com/schollz/progressbar/v3 v3.14.1
+	go.uber.org/multierr v1.11.0
 )
 
 require (
@@ -375,7 +376,6 @@ require (
 	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )
