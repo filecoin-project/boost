@@ -97,7 +97,6 @@ var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
 	Ensemble                  *kit.Ensemble
-	EnableLegacy              bool
 	MaxStagingBytes           int64
 	ProvisionalWalletBalances int64
 }
@@ -118,12 +117,6 @@ type TestFramework struct {
 }
 
 type FrameworkOpts func(pc *TestFrameworkConfig)
-
-func EnableLegacyDeals(enable bool) FrameworkOpts {
-	return func(tmc *TestFrameworkConfig) {
-		tmc.EnableLegacy = enable
-	}
-}
 
 func SetMaxStagingBytes(max int64) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
@@ -362,21 +355,18 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Wallets.DealCollateral = dealCollatAddr.String()
-	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
-	cfg.LotusDealmaking.PublishMsgPeriod = lotus_config.Duration(0)
+	cfg.Dealpublish.MaxDealsPerPublishMsg = 1
+	cfg.Dealpublish.PublishMsgPeriod = config.Duration(0)
 	val, err := ltypes.ParseFIL("0.1 FIL")
 	if err != nil {
 		return err
 	}
-	cfg.LotusFees.MaxPublishDealsFee = val
+	cfg.Dealpublish.MaxPublishDealsFee = val
 
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
-	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
+	cfg.HttpDownload.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
-	if f.config.EnableLegacy {
-		cfg.Dealmaking.EnableLegacyStorageDeals = true
-	}
 
 	for _, o := range opts {
 		o(cfg)

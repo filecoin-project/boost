@@ -158,7 +158,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 		Deals:          basicDeals,
 		Period:         int32(pending.PublishPeriod.Seconds()),
 		Start:          graphql.Time{Time: pending.PublishPeriodStart},
-		MaxDealsPerMsg: int32(r.cfg.LotusDealmaking.MaxDealsPerPublishMsg),
+		MaxDealsPerMsg: int32(r.cfg.Dealpublish.MaxDealsPerPublishMsg),
 	}, nil
 }
 

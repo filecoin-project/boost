@@ -30,7 +30,7 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multicodec"
-	multihash "github.com/multiformats/go-multihash"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +43,7 @@ func TestDummyPodsiDealOnline(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true), framework.SetMaxStagingBytes(10e9), framework.SetProvisionalWalletBalances(9e18))
+	opts = append(opts, framework.SetMaxStagingBytes(10e9), framework.SetProvisionalWalletBalances(9e18))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)

@@ -24,7 +24,6 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true))
 	opts = append(opts, framework.SetMaxStagingBytes(10000000)) // 10 MB
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()

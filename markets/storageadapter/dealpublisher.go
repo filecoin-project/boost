@@ -8,6 +8,7 @@ import (
 	"time"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
@@ -18,13 +19,10 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/go-state-types/exitcode"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/storage/ctladdr"
 )
 
@@ -113,13 +111,13 @@ type PublishMsgConfig struct {
 }
 
 func NewDealPublisher(
-	feeConfig *config.MinerFeeConfig,
+	maxPublishDealsFee *types.FIL,
 	publishMsgCfg PublishMsgConfig,
 ) func(lc fx.Lifecycle, full api.FullNode, as *ctladdr.AddressSelector) *DealPublisher {
 	return func(lc fx.Lifecycle, full api.FullNode, as *ctladdr.AddressSelector) *DealPublisher {
 		maxFee := abi.NewTokenAmount(0)
-		if feeConfig != nil {
-			maxFee = abi.TokenAmount(feeConfig.MaxPublishDealsFee)
+		if maxPublishDealsFee != nil {
+			maxFee = abi.TokenAmount(*maxPublishDealsFee)
 		}
 		publishSpec := &api.MessageSendSpec{MaxFee: maxFee}
 		dp := newDealPublisher(full, as, publishMsgCfg, publishSpec)

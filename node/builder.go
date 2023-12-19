@@ -413,18 +413,6 @@ var BoostNode = Options(
 )
 
 func ConfigBoost(cfg *config.Boost) Option {
-	pricingConfig := cfg.Dealmaking.RetrievalPricing
-	if pricingConfig.Strategy == config.RetrievalPricingExternalMode {
-		if pricingConfig.External == nil {
-			return Error(errors.New("retrieval pricing policy has been to set to external but external policy config is nil"))
-		}
-
-		if pricingConfig.External.Path == "" {
-			return Error(errors.New("retrieval pricing policy has been to set to external but external script path is empty"))
-		}
-	} else if pricingConfig.Strategy != config.RetrievalPricingDefaultMode {
-		return Error(errors.New("retrieval pricing policy must be either default or external"))
-	}
 
 	collatWalletStr := cfg.Wallets.DealCollateral
 	if collatWalletStr == "" && cfg.Wallets.PledgeCollateral != "" { // nolint:staticcheck
@@ -450,8 +438,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		return Error(errors.New("HttpDownload.NChunks should be between 1 and 16"))
 	}
 
-	legacyFees := cfg.LotusFees.Legacy()
-
 	return Options(
 		ConfigCommon(&cfg.Common),
 
@@ -471,7 +457,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 			StorageMiner: walletMiner,
 			CollatWallet: walletDealCollat,
 			PubMsgWallet: walletPSD,
-			PubMsgBalMin: abi.TokenAmount(cfg.LotusFees.MaxPublishDealsFee),
+			PubMsgBalMin: abi.TokenAmount(cfg.Dealpublish.MaxPublishDealsFee),
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
@@ -517,7 +503,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(StartProviderDataTransferKey, server.NewProviderDataTransfer),
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
-		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.Retrievals.GraphsyncRetrievalConfig.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
@@ -530,7 +516,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval)
 		Override(new(server.SectorAccessor), modules.NewSectorAccessor(cfg)),
-		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
+		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalLogDuration), time.Duration(cfg.Retrievals.GraphsyncRetrievalConfig.StalledRetrievalTimeout))),
 		Override(HandleRetrievalAskKey, modules.HandleQueryAsk),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
@@ -553,15 +539,15 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Boost retrieval deal filter
 		Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(nil)),
-		If(cfg.Dealmaking.RetrievalFilter != "",
-			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dtypes.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Dealmaking.RetrievalFilter)))),
+		If(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalFilter != "",
+			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dtypes.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalFilter)))),
 		),
 
-		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&legacyFees, storageadapter.PublishMsgConfig{
-			Period:                  time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
-			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
+		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&cfg.Dealpublish.MaxPublishDealsFee, storageadapter.PublishMsgConfig{
+			Period:                  time.Duration(cfg.Dealpublish.PublishMsgPeriod),
+			MaxDealsPerMsg:          cfg.Dealpublish.MaxDealsPerPublishMsg,
 			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
-			ManualDealPublish:       cfg.Dealmaking.ManualDealPublish,
+			ManualDealPublish:       cfg.Dealpublish.ManualDealPublish,
 		})),
 
 		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),

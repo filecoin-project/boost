@@ -49,7 +49,7 @@ func (r *resolver) TransferStats(_ context.Context) *transferStats {
 		})
 	}
 	return &transferStats{
-		HttpMaxConcurrentDownloads: int32(r.cfg.Dealmaking.HttpTransferMaxConcurrentDownloads),
+		HttpMaxConcurrentDownloads: int32(r.cfg.HttpDownload.HttpTransferMaxConcurrentDownloads),
 		Stats:                      gqlStats,
 	}
 }

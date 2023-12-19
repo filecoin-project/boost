@@ -322,7 +322,7 @@ func NewSectorStateDB(sqldb *sql.DB) *db.SectorStateDB {
 func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 
-		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi, cfg.Dealmaking.EnableLegacyStorageDeals)
+		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
@@ -476,9 +476,9 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
 			RemoteCommp:         cfg.Dealmaking.RemoteCommp,
 			TransferLimiter: storagemarket.TransferLimiterConfig{
-				MaxConcurrent:    cfg.Dealmaking.HttpTransferMaxConcurrentDownloads,
-				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
-				StallTimeout:     time.Duration(cfg.Dealmaking.HttpTransferStallTimeout),
+				MaxConcurrent:    cfg.HttpDownload.HttpTransferMaxConcurrentDownloads,
+				StallCheckPeriod: time.Duration(cfg.HttpDownload.HttpTransferStallCheckPeriod),
+				StallTimeout:     time.Duration(cfg.HttpDownload.HttpTransferStallTimeout),
 			},
 			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
 			StorageFilter:               cfg.Dealmaking.Filter,

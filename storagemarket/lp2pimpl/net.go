@@ -165,23 +165,21 @@ func NewDealClient(h host.Host, addr address.Address, walletApi api.Wallet, opti
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
-	ctx               context.Context
-	host              host.Host
-	prov              *storagemarket.Provider
-	fullNode          v1api.FullNode
-	plDB              *db.ProposalLogsDB
-	spApi             sealingpipeline.API
-	enableLegacyDeals bool
+	ctx      context.Context
+	host     host.Host
+	prov     *storagemarket.Provider
+	fullNode v1api.FullNode
+	plDB     *db.ProposalLogsDB
+	spApi    sealingpipeline.API
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API, enableLegacyDeals bool) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) *DealProvider {
 	p := &DealProvider{
-		host:              h,
-		prov:              prov,
-		fullNode:          fullNodeApi,
-		plDB:              plDB,
-		spApi:             spApi,
-		enableLegacyDeals: enableLegacyDeals,
+		host:     h,
+		prov:     prov,
+		fullNode: fullNodeApi,
+		plDB:     plDB,
+		spApi:    spApi,
 	}
 	return p
 }

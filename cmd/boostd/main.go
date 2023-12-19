@@ -36,8 +36,6 @@ func main() {
 			authCmd,
 			runCmd,
 			initCmd,
-			migrateMonolithCmd,
-			migrateMarketsCmd,
 			backupCmd,
 			restoreCmd,
 			configCmd,
@@ -48,7 +46,6 @@ func main() {
 			logCmd,
 			netCmd,
 			pieceDirCmd,
-			recoverCmd,
 		},
 	}
 	app.Setup()
