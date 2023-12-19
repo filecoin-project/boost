@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -14,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/markets/storageadapter"
@@ -21,7 +23,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
+
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/gateway"
@@ -52,7 +54,12 @@ type BoostAPI struct {
 
 	// Legacy Markets
 	LegacyDealManager legacy.LegacyDealManager
-	DealPublisher     *storageadapter.DealPublisher
+
+	// Boost - Direct Data onboarding
+	DirectDealsProvider *storagemarket.DirectDealsProvider
+
+	// Lotus Markets
+	DealPublisher *storageadapter.DealPublisher
 
 	// Graphsync Unpaid Retrieval
 	GraphsyncUnpaidRetrieval *retmarket.GraphsyncUnpaidRetrieval
@@ -164,6 +171,11 @@ func (sm *BoostAPI) BoostIndexerAnnounceLatestHttp(ctx context.Context, announce
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
 	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err
+}
+
+func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, params types.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
+	return nil, fmt.Errorf("not implemented")
+	// return sm.DirectDealsProvider.Import(ctx, params)
 }
 
 func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {

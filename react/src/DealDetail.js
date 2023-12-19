@@ -188,12 +188,12 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
-                    <td>{currentEpoch ? addCommas(currentEpoch) : null}</td>
+                    <td>{currentEpoch ? currentEpoch.toString() : null}</td>
                 </tr>
                 <tr>
                     <th>Start Epoch</th>
                     <td>
-                        {addCommas(deal.StartEpoch)}
+                        {deal.StartEpoch.toString()}
                         <span className="aux">
                             {startEpochTime ? ' (' + moment(startEpochTime).fromNow() + ')' : null}
                         </span>
@@ -202,7 +202,7 @@ export function DealDetail(props) {
                 <tr>
                     <th>End Epoch</th>
                     <td>
-                        {addCommas(deal.EndEpoch)}
+                        {deal.EndEpoch.toString()}
                         <span className="aux">
                             {endEpochTime ? ' (' + moment(endEpochTime).fromNow() + ')' : null}
                         </span>
@@ -211,7 +211,7 @@ export function DealDetail(props) {
                 <tr>
                     <th>Duration</th>
                     <td>
-                        {addCommas(deal.EndEpoch-deal.StartEpoch)}
+                        {deal.EndEpoch-deal.StartEpoch}
                         <span className="aux">
                             {startEpochTime && endEpochTime ? ' (' + moment(endEpochTime).diff(startEpochTime, 'days') + ' days)' : null}
                         </span>
@@ -299,7 +299,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Chain Deal ID</th>
-                    <td>{deal.ChainDealID ? addCommas(deal.ChainDealID) : null}</td>
+                    <td>{deal.ChainDealID ? deal.ChainDealID.toString() : null}</td>
                 </tr>
                 <tr>
                     <th>Checkpoint</th>
@@ -404,7 +404,7 @@ export function IsOfflineWaitingForData(deal) {
     return deal.IsOffline && deal.Checkpoint === 'Accepted'
 }
 
-function DealLog(props) {
+export function DealLog(props) {
     var prev = props.prev
     var log = props.log
     var sinceLast = ''
@@ -456,7 +456,7 @@ function DealLog(props) {
     </tr>
 }
 
-function getAllDataAsText(detailTableEl, dealID, logs) {
+export function getAllDataAsText(detailTableEl, dealID, logs) {
     var lines = []
     lines.push('=== Deal ' + dealID + ' ===')
     lines.push('')
@@ -494,7 +494,7 @@ function getAllDataAsText(detailTableEl, dealID, logs) {
     return lines.join('\n')+'\n'
 }
 
-function DealStatusInfo(props) {
+export function DealStatusInfo(props) {
     return <span className="deal-status-info">
         <Info>
             The deal can be in one of the following states:
@@ -545,15 +545,16 @@ function DealStatusInfo(props) {
                 </p>
             </p>
             <p>
-                <i>Announcing</i>
+                <i>Indexing</i>
                 <p>
-                    Boost is announcing the deal to the network so that clients know where to retrieve it.
+                    Boost is indexing the deal in the Local Index Directory(LID)
+                    and will be announcing the deal to the network so that clients know where to retrieve it from.
                 </p>
             </p>
             <p>
-                <i>Sealing</i>
+                <i>IndexedAndAnnounced</i>
                 <p>
-                    The deal has been added to a sector and is now sealing.
+                    The deal has been indexed locally and announced to the network indexers.
                 </p>
             </p>
             <p>

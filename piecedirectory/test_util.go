@@ -3,13 +3,14 @@ package piecedirectory
 import (
 	"context"
 	"io"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -103,4 +104,16 @@ type MockSectionReader struct {
 	car.SectionReader
 }
 
-func (*MockSectionReader) Close() error { return nil }
+func (MockSectionReader) Close() error { return nil }
+
+// like `CreateMockPieceReader`, but returns a reader over the contents of a file.
+func CreateMockPieceReaderFromPath(t *testing.T, path string) *mock_piecedirectory.MockPieceReader {
+	ctrl := gomock.NewController(t)
+	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(_ context.Context, _ address.Address, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (types.SectionReader, error) {
+			f, err := os.Open(path)
+			return f, err
+		})
+	return pr
+}

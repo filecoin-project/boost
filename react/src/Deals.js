@@ -1,8 +1,7 @@
-/* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
-    DealsListQuery, LegacyDealsCountQuery,
+    DealsListQuery, LegacyDealsCountQuery, SectorStatusQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -17,9 +16,12 @@ import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import './Deals.css'
+import warningImg from './bootstrap-icons/icons/exclamation-circle.svg'
 import {Pagination} from "./Pagination";
-import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
+import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData, DealStatusInfo} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
+import {DirectDealsCount} from "./DirectDeals";
+import {Info} from "./Info";
 
 const dealsBasePath = '/storage-deals'
 
@@ -144,9 +146,12 @@ function StorageDealsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
-                <th>Size</th>
+                <th>Size<SizeInfo /></th>
+                <th>On Chain ID</th>
                 <th>Client</th>
-                <th>State</th>
+                <th>Sealing State<SealingStatusInfo /></th>
+                <th>Deal State<DealStatusInfo /></th>
+
             </tr>
 
             {deals.map(deal => (
@@ -290,9 +295,11 @@ function DealRow(props) {
         }
     }
 
-    const showActions = (IsPaused(deal) || IsTransferring(deal) || IsOfflineWaitingForData(deal))
+    // Show deal action buttons if the deal can be retried / cancelled
+    var showActions = (IsPaused(deal) || IsTransferring(deal) || IsOfflineWaitingForData(deal))
+    const hasAnnounceError = deal.Err && deal.Checkpoint === 'AddedPiece' && (deal.Sector || {}).ID
     var rowClassName = ''
-    if (showActions) {
+    if (showActions || hasAnnounceError) {
         rowClassName = 'show-actions'
     }
 
@@ -304,21 +311,93 @@ function DealRow(props) {
             <td className="deal-id">
                 <ShortDealLink id={deal.ID} />
             </td>
-            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
+            <td className="size">{deal.IsOffline ? humanFileSize(deal.PieceSize) : humanFileSize(deal.Transfer.Size)}</td>
+            <td className="message-text">{deal.ChainDealID ? deal.ChainDealID.toString() : null}</td>
             <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
-            <td className="message">
+            <td className="sealing">
                 <div className="message-content">
                     <span className="message-text">
-                        {deal.Message}
-                        <TransferRate deal={deal} />
+                        {deal.SealingState}
                     </span>
-                    {showActions ? <DealActions deal={props.deal} refetchQueries={[DealsListQuery]} compact={true} /> : null}
+                </div>
+            </td>
+            <td className="message">
+                <div className="message-content">
+                    { hasAnnounceError ? (
+                        <DealRowAnnounceError deal={deal} />
+                    ) : (
+                        <>
+                            <span className="message-text">
+                                {deal.Message}
+                                <TransferRate deal={deal} />
+                            </span>
+                            {showActions ? <DealActions deal={props.deal} refetchQueries={[DealsListQuery]} compact={true} /> : null}
+                        </>
+                    ) }
                 </div>
             </td>
         </tr>
     )
+}
+
+// DealRowAnnounceError shows a row with the sealing status, and a warning icon.
+// When the user hovers on the warning icon it shows a box with the warning and
+// action buttons to retry / pause
+function DealRowAnnounceError({deal}) {
+    const warningMsgElId = "message-"+deal.ID
+    const warningImgElId = "img-warn-"+deal.ID
+    const messageBoxId = "message-box-"+deal.ID
+    useEffect(() => {
+        const warningImg = document.getElementById(warningImgElId)
+        const warningMsg = document.getElementById(warningMsgElId)
+        const messageBox = document.getElementById(messageBoxId)
+        if(!warningImg || !warningMsg || !messageBox) {
+            return
+        }
+
+        warningImg.addEventListener("mouseover", () => {
+            warningMsg.classList.add('showing')
+        })
+        messageBox.addEventListener("mouseleave", () => {
+            warningMsg.classList.remove('showing')
+        })
+
+        return function () {
+            warningImg.removeEventListener("mouseover")
+            messageBox.removeEventListener("mouseleave")
+        }
+    })
+
+    const {data, loading, error} = useQuery(SectorStatusQuery, {
+        pollInterval: 10000,
+        fetchPolicy: 'network-only',
+        variables: {
+            sectorNumber: deal.Sector.ID
+        }
+    })
+
+    if (error) {
+        return <span>Sealer: {error.message}</span>
+    }
+    if (loading) {
+        return null
+    }
+
+    return <div id={messageBoxId}>
+        <span>
+            <img id={warningImgElId} className="warning" src={warningImg} />
+            <span>Sealer: {data.sectorStatus.State}</span>
+        </span>
+        <span id={warningMsgElId} className="warning-msg">
+            <span className="message-text">
+                <img className="warning" src={warningImg} />
+                <span id={warningMsgElId}>{deal.Message}</span>
+            </span>
+            <DealActions deal={deal} refetchQueries={[DealsListQuery]} compact={true} />
+        </span>
+    </div>
 }
 
 function TransferRate({deal}) {
@@ -383,4 +462,52 @@ export function StorageDealsMenuItem(props) {
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+
+export function SealingStatusInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            The deal can be in one of the following sealing states:
+            <p>
+                <i>To be Sealed</i><br/>
+                <p>
+                    The storage deal is being processed by Boost before being handed off
+                    to the sealer.
+                </p>
+            </p>
+            <p>
+                <i>Sealer: </i><br/>
+                <p>
+                    The deal has been handed off to the sealing subsystem and is being sealed.
+                </p>
+            </p>
+            <p>
+                <i>Complete</i><br/>
+                <p>
+                    The sector containing the deal has expired or the deal errored out.
+                </p>
+            </p>
+        </Info>
+    </span>
+}
+
+export function SizeInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            Size column displays different sizes based on the deal type
+            <p>
+                <i>Online Deals</i><br/>
+                <p>
+                    Transfer Size or the car size specified in the deal proposal
+                </p>
+            </p>
+            <p>
+                <i>Offline</i><br/>
+                <p>
+                    Piece size specified in the deal proposal
+                </p>
+            </p>
+        </Info>
+    </span>
 }

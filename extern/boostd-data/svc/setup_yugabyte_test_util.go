@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
 	_ "github.com/lib/pq"
@@ -19,13 +19,14 @@ var tlog = logging.Logger("ybtest")
 
 var TestYugabyteSettings = yugabyte.DBSettings{
 	Hosts:         []string{"yugabyte"},
-	ConnectString: "postgresql://postgres:postgres@yugabyte:5433?sslmode=disable",
+	ConnectString: "postgresql://postgres:postgres@yugabyte:5433?sslmode=disable&load_balance=true",
+	CQLTimeout:    yugabyte.CqlTimeout,
 }
 
 // Used when testing against a local yugabyte instance.
 var TestYugabyteSettingsLocal = yugabyte.DBSettings{
 	Hosts:         []string{"localhost"},
-	ConnectString: "postgresql://postgres:postgres@localhost:5433?sslmode=disable",
+	ConnectString: "postgresql://postgres:postgres@localhost:5433?sslmode=disable&load_balance=true",
 }
 
 func init() {
@@ -73,7 +74,11 @@ func RecreateTables(ctx context.Context, t *testing.T, store *yugabyte.Store) {
 }
 
 func createTestSchema(ctx context.Context) error {
-	db, err := sql.Open("postgres", TestYugabyteSettings.ConnectString)
+	c, err := yugabyte.StripLoadBalance(TestYugabyteSettings.ConnectString)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("postgres", c)
 	if err != nil {
 		return err
 	}
@@ -83,7 +88,11 @@ func createTestSchema(ctx context.Context) error {
 }
 
 func dropTestSchema(ctx context.Context) error {
-	db, err := sql.Open("postgres", TestYugabyteSettings.ConnectString)
+	c, err := yugabyte.StripLoadBalance(TestYugabyteSettings.ConnectString)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("postgres", c)
 	if err != nil {
 		return err
 	}
@@ -95,6 +104,7 @@ func dropTestSchema(ctx context.Context) error {
 	// For the cassandra interface, we need to drop all the objects in the
 	// keyspace before we can drop the keyspace itself
 	cluster := gocql.NewCluster(TestYugabyteSettings.Hosts...)
+	cluster.Timeout = time.Duration(TestYugabyteSettings.CQLTimeout) * time.Second
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return err
@@ -144,6 +154,7 @@ func dropTestSchema(ctx context.Context) error {
 func awaitYugabyteUp(t *testing.T, duration time.Duration) {
 	start := time.Now()
 	cluster := gocql.NewCluster(TestYugabyteSettings.Hosts[0])
+	cluster.Timeout = time.Duration(TestYugabyteSettings.CQLTimeout) * time.Second
 	for {
 		_, err := cluster.CreateSession()
 		if err == nil {

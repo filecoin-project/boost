@@ -23,6 +23,10 @@ const (
 // CommP and traversing a DAG with graphsync; invokes a budget on DAG depth and density.
 var MaxTraversalLinks uint64 = 32 * (1 << 20)
 
+const (
+	DefaultAddIndexConcurrency = 8
+)
+
 func init() {
 	if envMaxTraversal, err := strconv.ParseUint(os.Getenv("LOTUS_MAX_TRAVERSAL_LINKS"), 10, 64); err == nil {
 		MaxTraversalLinks = envMaxTraversal
@@ -87,6 +91,7 @@ func DefaultBoost() *Boost {
 				Enabled: false,
 			},
 			ParallelAddIndexLimit: 4,
+			AddIndexConcurrency:   DefaultAddIndexConcurrency,
 			EmbeddedServicePort:   8042,
 			ServiceApiInfo:        "",
 			ServiceRPCTimeout:     Duration(15 * time.Minute),

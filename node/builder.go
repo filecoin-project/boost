@@ -11,6 +11,8 @@ import (
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
+	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
@@ -37,8 +39,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/storedask"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
-	bdclient "github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -402,6 +402,7 @@ var BoostNode = Options(
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
 	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
+	Override(new(*db.DirectDealsDB), modules.NewDirectDealsDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
@@ -494,6 +495,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(storagemarket.CommpThrottle), modules.NewCommpThrottle(cfg)),
+		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 

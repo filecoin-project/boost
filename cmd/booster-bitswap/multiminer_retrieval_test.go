@@ -4,6 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"path"
+	"sort"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	"github.com/filecoin-project/boost/itests/shared"
 	carv2 "github.com/ipld/go-car/v2"
@@ -12,10 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
-	"path"
-	"sort"
-	"testing"
-	"time"
 )
 
 func TestMultiMinerBitswapRetrieval(t *testing.T) {
@@ -121,6 +122,7 @@ func runBoosterBitswap(ctx context.Context, repo string, minerApiInfo []string, 
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,
 		"--api-version-check=false",
+		"--no-metrics",
 	}
 	for _, apiInfo := range minerApiInfo {
 		args = append(args, "--api-storage="+apiInfo)

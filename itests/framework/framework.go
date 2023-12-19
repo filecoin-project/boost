@@ -28,6 +28,7 @@ import (
 	rc "github.com/filecoin-project/boost/retrievalmarket/client"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/storedask"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -81,7 +82,7 @@ import (
 	"github.com/ipld/go-ipld-prime/linking"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	trustless "github.com/ipld/go-trustless-utils"
-	traversal "github.com/ipld/go-trustless-utils/traversal"
+	"github.com/ipld/go-trustless-utils/traversal"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -95,9 +96,10 @@ import (
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
-	Ensemble             *kit.Ensemble
-	EnableLegacy         bool
-	MaxStagingDealsBytes int64
+	Ensemble                  *kit.Ensemble
+	EnableLegacy              bool
+	MaxStagingBytes           int64
+	ProvisionalWalletBalances int64
 }
 
 type TestFramework struct {
@@ -123,6 +125,12 @@ func EnableLegacyDeals(enable bool) FrameworkOpts {
 	}
 }
 
+func SetMaxStagingBytes(max int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MaxStagingBytes = max
+	}
+}
+
 func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.Ensemble = e
@@ -131,12 +139,21 @@ func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 
 func WithMaxStagingDealsBytes(e int64) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
-		tmc.MaxStagingDealsBytes = e
+		tmc.MaxStagingBytes = e
+	}
+}
+
+func SetProvisionalWalletBalances(balance int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.ProvisionalWalletBalances = balance
 	}
 }
 
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fmc := &TestFrameworkConfig{}
+	fmc := &TestFrameworkConfig{
+		// default provisional balance
+		ProvisionalWalletBalances: 1e18,
+	}
 	for _, opt := range opts {
 		opt(fmc)
 	}
@@ -242,7 +259,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		Log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
@@ -257,7 +274,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating publish storage deals wallet")
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
@@ -266,7 +283,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		Log.Info("Creating deal collateral wallet")
 		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
-		amt := abi.NewTokenAmount(1e18)
+		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
 		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
 		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
@@ -352,10 +369,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 	cfg.LotusFees.MaxPublishDealsFee = val
-	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
-	if f.config.MaxStagingDealsBytes > 4000000 {
-		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingDealsBytes
-	}
+
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
@@ -366,6 +380,12 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	for _, o := range opts {
 		o(cfg)
+	}
+
+	if f.config.MaxStagingBytes > 0 {
+		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingBytes
+	} else {
+		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	}
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
@@ -596,7 +616,7 @@ type DealResult struct {
 }
 
 func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
-	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
+	cidAndSize, err := storagemarket.GenerateCommPLocally(carFilepath)
 	if err != nil {
 		return nil, err
 	}
@@ -610,6 +630,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	if err != nil {
 		return nil, err
 	}
+	price := big.Div(big.Mul(storedask.DefaultPrice, abi.NewTokenAmount(int64(cidAndSize.Size))), abi.NewTokenAmount(1<<30))
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.Size,
@@ -619,7 +640,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             startEpoch + market.DealMinDuration,
-		StoragePricePerEpoch: abi.NewTokenAmount(2000000),
+		StoragePricePerEpoch: price,
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}

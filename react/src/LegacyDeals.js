@@ -94,6 +94,7 @@ function LegacyStorageDealsContent(props) {
                 <th className="start" onClick={toggleTimestampFormat}>Start</th>
                 <th>Deal ID</th>
                 <th>Piece Size</th>
+                <th>On Chain ID</th>
                 <th>Client</th>
                 <th>State</th>
             </tr>
@@ -138,6 +139,7 @@ function DealRow(props) {
                 </Link>
             </td>
             <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
+            <td className="message-text">{deal.ChainDealID ? deal.ChainDealID.toString() : null}</td>
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>

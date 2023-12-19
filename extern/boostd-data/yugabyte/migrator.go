@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/filecoin-project/boostd-data/yugabyte/cassmigrate"
-	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
+	"net/url"
+	"time"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/cassmigrate"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	_ "github.com/lib/pq"
 	"github.com/yugabyte/gocql"
@@ -42,13 +45,18 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 	// Note that the migration library requires a *sql.DB, but there's no way
 	// to go from a pgxpool connection to a *sql.DB so we need to open a new
 	// connection.
-	sqldb, err := sql.Open("postgres", m.settings.ConnectString)
+	c, err := StripLoadBalance(m.settings.ConnectString)
+	if err != nil {
+		return err
+	}
+	sqldb, err := sql.Open("postgres", c)
 	if err != nil {
 		return fmt.Errorf("opening postgres connection to %s: %w", m.settings.ConnectString, err)
 	}
 
 	// Create a cassandra connection to be used only for running migrations.
 	cluster := gocql.NewCluster(m.settings.Hosts...)
+	cluster.Timeout = time.Duration(m.settings.CQLTimeout) * time.Second
 	cluster.Keyspace = m.CassandraKeyspace
 	session, err := cluster.CreateSession()
 	if err != nil {
@@ -74,4 +82,20 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 	log.Infow("cassandra migrations complete")
 
 	return nil
+}
+
+// StripLoadBalance is used as a workaround to pass YGB-PGX formatted string to SQL formatted string
+func StripLoadBalance(connectString string) (string, error) {
+	u, err := url.Parse(connectString)
+	if err != nil {
+		return "", fmt.Errorf("parsing connect-string for migrator: %w", err)
+	}
+	q := u.Query()
+	q.Del("load_balance")
+	q.Del("yb_servers_refresh_interval")
+	q.Del("failed-host-reconnect-delay-secs")
+	q.Del("fallback-to-topology-keys-only")
+	q.Del("topology_keys")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }

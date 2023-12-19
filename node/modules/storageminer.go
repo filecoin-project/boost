@@ -13,6 +13,7 @@ import (
 	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 	dtgstransport "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/lib/legacy"
@@ -33,7 +34,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/go-address"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-state-types/builtin"
@@ -285,6 +285,10 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
+func NewDirectDealsDB(sqldb *sql.DB) *db.DirectDealsDB {
+	return db.NewDirectDealsDB(sqldb)
+}
+
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }
@@ -461,17 +465,16 @@ func NewLegacyDealsManager(lc fx.Lifecycle, legacyFSM fsm.Group) legacy.LegacyDe
 	return mgr
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, sask storedask.StoredAsk, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
-		commpc types.CommpCalculator, sps sealingpipeline.API,
+		commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
-			MaxTransferDuration:     time.Duration(cfg.Dealmaking.MaxTransferDuration),
-			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
-			MaxConcurrentLocalCommp: cfg.Dealmaking.MaxConcurrentLocalCommp,
+			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
+			RemoteCommp:         cfg.Dealmaking.RemoteCommp,
 			TransferLimiter: storagemarket.TransferLimiterConfig{
 				MaxConcurrent:    cfg.Dealmaking.HttpTransferMaxConcurrentDownloads,
 				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
@@ -483,13 +486,23 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks), httptransport.AllowPrivateIPsOpt(cfg.HttpDownload.AllowPrivateIPs))
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc, commpt,
 			sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, sask, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
 		}
 
 		return prov, nil
+	}
+}
+
+func NewCommpThrottle(cfg *config.Boost) func() storagemarket.CommpThrottle {
+	return func() storagemarket.CommpThrottle {
+		size := uint64(1)
+		if cfg.Dealmaking.MaxConcurrentLocalCommp > 1 {
+			size = cfg.Dealmaking.MaxConcurrentLocalCommp
+		}
+		return make(chan struct{}, size)
 	}
 }
 

@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/lib"
+	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdclient "github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/lotus/api"
@@ -124,7 +124,9 @@ func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.Min
 
 		// Create the piece directory implementation
 		pdctx, cancel := context.WithCancel(context.Background())
-		pd := piecedirectory.NewPieceDirectory(store, sa, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
+		pd := piecedirectory.NewPieceDirectory(store, sa,
+			cfg.LocalIndexDirectory.ParallelAddIndexLimit,
+			piecedirectory.WithAddIndexConcurrency(cfg.LocalIndexDirectory.AddIndexConcurrency))
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				err := sa.Start(ctx, log)

@@ -68,7 +68,6 @@ body:
     description: |
       Please provide debug logs of the problem, remember you can get set log level control for:
       * boostd: use `boostd log list` to get all log systems available and set level by `boostd log set-level`.
-      If you don't provide detailed logs when you raise the issue it will almost certainly be the first request we make before furthur diagnosing the problem.
   validations:
     required: true
 - type: textarea

@@ -28,3 +28,8 @@ scrape_configs:
       - targets: [ 'booster-bitswap:9696' ]
         labels:
           host: 'local'
+  - job_name: 'boostd-data'
+    static_configs:
+      - targets: [ 'boostd-data:8042' ]
+        labels:
+          host: 'local'

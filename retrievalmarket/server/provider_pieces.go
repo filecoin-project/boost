@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"

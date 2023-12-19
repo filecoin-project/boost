@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"

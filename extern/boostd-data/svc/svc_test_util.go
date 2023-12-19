@@ -11,9 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/testutils"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -149,7 +150,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 			require.NoError(t, err)
 
 			randomuuid := uuid.New()
-			pieceCid := testutil.GenerateCid()
+			pieceCid := testutils.GenerateCid()
 			err = cl.AddIndex(ctx, pieceCid, records, true)
 			require.NoError(t, err)
 

@@ -97,6 +97,9 @@ const DealsListQuery = gql`
                 Err
                 Retry
                 Message
+                SealingState
+                ChainDealID
+                PieceSize
                 Transfer {
                     Type
                     Size
@@ -138,6 +141,35 @@ const LegacyDealsListQuery = gql`
                 Status
                 Message
                 SectorNumber
+                ChainDealID
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
+const DirectDealsListQuery = gql`
+    query AppDirectDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
+        directDeals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
+            deals {
+                ID
+                CreatedAt
+                AllocationID
+                ClientAddress
+                Checkpoint
+                CheckpointAt
+                AnnounceToIPNI
+                KeepUnsealedCopy
+                CleanupData
+                Err
+                Retry
+                Message
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
             }
             totalCount
             more
@@ -154,6 +186,12 @@ const DealsCountQuery = gql`
 const LegacyDealsCountQuery = gql`
     query AppLegacyDealCountQuery {
         legacyDealsCount
+    }
+`;
+
+const DirectDealsCountQuery = gql`
+    query AppDirectDealCountQuery {
+        directDealsCount
     }
 `;
 
@@ -451,6 +489,48 @@ const LegacyDealQuery = gql`
     }
 `;
 
+const DirectDealQuery = gql`
+    query AppDirectDealQuery($id: ID!) {
+        directDeal(id: $id) {
+            ID
+            CreatedAt
+            AllocationID
+            ClientAddress
+            ProviderAddress
+            PieceCid
+            PieceSize
+            StartEpoch
+            EndEpoch
+            InboundFilePath
+            Checkpoint
+            CheckpointAt
+            AnnounceToIPNI
+            KeepUnsealedCopy
+            CleanupData
+            Err
+            Retry
+            Message
+            Sector {
+                ID
+                Offset
+                Length
+            }
+            Logs {
+                CreatedAt
+                LogMsg
+                LogParams
+                Subsystem
+            }
+        }
+    }
+`;
+
+const PiecesWithRootPayloadCidQuery = gql`
+    query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
+        piecesWithRootPayloadCid(payloadCid: $payloadCid)
+    }
+`;
+
 const PiecesWithPayloadCidQuery = gql`
     query AppPiecesWithPayloadCidQuery($payloadCid: String!) {
         piecesWithPayloadCid(payloadCid: $payloadCid)
@@ -631,6 +711,16 @@ const SealingPipelineQuery = gql`
     }
 `;
 
+const SectorStatusQuery = gql`
+    query AppSectorStatusQuery($sectorNumber: Uint64!) {
+        sectorStatus(sectorNumber: $sectorNumber) {
+            Number
+            State
+            DealIDs
+        }
+    }
+`;
+
 const FundsQuery = gql`
     query AppFundsQuery {
         funds {
@@ -805,9 +895,12 @@ export {
     GraphsyncRetrievalMinerAddressesQuery,
     DealsListQuery,
     LegacyDealsListQuery,
+    DirectDealsListQuery,
     DealsCountQuery,
     LegacyDealsCountQuery,
+    DirectDealsCountQuery,
     LegacyDealQuery,
+    DirectDealQuery,
     DealSubscription,
     DealCancelMutation,
     DealRetryPausedMutation,
@@ -842,6 +935,7 @@ export {
     TransferStatsQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    SectorStatusQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
     PublishPendingDealsMutation,

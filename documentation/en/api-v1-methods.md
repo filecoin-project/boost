@@ -11,6 +11,7 @@
 * [Boost](#boost)
   * [BoostDeal](#boostdeal)
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
+  * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
@@ -296,6 +297,39 @@ Response:
   "NBytesReceived": 9,
   "FastRetrieval": true,
   "AnnounceToIPNI": true
+}
+```
+
+### BoostDirectDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "DealUUID": "07070707-0707-0707-0707-070707070707",
+    "AllocationID": 0,
+    "PieceCid": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "ClientAddr": "f01234",
+    "StartEpoch": 10101,
+    "EndEpoch": 10101,
+    "FilePath": "string value",
+    "DeleteAfterImport": true,
+    "RemoveUnsealedCopy": true,
+    "SkipIPNIAnnounce": true
+  }
+]
+```
+
+Response:
+```json
+{
+  "Accepted": true,
+  "Reason": "string value"
 }
 ```
 

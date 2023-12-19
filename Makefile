@@ -217,11 +217,11 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.23.4-rc1
+lotus_version?=v1.25.0
 ffi_from_source?=0
 build_lotus?=0
 build_boost?=1
-boost_version?=v2.1.0-rc1
+boost_version?=v2.1.0-rc2
 ifeq ($(build_boost),1)
 #v1: build boost images currently checked out branch
 	boost_build_cmd=docker/boost
@@ -312,9 +312,14 @@ docker/booster-bitswap:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
+docker/yugabytedb:
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/yugabytedb:dev \
+		-f docker/Dockerfile.yugabyte .
+.PHONY: docker/booster-http
 .PHONY: docker/booster-bitswap
 docker/all: $(lotus_build_cmd) $(boost_build_cmd) $(booster_http_build_cmd) $(booster_bitswap_build_cmd) \
-	docker/lotus docker/lotus-miner
+	docker/lotus docker/lotus-miner docker/yugabytedb
 .PHONY: docker/all
 
 ### To allow devs to pull individual images. Require build_boost=0 and boost_version to be supplied

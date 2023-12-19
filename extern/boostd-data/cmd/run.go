@@ -4,17 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"time"
 
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/yugabyte"
-	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
+	"github.com/filecoin-project/boost/extern/boostd-data/build"
+	"github.com/filecoin-project/boost/extern/boostd-data/metrics"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	carv2 "github.com/ipld/go-car/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+)
+
+const (
+	DefaultInsertConcurrency = 4
 )
 
 var runCmd = &cli.Command{
@@ -23,6 +38,7 @@ var runCmd = &cli.Command{
 		leveldbCmd,
 		yugabyteCmd,
 		yugabyteMigrateCmd,
+		yugabyteAddIndexCmd,
 	},
 }
 
@@ -54,9 +70,10 @@ var leveldbCmd = &cli.Command{
 	Before: before,
 	Flags: append([]cli.Flag{
 		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory where the leveldb database is created",
-			Value: "~/.boost",
+			Name:    "repo",
+			EnvVars: []string{"LID_LEVELDB_PATH"},
+			Usage:   "repo directory where the leveldb database is created. Default is ~/.boost",
+			Value:   "~/.boost",
 		}},
 		runFlags...,
 	),
@@ -90,14 +107,27 @@ var yugabyteCmd = &cli.Command{
 			Name:     "connect-string",
 			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
 		}},
 		runFlags...,
 	),
 	Action: func(cctx *cli.Context) error {
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
-			ConnectString: cctx.String("connect-string"),
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
 		}
 
 		// One of the migrations requires a miner address. But we don't want to
@@ -119,7 +149,7 @@ var yugabyteCmd = &cli.Command{
 }
 
 func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
-	ctx := cliutil.ReqContext(cctx)
+	ctxx := cliutil.ReqContext(cctx)
 
 	if cctx.Bool("pprof") {
 		go func() {
@@ -129,6 +159,20 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 			}
 		}()
 	}
+
+	ctx, _ := tag.New(ctxx,
+		tag.Insert(metrics.Version, build.BuildVersion),
+		tag.Insert(metrics.Commit, build.CurrentCommit),
+		tag.Insert(metrics.NodeType, "boostd-data"),
+	)
+	// Register all metric views
+	if err := view.Register(
+		metrics.DefaultViews...,
+	); err != nil {
+		log.Fatalf("Cannot register the view: %v", err)
+	}
+	// Set the metric to one so, it is published to the exporter
+	stats.Record(ctx, metrics.BoostInfo.M(1))
 
 	// Instantiate the tracer and exporter
 	enableTracing := cctx.Bool("tracing")
@@ -189,6 +233,17 @@ var yugabyteMigrateCmd = &cli.Command{
 			Name:  "miner-address",
 			Usage: "default miner address eg f1234",
 		},
+		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("migrations", "info")
@@ -196,8 +251,10 @@ var yugabyteMigrateCmd = &cli.Command{
 
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
-			ConnectString: cctx.String("connect-string"),
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
 		}
 
 		maddr := migrations.DisabledMinerAddr
@@ -216,5 +273,112 @@ var yugabyteMigrateCmd = &cli.Command{
 			return fmt.Errorf(msg)
 		}
 		return err
+	},
+}
+
+var yugabyteAddIndexCmd = &cli.Command{
+	Name:   "yugabyte-add-index",
+	Usage:  "Add index via boostd-data to YugabyteDB (testing tool)",
+	Before: before,
+	Flags: []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "hosts",
+			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "filename",
+			Usage:    "filename must be same as pieceCID",
+			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "insert-concurrency",
+			Usage: "the number of concurrent tasks that each add index operation is split into",
+			Value: DefaultInsertConcurrency,
+		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
+
+		// Create a yugabyte data service
+		settings := yugabyte.DBSettings{
+			Hosts:             cctx.StringSlice("hosts"),
+			ConnectString:     cctx.String("connect-string"),
+			CQLTimeout:        cctx.Int("CQLTimeout"),
+			InsertConcurrency: cctx.Int("insert-concurrency"),
+		}
+
+		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)
+
+		bdsvc := svc.NewYugabyte(settings, migrator)
+		err := bdsvc.Impl.Start(ctx)
+		if err != nil {
+			return err
+		}
+
+		piececidStr := cctx.String("filename")
+
+		piececid, err := cid.Parse(piececidStr)
+		if err != nil {
+			return err
+		}
+
+		reader, err := os.Open(cctx.String("filename"))
+		if err != nil {
+			return fmt.Errorf("couldn't open file: %s", err)
+		}
+		defer reader.Close()
+
+		opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
+		blockReader, err := carv2.NewBlockReader(reader, opts...)
+		if err != nil {
+			return fmt.Errorf("getting block reader over piece file %s: %w", piececid, err)
+		}
+
+		recs := make([]model.Record, 0)
+
+		now := time.Now()
+
+		blockMetadata, err := blockReader.SkipNext()
+		for err == nil {
+			recs = append(recs, model.Record{
+				Cid: blockMetadata.Cid,
+				OffsetSize: model.OffsetSize{
+					Offset: blockMetadata.Offset,
+					Size:   blockMetadata.Size,
+				},
+			})
+
+			blockMetadata, err = blockReader.SkipNext()
+		}
+		if !errors.Is(err, io.EOF) {
+			return fmt.Errorf("generating index for piece %s: %w", piececid, err)
+		}
+
+		log.Warnw("read index successfully", "piececid", piececid, "recs", len(recs), "took", time.Since(now))
+
+		now = time.Now()
+
+		aip := bdsvc.Impl.AddIndex(ctx, piececid, recs, true)
+		for resp := range aip {
+			if resp.Err != "" {
+				return fmt.Errorf("failed to add index to yugabytedb: %s", resp.Err)
+			}
+			log.Warnw("adding index to yugabytedb", "progress", resp.Progress)
+		}
+		log.Warnw("added index to yugabytedb successfully", "took", time.Since(now))
+
+		return nil
 	},
 }

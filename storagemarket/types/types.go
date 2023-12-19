@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -21,7 +22,7 @@ import (
 	"github.com/ipni/go-libipni/maurl"
 )
 
-//go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
+//go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams DirectDealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 //go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager,IndexProvider
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
@@ -81,6 +82,19 @@ type DealParams struct {
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
+	RemoveUnsealedCopy bool
+	SkipIPNIAnnounce   bool
+}
+
+type DirectDealParams struct {
+	DealUUID           uuid.UUID
+	AllocationID       verifreg.AllocationId
+	PieceCid           cid.Cid
+	ClientAddr         address.Address
+	StartEpoch         abi.ChainEpoch
+	EndEpoch           abi.ChainEpoch
+	FilePath           string
+	DeleteAfterImport  bool
 	RemoveUnsealedCopy bool
 	SkipIPNIAnnounce   bool
 }

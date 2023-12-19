@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"testing"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	pdTypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
-	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
@@ -17,10 +21,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
-	"io"
-	"os"
-	"testing"
 )
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
@@ -42,6 +44,10 @@ func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 
 	t.Run("imported index", func(t *testing.T) {
 		testImportedIndex(ctx, t, cl)
+	})
+
+	t.Run("data segment index", func(t *testing.T) {
+		testDataSegmentIndex(ctx, t, cl)
 	})
 
 	t.Run("flagging pieces", func(t *testing.T) {
@@ -231,6 +237,62 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)
+}
+
+func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
+	// Any calls to get a reader over data should return a reader over the fixture
+	pr := CreateMockPieceReaderFromPath(t, "./testdata/deal.data")
+	fstat, err := os.Stat("./testdata/deal.data")
+	require.NoError(t, err)
+
+	paddedPieceSize := abi.PaddedPieceSize(fstat.Size())
+	maddr := address.TestAddress
+	rdr, err := pr.GetReader(ctx, maddr, 0, 0, paddedPieceSize)
+	require.NoError(t, err)
+	pieceCid := CalculateCommp(t, rdr).PieceCID
+
+	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
+
+	// Add deal info for the piece - it doesn't matter what it is, the piece
+	// just needs to have at least one deal associated with it
+	di := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 1,
+		SectorID:    2,
+		PieceOffset: 0,
+		PieceLength: paddedPieceSize,
+	}
+	// Adding the deal for the piece causes LID to fetch the piece data
+	// from the reader and index it
+	err = pm.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// Load the index of blocks
+	idx, err := pm.GetIterableIndex(ctx, pieceCid)
+	require.NoError(t, err)
+
+	// Count the blocks in the piece
+	var count int
+	var testCid cid.Cid
+	_ = idx.ForEach(func(h multihash.Multihash, u uint64) error {
+		testCid = cid.NewCidV1(cid.Raw, h)
+		count++
+		return fmt.Errorf("done")
+	})
+
+	// There should be exactly one cid in the piece
+	require.Equal(t, 1, count)
+
+	// Verify that getting the size of a block works correctly
+	bss, err := pm.BlockstoreGetSize(ctx, testCid)
+	require.NoError(t, err)
+	require.Equal(t, 392273, bss)
+
+	// validate getting a cid from the 2nd segment:
+	bss, err = pm.BlockstoreGetSize(ctx, cid.MustParse("bafk2bzacecul64ojb2rl7szydmytaaqqfvbceueaooclsshi5ennuyhsgzt2m"))
+	require.NoError(t, err)
+	require.Equal(t, 188193, bss)
 }
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {

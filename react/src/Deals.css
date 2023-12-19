@@ -11,7 +11,7 @@
 .deals th {
     white-space: nowrap;
     text-align: left;
-    opacity: 0.6;
+    color: #888888;
 }
 
 .deals td.start, .deals th.start {
@@ -27,7 +27,7 @@
 .deals td.deal-id {
     cursor: pointer;
     color: #465298;
-    width: 7em;
+    white-space: nowrap;
 }
 
 .deals td.client {
@@ -45,6 +45,10 @@
     width: 100%;
 }
 
+.deals td.sealing {
+    white-space: nowrap;
+}
+
 .deals tr.error {
     opacity: 0.8;
 }
@@ -54,8 +58,31 @@
     align-items: center;
 }
 
-.deals tr.show-actions td.message .message-content .message-text {
+.deals .message-content {
+    position: relative;
+}
+
+.deals .message-content .message-text {
     flex-grow: 1;
+}
+
+.deals .message-content .warning-msg {
+    position: absolute;
+    top: -1em;
+    left: -1em;
+    padding: 1em;
+    background-color: #fff;
+    box-shadow: 0em 0em 1em #ddd;
+    border-radius: 0.5em;
+    z-index: 10;
+    display: none;
+}
+.deals .message-content .warning-msg.showing {
+    display: flex;
+}
+
+.deals .message-content .warning {
+    margin-right: 0.5em;
 }
 
 .deals tr.show-actions td.message .message-content .message-text .transfer-rate {
@@ -161,4 +188,8 @@
 .search-filters hr {
     border: 1px solid #DDD;
     margin: 1em 0em;
+}
+
+.info-box {
+    opacity: 1;
 }

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/testutils"
 	"github.com/ipfs/go-cid"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
@@ -145,7 +145,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 
 	addStart := time.Now()
 	var eg errgroup.Group
-	baseCid := testutil.GenerateCid().Bytes()
+	baseCid := testutils.GenerateCid().Bytes()
 	for i := 0; i < parallelism; i++ {
 		eg.Go(func() error {
 			for ctx.Err() == nil {

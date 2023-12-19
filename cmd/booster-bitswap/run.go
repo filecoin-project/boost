@@ -4,18 +4,24 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"time"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
-	bdclient "github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 )
 
 var runCmd = &cli.Command{
@@ -61,6 +67,11 @@ var runCmd = &cli.Command{
 			Name:  "add-index-throttle",
 			Usage: "the maximum number of add index operations that can run in parallel",
 			Value: 4,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-concurrency",
+			Usage: "the maximum number of parallel tasks that a single add index operation can be split into",
+			Value: config.DefaultAddIndexConcurrency,
 		},
 		&cli.StringFlag{
 			Name:  "proxy",
@@ -120,6 +131,10 @@ var runCmd = &cli.Command{
 			Hidden: true,
 			Value:  true,
 		},
+		&cli.BoolFlag{
+			Name:  "no-metrics",
+			Usage: "stops emitting information about the node as metrics (param is used by tests)",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -133,6 +148,22 @@ var runCmd = &cli.Command{
 		}
 
 		ctx := lcli.ReqContext(cctx)
+		if !cctx.Bool("no-metrics") {
+			ctx, _ = tag.New(ctx,
+				tag.Insert(metrics.Version, build.BuildVersion),
+				tag.Insert(metrics.Commit, build.CurrentCommit),
+				tag.Insert(metrics.NodeType, "booster-bitswap"),
+				tag.Insert(metrics.StartedAt, time.Now().String()),
+			)
+			// Register all metric views
+			if err := view.Register(
+				metrics.DefaultViews...,
+			); err != nil {
+				log.Fatalf("Cannot register the view: %v", err)
+			}
+			// Set the metric to one so, it is published to the exporter
+			stats.Record(ctx, metrics.BoostInfo.M(1))
+		}
 
 		// Instantiate the tracer and exporter
 		if cctx.Bool("tracing") {
@@ -209,7 +240,8 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"),
+			piecedirectory.WithAddIndexConcurrency(cctx.Int("add-index-concurrency")))
 		remoteStore := remoteblockstore.NewRemoteBlockstore(pd, &bitswapBlockMetrics)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 

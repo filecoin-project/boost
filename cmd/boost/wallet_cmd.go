@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
+	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
@@ -17,6 +20,7 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 )
 
 var walletCmd = &cli.Command{
@@ -203,6 +207,8 @@ var walletList = &cli.Command{
 					wallet[dataCapKey] = dcap
 					if !cctx.Bool("json") && dcap == nil {
 						wallet[dataCapKey] = "X"
+					} else if dcap != nil {
+						wallet[dataCapKey] = humanize.IBytes(dcap.Int.Uint64())
 					}
 				} else {
 					wallet[dataCapKey] = "n/a"
@@ -385,13 +391,32 @@ var walletImport = &cli.Command{
 
 		var inpdata []byte
 		if !cctx.Args().Present() || cctx.Args().First() == "-" {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Enter private key: ")
-			indata, err := reader.ReadBytes('\n')
-			if err != nil {
-				return err
+			if term.IsTerminal(int(os.Stdin.Fd())) {
+				fmt.Print("Enter private key(not display in the terminal): ")
+
+				sigCh := make(chan os.Signal, 1)
+				// Notify the channel when SIGINT is received
+				signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+				go func() {
+					<-sigCh
+					fmt.Println("\nInterrupt signal received. Exiting...")
+					os.Exit(1)
+				}()
+
+				inpdata, err = term.ReadPassword(int(os.Stdin.Fd()))
+				if err != nil {
+					return err
+				}
+				fmt.Println()
+			} else {
+				reader := bufio.NewReader(os.Stdin)
+				indata, err := reader.ReadBytes('\n')
+				if err != nil {
+					return err
+				}
+				inpdata = indata
 			}
-			inpdata = indata
 
 		} else {
 			fdata, err := os.ReadFile(cctx.Args().First())

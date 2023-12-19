@@ -34,6 +34,7 @@ type Boost interface {
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                  //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                     //perm:admin
 	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                      //perm:write
+	BoostDirectDeal(ctx context.Context, params smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error)                                   //perm:admin
 
 	// MethodGroup: Blockstore
 	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)  //perm:read

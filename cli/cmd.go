@@ -2,7 +2,7 @@ package cli
 
 import (
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
+	scliutil "github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	lcliutil "github.com/filecoin-project/lotus/cli/util"
 )
 

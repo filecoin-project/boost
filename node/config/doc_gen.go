@@ -639,6 +639,13 @@ the piece from the sealing subsystem, creates an index of where each block
 is in the piece, and adds the index to the local index directory.`,
 		},
 		{
+			Name: "AddIndexConcurrency",
+			Type: "int",
+
+			Comment: `AddIndexConcurrency sets the number of concurrent tasks that each add index operation is split into.
+This setting is usefull to better utilise bandwidth between boostd and boost-data. The default value is 8.`,
+		},
+		{
 			Name: "EmbeddedServicePort",
 			Type: "uint64",
 
@@ -1665,6 +1672,12 @@ Before enabling this option, make sure your PoSt workers work correctly.`,
 'lotus-miner proving compute window-post 0'`,
 		},
 		{
+			Name: "//",
+			Type: "//",
+
+			Comment: `A single partition may contain up to 2349 32GiB sectors, or 2300 64GiB sectors.`,
+		},
+		{
 			Name: "MaxPartitionsPerPoStMessage",
 			Type: "int",
 
@@ -1946,7 +1959,7 @@ required to have expiration of at least the soonest-ending deal`,
 
 			Comment: `CommittedCapacitySectorLifetime is the duration a Committed Capacity (CC) sector will
 live before it must be extended or converted into sector containing deals before it is
-terminated. Value must be between 180-540 days inclusive`,
+terminated. Value must be between 180-1278 days (1278 in nv21, 540 before nv21).`,
 		},
 		{
 			Name: "WaitDealsDelay",
@@ -2090,6 +2103,12 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 			Type: "Duration",
 
 			Comment: ``,
+		},
+		{
+			Name: "UseSyntheticPoRep",
+			Type: "bool",
+
+			Comment: `UseSyntheticPoRep, when set to true, will reduce the amount of cache data held on disk after the completion of PreCommit 2 to 11GiB.`,
 		},
 	},
 	"lotus_config.Splitstore": []DocField{

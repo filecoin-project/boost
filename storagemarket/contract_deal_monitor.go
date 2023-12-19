@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	mbig "math/big"
+	"time"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types"

@@ -1,21 +1,34 @@
 package lib
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 
+	"github.com/chzyer/readline"
+	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/markets/piecestore"
-	"github.com/filecoin-project/boost/markets/piecestore/impl"
+	piecestoreimpl "github.com/filecoin-project/boost/markets/piecestore/impl"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-statemachine/fsm"
+	"github.com/filecoin-project/lotus/api"
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/messagesigner"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/backupds"
+	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	ds_sync "github.com/ipfs/go-datastore/sync"
+	"github.com/urfave/cli/v2"
 )
 
 func OpenDataStore(path string) (*backupds.Datastore, error) {
@@ -121,4 +134,95 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	}
 
 	return deals, err
+}
+
+func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
+	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+	vmessagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
+
+	head, err := api.ChainHead(ctx)
+	if err != nil {
+		return
+	}
+	basefee := head.Blocks()[0].ParentBaseFee
+
+	spec := &lapi.MessageSendSpec{
+		MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
+	}
+	msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
+	if err != nil {
+		err = fmt.Errorf("GasEstimateMessageGas error: %w", err)
+		return
+	}
+
+	// use basefee + 20%
+	newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
+	newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
+
+	if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
+		msg.GasFeeCap = newGasFeeCap
+	}
+
+	smsg, err := vmessagesigner.SignMessage(ctx, msg, nil, func(*types.SignedMessage) error { return nil })
+	if err != nil {
+		return
+	}
+
+	fmt.Println("about to send message with the following gas costs")
+	maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
+	fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
+	fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
+	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
+	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
+	fmt.Println("basefee:     ", types.FIL(basefee))
+	fmt.Println()
+	if !cctx.Bool("assume-yes") {
+		var yes bool
+		yes, err = confirm(ctx)
+		if err != nil {
+			return
+		}
+		if !yes {
+			return
+		}
+	}
+
+	cid, err = api.MpoolPush(ctx, smsg)
+	if err != nil {
+		err = fmt.Errorf("mpool push: failed to push message: %w", err)
+		return
+	}
+
+	sent = true
+	return
+}
+
+func confirm(ctx context.Context) (bool, error) {
+	cs := readline.NewCancelableStdin(os.Stdin)
+	go func() {
+		<-ctx.Done()
+		cs.Close() // nolint:errcheck
+	}()
+	rl := bufio.NewReader(cs)
+	for {
+		fmt.Printf("Proceed? Yes [y] / No [n]:\n")
+
+		line, _, err := rl.ReadLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return false, fmt.Errorf("request canceled: %w", err)
+			}
+
+			return false, fmt.Errorf("reading input: %w", err)
+		}
+
+		switch string(line) {
+		case "yes", "y":
+			return true, nil
+		case "n":
+			return false, nil
+		default:
+			return false, nil
+		}
+	}
 }

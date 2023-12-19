@@ -154,7 +154,9 @@ function LogRow(props) {
             </td>
             <td className="deal-id">
                 <span id={copyId} className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
-                {log.Accepted ? <ShortDealLink id={log.DealUUID} /> : <ShortDealID id={log.DealUUID} />}
+                <div className="deal-id">
+                    {log.Accepted ? <ShortDealLink id={log.DealUUID} /> : log.DealUUID}
+                </div>
             </td>
             <td className="size">
                 {humanFileSize(log.PieceSize)}

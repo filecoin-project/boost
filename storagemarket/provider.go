@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -25,7 +26,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -43,7 +43,7 @@ import (
 var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
-	ErrDealNotSealed       = errors.New("storage failed - deal not found in sector")
+	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
 )
 
 var (
@@ -74,10 +74,8 @@ type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 	// Whether to do commp on the Boost node (local) or the sealing node (remote)
-	RemoteCommp bool
-	// The number of commp processes that can run in parallel
-	MaxConcurrentLocalCommp uint64
-	TransferLimiter         TransferLimiterConfig
+	RemoteCommp     bool
+	TransferLimiter TransferLimiterConfig
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
 	// Cache timeout for Sealing Pipeline status
@@ -105,6 +103,7 @@ type Provider struct {
 	publishedDealChan    chan publishDealReq
 	updateRetryStateChan chan updateRetryStateReq
 	storageSpaceChan     chan storageSpaceDealReq
+	processedDealChan    chan processedDealReq
 
 	// Sealing Pipeline API
 	sps      sealingpipeline.API
@@ -127,7 +126,7 @@ type Provider struct {
 	transfers      *dealTransfers
 
 	pieceAdder                  types.PieceAdder
-	commpThrottle               chan struct{}
+	commpThrottle               CommpThrottle
 	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
@@ -146,7 +145,7 @@ type Provider struct {
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator, commpThrottle CommpThrottle,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -161,11 +160,6 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Make sure that max concurrent local commp is at least 1
-	if cfg.MaxConcurrentLocalCommp == 0 {
-		cfg.MaxConcurrentLocalCommp = 1
-	}
 
 	if cfg.SealingPipelineCacheTimeout < 0 {
 		cfg.SealingPipelineCacheTimeout = 30 * time.Second
@@ -189,6 +183,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		publishedDealChan:    make(chan publishDealReq),
 		updateRetryStateChan: make(chan updateRetryStateReq),
 		storageSpaceChan:     make(chan storageSpaceDealReq),
+		processedDealChan:    make(chan processedDealReq),
 
 		Transport:      tspt,
 		xferLimiter:    xferLimiter,
@@ -198,7 +193,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
-		commpThrottle:               make(chan struct{}, cfg.MaxConcurrentLocalCommp),
+		commpThrottle:               commpThrottle,
 		commpCalc:                   commpCalc,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
@@ -660,24 +655,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
 	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
-	sectorNum, offset, err := p.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
-	curTime := build.Clock.Now()
-
-	for build.Clock.Since(curTime) < addPieceRetryTimeout {
-		if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
-			if err != nil {
-				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
-			}
-			break
-		}
-		select {
-		case <-build.Clock.After(addPieceRetryWait):
-			sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
-		case <-ctx.Done():
-			return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
-		}
-	}
-
+	sectorNum, offset, err := addPieceWithRetry(ctx, p.pieceAdder, pieceSize, pieceData, sdInfo)
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
@@ -688,4 +666,25 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 		Offset:       offset,
 		Size:         pieceSize.Padded(),
 	}, nil
+}
+
+func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo lapi.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	sectorNum, offset, err := pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+	curTime := build.Clock.Now()
+	for err != nil && build.Clock.Since(curTime) < addPieceRetryTimeout {
+		// Check if the error was because there are too many sectors sealing
+		if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
+			// There was some other error, return it
+			return 0, 0, err
+		}
+
+		// There are too many sectors sealing, back off for a while then try again
+		select {
+		case <-build.Clock.After(addPieceRetryWait):
+			sectorNum, offset, err = pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+		case <-ctx.Done():
+			return 0, 0, fmt.Errorf("shutdown while adding piece")
+		}
+	}
+	return sectorNum, offset, err
 }

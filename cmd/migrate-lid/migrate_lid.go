@@ -14,14 +14,14 @@ import (
 
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/boostd-data/ldb"
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/boostd-data/yugabyte"
-	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -132,6 +132,12 @@ var migrateYugabyteDBCmd = &cli.Command{
 			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
 			Value: 16,
 		},
+		&cli.IntFlag{
+			Name:     "CQLTimeout",
+			Usage:    "client timeout value in seconds for CQL queries",
+			Required: false,
+			Value:    yugabyte.CqlTimeout,
+		},
 	}...),
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
@@ -150,6 +156,7 @@ var migrateYugabyteDBCmd = &cli.Command{
 			Hosts:                    cctx.StringSlice("hosts"),
 			ConnectString:            cctx.String("connect-string"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
+			CQLTimeout:               cctx.Int("CQLTimeout"),
 		}
 
 		// Note that it doesn't matter what address we pass here: because the
@@ -501,13 +508,14 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 			}
 
 			dealInfo := model.DealInfo{
-				DealUuid:    uuid,
-				IsLegacy:    isLegacy,
-				ChainDealID: d.DealID,
-				MinerAddr:   address.Address(maddr),
-				SectorID:    d.SectorID,
-				PieceOffset: d.Offset,
-				PieceLength: d.Length,
+				DealUuid:     uuid,
+				IsLegacy:     isLegacy,
+				ChainDealID:  d.DealID,
+				MinerAddr:    address.Address(maddr),
+				SectorID:     d.SectorID,
+				PieceOffset:  d.Offset,
+				PieceLength:  d.Length,
+				IsDirectDeal: false, // Explicitly set it to false as there should be no direct deals before this migration
 			}
 
 			err = store.AddDealForPiece(ctx, pcid, dealInfo)

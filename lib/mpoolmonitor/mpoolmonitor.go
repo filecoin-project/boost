@@ -172,3 +172,34 @@ func (mm *MpoolMonitor) Stop(ctx context.Context) error {
 	mm.cancel()
 	return nil
 }
+
+func (mm *MpoolMonitor) MsgInMpool(msgCid cid.Cid) bool {
+	mm.lk.Lock()
+	defer mm.lk.Unlock()
+	_, ok := mm.msgs[msgCid]
+	return ok
+}
+
+func (mm *MpoolMonitor) MsgExecElapsedEpochs(ctx context.Context, msgCid cid.Cid) (bool, abi.ChainEpoch, error) {
+	found := mm.MsgInMpool(msgCid)
+	if found {
+		return found, 0, nil
+	}
+	x, err := mm.fullNode.StateSearchMsg(ctx, types.EmptyTSK, msgCid, abi.ChainEpoch(20), true)
+	// check for nil is required as the StateSearchMsg / ChainHead sometimes return a nil pointer
+	// without an error (TODO: investigate) that has caused panics in boost
+	if x == nil {
+		return found, 0, fmt.Errorf("Message not yet found in state store")
+	}
+	if err != nil {
+		return found, 0, fmt.Errorf("searching message: %w", err)
+	}
+	c, err := mm.fullNode.ChainHead(ctx)
+	if c == nil {
+		return found, 0, fmt.Errorf("chain head is nil")
+	}
+	if err != nil {
+		return found, 0, fmt.Errorf("getting chain head: %w", err)
+	}
+	return found, c.Height() - x.Height, nil
+}
