@@ -13,7 +13,6 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/node/bindnode"
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -28,9 +27,6 @@ import (
 )
 
 //go:generate cbor-gen-for --map-encoding Query QueryResponse DealProposal DealResponse Params QueryParams DealPayment ClientDealState ProviderDealState PaymentInfo RetrievalPeer Ask
-
-//go:embed types.ipldsch
-var embedSchema []byte
 
 // QueryProtocolID is the protocol for querying information about retrieval
 // deal parameters
@@ -276,13 +272,6 @@ type Params struct {
 	UnsealPrice             abi.TokenAmount
 }
 
-// paramsBindnodeOptions is the bindnode options required to convert custom
-// types used by the Param type
-var paramsBindnodeOptions = []bindnode.Option{
-	CborGenCompatibleNodeBindnodeOption,
-	TokenAmountBindnodeOption,
-}
-
 func (p Params) SelectorSpecified() bool {
 	return p.Selector != nil && !bytes.Equal(p.Selector.Raw, cbg.CborNull)
 }
@@ -366,11 +355,6 @@ var DealProposalUndefined = DealProposal{}
 
 // DealProposalType is the DealProposal voucher type
 const DealProposalType = datatransfer.TypeIdentifier("RetrievalDealProposal/1")
-
-// dealProposalBindnodeOptions is the bindnode options required to convert
-// custom types used by the DealProposal type; the only custom types involved
-// are for Params so we can reuse those options.
-var dealProposalBindnodeOptions = paramsBindnodeOptions
 
 func DealProposalFromNode(node datamodel.Node) (*DealProposal, error) {
 	if node == nil {
@@ -548,35 +532,5 @@ var BindnodeRegistry = bindnoderegistry.NewRegistry()
 // DealResponseType is the DealResponse usable as a voucher type
 const DealResponseType = datatransfer.TypeIdentifier("RetrievalDealResponse/1")
 
-// dealResponseBindnodeOptions is the bindnode options required to convert custom
-// types used by the DealResponse type
-var dealResponseBindnodeOptions = []bindnode.Option{TokenAmountBindnodeOption}
-
 // DealPaymentType is the DealPayment voucher type
 const DealPaymentType = datatransfer.TypeIdentifier("RetrievalDealPayment/1")
-
-// dealPaymentBindnodeOptions is the bindnode options required to convert custom
-// types used by the DealPayment type
-var dealPaymentBindnodeOptions = []bindnode.Option{
-	SignatureBindnodeOption,
-	AddressBindnodeOption,
-	BigIntBindnodeOption,
-	TokenAmountBindnodeOption,
-}
-
-//func init() {
-//	for _, r := range []struct {
-//		typ     interface{}
-//		typName string
-//		opts    []bindnode.Option
-//	}{
-//		{(*Params)(nil), "Params", paramsBindnodeOptions},
-//		{(*DealProposal)(nil), "DealProposal", dealProposalBindnodeOptions},
-//		{(*DealResponse)(nil), "DealResponse", dealResponseBindnodeOptions},
-//		{(*DealPayment)(nil), "DealPayment", dealPaymentBindnodeOptions},
-//	} {
-//		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, r.opts...); err != nil {
-//			panic(err.Error())
-//		}
-//	}
-//}
