@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -94,6 +95,11 @@ func TestDummydealOnline(t *testing.T) {
 	require.NoError(t, err)
 
 	// rootCid is an identity CID
-	outFile := f.Retrieve(ctx, t, tempdir, rootCid, res.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil)
+	outFile := f.Retrieve(
+		ctx,
+		t,
+		trustlessutils.Request{Root: rootCid, Scope: trustlessutils.DagScopeAll},
+		true,
+	)
 	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

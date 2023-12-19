@@ -2,7 +2,6 @@ package itests
 
 import (
 	"context"
-	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -14,10 +13,7 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-unixfsnode"
-	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
+	trustless "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,51 +110,71 @@ func TestDealRetrieval(t *testing.T) {
 	// Deal is stored and sealed, attempt different retrieval forms
 
 	retrievalCases := []struct {
-		name                   string
-		selector               datamodel.Node
-		matcherFrom, matcherTo int64
-		expectCids             []cid.Cid
+		name       string
+		request    trustless.Request
+		expectCids []cid.Cid
 	}{
 		{
-			name:       "full file, explore-all",
-			selector:   unixfsnode.UnixFSPathSelectorBuilder("", unixfsnode.ExploreAllRecursivelySelector, false),
+			name: "full file, explore-all",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeAll,
+			},
 			expectCids: append([]cid.Cid{root}, leaves...),
 		},
 		{
-			name:        "slice: 0 to 7MiB",
-			matcherFrom: 0,
-			matcherTo:   7 << 20,
-			expectCids:  append([]cid.Cid{root}, leaves...),
+			name: "slice: 0 to 7MiB",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: 0, To: ptrInt(7 << 20)},
+			},
+			expectCids: append([]cid.Cid{root}, leaves...),
 		},
 		{
-			name:        "slice: 1MiB to 2MiB",
-			matcherFrom: 1 << 20,
-			matcherTo:   2 << 20,
-			expectCids:  append([]cid.Cid{root}, leaves[4:9]...),
+			name: "slice: 1MiB to 2MiB",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: 1 << 20, To: ptrInt(2 << 20)},
+			},
+			expectCids: append([]cid.Cid{root}, leaves[4:9]...),
 		},
 		{
-			name:        "slice: first byte",
-			matcherFrom: 0,
-			matcherTo:   1,
-			expectCids:  append([]cid.Cid{root}, leaves[0]),
+			name: "slice: first byte",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: 0, To: ptrInt(1)},
+			},
+			expectCids: append([]cid.Cid{root}, leaves[0]),
 		},
 		{
-			name:        "slice: last byte",
-			matcherFrom: 7340031,
-			matcherTo:   7340032,
-			expectCids:  append([]cid.Cid{root}, leaves[len(leaves)-1]),
+			name: "slice: last byte",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: 7340031, To: ptrInt(7340032)},
+			},
+			expectCids: append([]cid.Cid{root}, leaves[len(leaves)-1]),
 		},
 		{
-			name:        "slice: last two blocks, negative range, boundary",
-			matcherFrom: -168000 - 1,
-			matcherTo:   math.MaxInt64,
-			expectCids:  append([]cid.Cid{root}, leaves[len(leaves)-2:]...),
+			name: "slice: last two blocks, negative range, boundary",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: -168000 - 1},
+			},
+			expectCids: append([]cid.Cid{root}, leaves[len(leaves)-2:]...),
 		},
 		{
-			name:        "slice: last block, negative range, boundary",
-			matcherFrom: -168000,
-			matcherTo:   math.MaxInt64,
-			expectCids:  append([]cid.Cid{root}, leaves[len(leaves)-1]),
+			name: "slice: last block, negative range, boundary",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeEntity,
+				Bytes: &trustless.ByteRange{From: -168000},
+			},
+			expectCids: append([]cid.Cid{root}, leaves[len(leaves)-1]),
 		},
 		{
 			// In this case we are attempting to traverse beyond the file to a
@@ -166,24 +182,26 @@ func TestDealRetrieval(t *testing.T) {
 			// return that. This is not strictly an error case, it's up to the
 			// consumer of this data to verify the path doesn't resolve in the
 			// data they get back.
-			name:       "path beyond file",
-			selector:   unixfsnode.UnixFSPathSelectorBuilder("not/a/path", unixfsnode.ExploreAllRecursivelySelector, false),
+			name: "path beyond file",
+			request: trustless.Request{
+				Root:  root,
+				Scope: trustless.DagScopeAll,
+				Path:  "not/a/path",
+			},
 			expectCids: []cid.Cid{root},
 		},
 	}
 
 	for _, tc := range retrievalCases {
 		t.Run(tc.name, func(t *testing.T) {
-			selNode := tc.selector
-			if selNode == nil {
-				// build a selector from the specified slice matcher range
-				ssb := builder.NewSelectorSpecBuilder(basicnode.Prototype.Any)
-				ss := ssb.ExploreInterpretAs("unixfs", ssb.MatcherSubset(tc.matcherFrom, tc.matcherTo))
-				selNode = ss.Node()
-			}
-
 			log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root)
-			outPath := f.Retrieve(ctx, t, tempdir, root, res.DealParams.ClientDealProposal.Proposal.PieceCID, false, selNode)
+
+			outPath := f.Retrieve(
+				ctx,
+				t,
+				tc.request,
+				false,
+			)
 
 			// Inspect what we got
 			gotCids, err := testutil.CidsInCar(outPath)
@@ -201,4 +219,8 @@ func TestDealRetrieval(t *testing.T) {
 			require.Equal(t, toStr(tc.expectCids), toStr(gotCids))
 		})
 	}
+}
+
+func ptrInt(i int64) *int64 {
+	return &i
 }

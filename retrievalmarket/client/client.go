@@ -31,6 +31,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
@@ -160,7 +161,24 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		}
 	}
 
+	errCh := make(chan error)
+	startedCh := make(chan struct{})
+
+	mgr.OnReady(func(err error) {
+		if err != nil {
+			errCh <- err
+			return
+		}
+		close(startedCh)
+	})
+
 	if err := mgr.Start(context.Background()); err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-startedCh:
+	case err := <-errCh:
 		return nil, err
 	}
 
@@ -537,7 +555,15 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	defer unsubscribe()
 
 	// Submit the retrieval deal proposal to the miner
-	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, selectorparse.CommonSelector_ExploreAllRecursively)
+	selector := selectorparse.CommonSelector_ExploreAllRecursively
+	if proposal.SelectorSpecified() {
+		var err error
+		selector, err = ipld.Decode(proposal.Selector.Raw, dagcbor.Decode)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode selector from proposal: %w", err)
+		}
+	}
+	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, selector)
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure

@@ -7,19 +7,40 @@ import (
 	"io"
 
 	// must be imported to init() raw-codec support
+	dagpb "github.com/ipld/go-codec-dagpb"
 	_ "github.com/ipld/go-ipld-prime/codec/raw"
+	"github.com/ipld/go-ipld-prime/linking"
+	"github.com/ipld/go-ipld-prime/node/basicnode"
 
 	"github.com/ipfs/go-cid"
 	mdagipld "github.com/ipfs/go-ipld-format"
 	"github.com/ipfs/go-unixfsnode"
-	dagpb "github.com/ipld/go-codec-dagpb"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/ipld/go-ipld-prime/traversal"
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 )
+
+func CreateLinkSystem(ds mdagipld.DAGService) linking.LinkSystem {
+	// this is how we implement GETs
+	linkSystem := cidlink.DefaultLinkSystem()
+	linkSystem.StorageReadOpener = func(lctx ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
+		cl, isCid := lnk.(cidlink.Link)
+		if !isCid {
+			return nil, fmt.Errorf("unexpected link type %#v", lnk)
+		}
+
+		node, err := ds.Get(lctx.Ctx, cl.Cid)
+		if err != nil {
+			return nil, err
+		}
+
+		return bytes.NewBuffer(node.RawData()), nil
+	}
+	unixfsnode.AddUnixFSReificationToLinkSystem(&linkSystem)
+	return linkSystem
+}
 
 func TraverseDag(
 	ctx context.Context,
@@ -38,32 +59,14 @@ func TraverseDag(
 		return err
 	}
 
-	// not sure what this is for TBH: we also provide ctx in  &traversal.Config{}
 	linkContext := ipld.LinkContext{Ctx: ctx}
-
+	linkSystem := CreateLinkSystem(ds)
 	// this is what allows us to understand dagpb
 	nodePrototypeChooser := dagpb.AddSupportToChooser(
 		func(ipld.Link, ipld.LinkContext) (ipld.NodePrototype, error) {
 			return basicnode.Prototype.Any, nil
 		},
 	)
-
-	// this is how we implement GETs
-	linkSystem := cidlink.DefaultLinkSystem()
-	linkSystem.StorageReadOpener = func(lctx ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
-		cl, isCid := lnk.(cidlink.Link)
-		if !isCid {
-			return nil, fmt.Errorf("unexpected link type %#v", lnk)
-		}
-
-		node, err := ds.Get(lctx.Ctx, cl.Cid)
-		if err != nil {
-			return nil, err
-		}
-
-		return bytes.NewBuffer(node.RawData()), nil
-	}
-	unixfsnode.AddUnixFSReificationToLinkSystem(&linkSystem)
 
 	// this is how we pull the start node out of the DS
 	startLink := cidlink.Link{Cid: startFrom}

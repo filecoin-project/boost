@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,6 +47,11 @@ func TestDummydealOffline(t *testing.T) {
 	err = f.WaitForDealAddedToSector(offlineDealUuid)
 	require.NoError(t, err)
 
-	outFile := f.Retrieve(ctx, t, tempdir, rootCid, dealRes.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil)
+	outFile := f.Retrieve(
+		ctx,
+		t,
+		trustlessutils.Request{Root: rootCid, Scope: trustlessutils.DagScopeAll},
+		true,
+	)
 	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

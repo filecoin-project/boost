@@ -213,7 +213,7 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.1.0
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
-	github.com/ipfs/go-unixfsnode v1.8.0
+	github.com/ipfs/go-unixfsnode v1.9.0
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20220616142416-9004dbd839e0 // indirect
@@ -327,6 +327,7 @@ require (
 	github.com/filecoin-project/lotus v1.23.4-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
+	github.com/ipld/go-trustless-utils v0.4.1
 	github.com/ipni/go-libipni v0.5.1
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/schollz/progressbar/v3 v3.13.1

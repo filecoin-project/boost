@@ -24,7 +24,7 @@ import (
 	"github.com/ipld/go-ipld-prime/fluent/qp"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
@@ -110,7 +110,6 @@ func TestDealAndRetrievalWithIdentityCID(t *testing.T) {
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
 	require.NoError(t, err)
-	pieceCid := res.DealParams.ClientDealProposal.Proposal.PieceCID
 	log.Infof("deal ID is : %s", dealCid.String())
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
 	err = f.WaitForDealAddedToSector(dealUuid)
@@ -121,7 +120,7 @@ func TestDealAndRetrievalWithIdentityCID(t *testing.T) {
 	// Deal is stored and sealed, attempt different retrieval forms
 
 	log.Debugw("deal is sealed, starting retrieval", "cid", dealCid.String(), "root", root.String())
-	outPath := f.Retrieve(ctx, t, tempdir, root, pieceCid, false, selectorparse.CommonSelector_ExploreAllRecursively)
+	outPath := f.Retrieve(ctx, t, trustlessutils.Request{Root: root, Scope: trustlessutils.DagScopeAll}, false)
 
 	// Inspect what we got
 	gotCids, err := testutil.CidsInCar(outPath)
