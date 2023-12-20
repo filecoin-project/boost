@@ -666,6 +666,12 @@ Set this value to "" if the local index directory data service is embedded.`,
 
 			Comment: `The RPC timeout when making requests to the boostd-data service`,
 		},
+		{
+			Name: "EnablePieceDoctor",
+			Type: "bool",
+
+			Comment: `PieceDoctor runs a continuous background process to check each piece in LID for retrievability`,
+		},
 	},
 	"LocalIndexDirectoryLeveldbConfig": []DocField{
 		{
