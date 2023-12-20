@@ -314,9 +314,9 @@ type HttpDownloadConfig struct {
 }
 
 type RetrievalConfig struct {
-	GraphsyncRetrievalConfig
-	BitswapRetrievalConfig
-	HTTPRetrievalConfig
+	Graphsync GraphsyncRetrievalConfig
+	Bitswap   BitswapRetrievalConfig
+	HTTP      HTTPRetrievalConfig
 }
 
 type BitswapRetrievalConfig struct {

@@ -700,6 +700,26 @@ Set this value to "" if the local index directory data service is embedded.`,
 message in lotus mpool`,
 		},
 	},
+	"RetrievalConfig": []DocField{
+		{
+			Name: "Graphsync",
+			Type: "GraphsyncRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Bitswap",
+			Type: "BitswapRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "HTTP",
+			Type: "HTTPRetrievalConfig",
+
+			Comment: ``,
+		},
+	},
 	"StorageConfig": []DocField{
 		{
 			Name: "ParallelFetchLimit",
