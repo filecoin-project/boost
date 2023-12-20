@@ -212,6 +212,6 @@ func (r *resolver) RetrievalLogsCount(ctx context.Context, args struct{ IsIndexe
 	count, err := r.retDB.Count(ctx, isIndexer)
 	return &retStateCount{
 		Count:  int32(count),
-		Period: gqltypes.Uint64(r.cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalLogDuration),
+		Period: gqltypes.Uint64(r.cfg.Retrievals.Graphsync.RetrievalLogDuration),
 	}, err
 }

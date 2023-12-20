@@ -83,9 +83,9 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		_, isDisabled := prov.(*DisabledIndexProvider)
 
 		// bitswap is enabled if there is a bitswap peer id
-		bitswapEnabled := cfg.Retrievals.BitswapRetrievalConfig.BitswapPeerID != ""
+		bitswapEnabled := cfg.Retrievals.Bitswap.BitswapPeerID != ""
 		// http is considered enabled if there is an http retrieval multiaddr set
-		httpEnabled := cfg.Retrievals.HTTPRetrievalConfig.HTTPRetrievalMultiaddr != ""
+		httpEnabled := cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr != ""
 
 		// setup bitswap extended provider if there is a public multi addr for bitswap
 		w := &Wrapper{
@@ -375,26 +375,26 @@ func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xprovi
 			return err
 		}
 		var ep xproviders.Info
-		if len(w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPublicAddresses) > 0 {
-			if w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPrivKeyFile == "" {
+		if len(w.cfg.Retrievals.Bitswap.BitswapPublicAddresses) > 0 {
+			if w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile == "" {
 				return fmt.Errorf("missing required configuration key BitswapPrivKeyFile: " +
 					"boost is configured with BitswapPublicAddresses but the BitswapPrivKeyFile configuration key is empty")
 			}
 
 			// we need the private key for bitswaps peerID in order to announce publicly
-			keyFile, err := os.ReadFile(w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPrivKeyFile)
+			keyFile, err := os.ReadFile(w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile)
 			if err != nil {
-				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPrivKeyFile, err)
+				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile, err)
 			}
 			privKey, err := crypto.UnmarshalPrivateKey(keyFile)
 			if err != nil {
-				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPrivKeyFile, err)
+				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile, err)
 			}
 			// setup an extended provider record, containing the booster-bitswap multi addr,
 			// peer ID, private key for signing, and metadata
 			ep = xproviders.Info{
-				ID:       w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPeerID,
-				Addrs:    w.cfg.Retrievals.BitswapRetrievalConfig.BitswapPublicAddresses,
+				ID:       w.cfg.Retrievals.Bitswap.BitswapPeerID,
+				Addrs:    w.cfg.Retrievals.Bitswap.BitswapPublicAddresses,
 				Priv:     privKey,
 				Metadata: mbytes,
 			}
@@ -432,7 +432,7 @@ func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xprovi
 		}
 		var ep = xproviders.Info{
 			ID:       w.h.ID().String(),
-			Addrs:    []string{w.cfg.Retrievals.HTTPRetrievalConfig.HTTPRetrievalMultiaddr},
+			Addrs:    []string{w.cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr},
 			Metadata: mbytes,
 			Priv:     key,
 		}

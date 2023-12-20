@@ -154,16 +154,16 @@ func DefaultBoost() *Boost {
 			AllowPrivateIPs:                    false,
 		},
 		Retrievals: RetrievalConfig{
-			GraphsyncRetrievalConfig{
+			Graphsync: GraphsyncRetrievalConfig{
 				SimultaneousTransfersForRetrieval: DefaultSimultaneousTransfers,
 				RetrievalLogDuration:              Duration(time.Hour * 24),
 				StalledRetrievalTimeout:           Duration(time.Second * 30),
 				GraphsyncStorageAccessApiInfo:     []string{},
 			},
-			BitswapRetrievalConfig{
+			Bitswap: BitswapRetrievalConfig{
 				BitswapPublicAddresses: []string{},
 			},
-			HTTPRetrievalConfig{
+			HTTP: HTTPRetrievalConfig{
 				HTTPRetrievalMultiaddr: "",
 			},
 		},

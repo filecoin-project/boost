@@ -503,7 +503,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(StartProviderDataTransferKey, server.NewProviderDataTransfer),
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
-		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.Retrievals.GraphsyncRetrievalConfig.SimultaneousTransfersForRetrieval)),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.Retrievals.Graphsync.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
@@ -516,7 +516,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval)
 		Override(new(server.SectorAccessor), modules.NewSectorAccessor(cfg)),
-		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalLogDuration), time.Duration(cfg.Retrievals.GraphsyncRetrievalConfig.StalledRetrievalTimeout))),
+		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Retrievals.Graphsync.RetrievalLogDuration), time.Duration(cfg.Retrievals.Graphsync.StalledRetrievalTimeout))),
 		Override(HandleRetrievalAskKey, modules.HandleQueryAsk),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
@@ -539,8 +539,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Boost retrieval deal filter
 		Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(nil)),
-		If(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalFilter != "",
-			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dtypes.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Retrievals.GraphsyncRetrievalConfig.RetrievalFilter)))),
+		If(cfg.Retrievals.Graphsync.RetrievalFilter != "",
+			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dtypes.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Retrievals.Graphsync.RetrievalFilter)))),
 		),
 
 		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&cfg.Dealpublish.MaxPublishDealsFee, storageadapter.PublishMsgConfig{
