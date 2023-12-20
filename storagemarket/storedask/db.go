@@ -47,10 +47,12 @@ func (s *StorageAskDB) Update(ctx context.Context, ask legacytypes.StorageAsk) e
 	err := row.Scan(&minerString)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
+		log.Debugf("inserting a new storage ask in db for miner: %s", minerString)
 		return s.set(ctx, ask)
 	case err != nil:
 		return err
 	default:
+		log.Debugf("updating the storage ask in db for miner: %s", minerString)
 		return s.update(ctx, ask)
 	}
 }
@@ -64,9 +66,7 @@ func (s *StorageAskDB) set(ctx context.Context, ask legacytypes.StorageAsk) erro
 }
 
 func (s *StorageAskDB) update(ctx context.Context, ask legacytypes.StorageAsk) error {
-	qry := "UPDATE StorageAsk (Price, VerifiedPrice, MinPieceSize, MaxPieceSize, TS, Expiry, SeqNo) "
-	qry += "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-	qry += "WHERE Miner=?"
+	qry := "UPDATE StorageAsk SET Price=?, VerifiedPrice=?, MinPieceSize=?, MaxPieceSize=?, TS=?, Expiry=?, SeqNo=? WHERE Miner=?"
 	values := []interface{}{ask.Price.Int64(), ask.VerifiedPrice.Int64(), ask.MinPieceSize, ask.MaxPieceSize, ask.Timestamp, ask.Expiry, ask.SeqNo, ask.Miner.String()}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
