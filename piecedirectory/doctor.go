@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 )
 
 var doclog = logging.Logger("piecedoc")
@@ -77,8 +78,16 @@ func (d *Doctor) Run(ctx context.Context) {
 
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
+
+			// Prefetch the state claims
+			doclog.Debugw("prefetching state claims", "address", d.maddr)
+			claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
+			if err != nil {
+				return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
+			}
+
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid, lu, head)
+				err := d.checkPiece(ctx, pcid, lu, head, claims)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -107,7 +116,7 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet) error {
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
 	// Check if piece belongs to an active sector
@@ -161,10 +170,6 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	// Check that Deal is actually on-chain for the active sectors
 	if d.fullnodeApi != nil { // nil in tests
 		found := false
-		claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
-		if err != nil {
-			return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
-		}
 		for _, dealId := range chainDeals {
 			if dealId.IsDirectDeal {
 				doclog.Debugw("checking state for direct deal", "piece", pieceCid, "allocation", dealId.ChainDealID)
