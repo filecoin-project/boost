@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
@@ -252,5 +253,26 @@ func toSharedBalance(bal api.MarketBalance) storagemarket.Balance {
 	return storagemarket.Balance{
 		Locked:    bal.Locked,
 		Available: big.Sub(bal.Escrow, bal.Locked),
+	}
+}
+
+func (m *FundManager) LogCleanup(ctx context.Context, FundsLogDurationDays int) {
+
+	// Create a ticker with an hour tick
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			log.Infof("Cleaning logs older than %d days from fundsDB ", FundsLogDurationDays)
+			err := m.db.CleanupLogs(ctx, FundsLogDurationDays)
+			if err != nil {
+				log.Errorf("Failed to cleanup old logs from fundsDB: %s", err)
+			}
+
+		case <-ctx.Done():
+			return
+		}
 	}
 }
