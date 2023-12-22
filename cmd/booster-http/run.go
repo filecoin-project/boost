@@ -109,12 +109,12 @@ var runCmd = &cli.Command{
 				if _, err := fmt.Fprintf(ctx.App.ErrWriter, "--serve-blocks is no longer supported.\n\n%s\n\n", trustlessMessage); err != nil {
 					return err
 				}
-				return errors.New("--serve-blocks is no longer supported, use bifrost-gateway instead")
+				return errors.New("--serve-blocks is no longer supported, --serve-cars implies raw block support")
 			},
 		},
 		&cli.BoolFlag{
 			Name:  "serve-cars",
-			Usage: "serve CAR files with the Trustless IPFS Gateway API",
+			Usage: "serve CAR files and raw blocks with the Trustless IPFS Gateway API",
 			Value: true,
 		},
 		&cli.BoolFlag{
