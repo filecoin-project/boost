@@ -24,6 +24,7 @@
   * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
+  * [BoostIndexerAnnounceDealRemoved](#boostindexerannouncedealremoved)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
@@ -46,6 +47,8 @@
   * [DealsSetPieceCidBlocklist](#dealssetpiececidblocklist)
 * [I](#i)
   * [ID](#id)
+* [Legacy](#legacy)
+  * [LegacyDealByProposalCid](#legacydealbyproposalcid)
 * [Log](#log)
   * [LogList](#loglist)
   * [LogSetLevel](#logsetlevel)
@@ -596,6 +599,27 @@ Inputs: `null`
 
 Response: `{}`
 
+### BoostIndexerAnnounceDealRemoved
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
 ### BoostIndexerAnnounceLatest
 
 
@@ -915,6 +939,81 @@ Perms: read
 Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
+
+## Legacy
+
+
+### LegacyDealByProposalCid
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+{
+  "Proposal": {
+    "PieceCID": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "PieceSize": 1032,
+    "VerifiedDeal": true,
+    "Client": "f01234",
+    "Provider": "f01234",
+    "Label": "",
+    "StartEpoch": 10101,
+    "EndEpoch": 10101,
+    "StoragePricePerEpoch": "0",
+    "ProviderCollateral": "0",
+    "ClientCollateral": "0"
+  },
+  "ClientSignature": {
+    "Type": 2,
+    "Data": "Ynl0ZSBhcnJheQ=="
+  },
+  "ProposalCid": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "AddFundsCid": null,
+  "PublishCid": null,
+  "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  "State": 42,
+  "PiecePath": ".lotusminer/fstmp123",
+  "MetadataPath": ".lotusminer/fstmp123",
+  "SlashEpoch": 10101,
+  "FastRetrieval": true,
+  "Message": "string value",
+  "FundsReserved": "0",
+  "Ref": {
+    "TransferType": "string value",
+    "Root": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "PieceCid": null,
+    "PieceSize": 1024,
+    "RawBlockSize": 42
+  },
+  "AvailableForRetrieval": true,
+  "DealID": 5432,
+  "CreationTime": "0001-01-01T00:00:00Z",
+  "TransferChannelId": {
+    "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "ID": 3
+  },
+  "SectorNumber": 9,
+  "InboundCAR": "string value"
+}
+```
 
 ## Log
 
