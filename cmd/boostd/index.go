@@ -169,7 +169,7 @@ var indexProvAnnounceDealRemovalAd = &cli.Command{
 			}
 			proposalCid = &prop
 		} else {
-			_, err = napi.LegacyDealByProposalCid(ctx, *proposalCid)
+			_, err = napi.BoostLegacyDealByProposalCid(ctx, *proposalCid)
 			if err != nil {
 				_, err := napi.BoostDealBySignedProposalCid(ctx, *proposalCid)
 				if err != nil {

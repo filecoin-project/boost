@@ -78,6 +78,8 @@ type BoostStruct struct {
 
 		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
 
+		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) `perm:"admin"`
+
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -109,8 +111,6 @@ type BoostStruct struct {
 		DealsSetConsiderVerifiedStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
 
 		DealsSetPieceCidBlocklist func(p0 context.Context, p1 []cid.Cid) error `perm:"admin"`
-
-		LegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) `perm:"admin"`
 
 		MarketCancelDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
 
@@ -502,6 +502,17 @@ func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) 
 	return *new([]multihash.Multihash), ErrNotSupported
 }
 
+func (s *BoostStruct) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) {
+	if s.Internal.BoostLegacyDealByProposalCid == nil {
+		return *new(storagemarket.MinerDeal), ErrNotSupported
+	}
+	return s.Internal.BoostLegacyDealByProposalCid(p0, p1)
+}
+
+func (s *BoostStub) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) {
+	return *new(storagemarket.MinerDeal), ErrNotSupported
+}
+
 func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostMakeDeal == nil {
 		return nil, ErrNotSupported
@@ -676,17 +687,6 @@ func (s *BoostStruct) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid
 
 func (s *BoostStub) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
 	return ErrNotSupported
-}
-
-func (s *BoostStruct) LegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) {
-	if s.Internal.LegacyDealByProposalCid == nil {
-		return *new(storagemarket.MinerDeal), ErrNotSupported
-	}
-	return s.Internal.LegacyDealByProposalCid(p0, p1)
-}
-
-func (s *BoostStub) LegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) {
-	return *new(storagemarket.MinerDeal), ErrNotSupported
 }
 
 func (s *BoostStruct) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
