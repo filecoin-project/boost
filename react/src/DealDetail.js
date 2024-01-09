@@ -500,74 +500,74 @@ export function DealStatusInfo(props) {
             The deal can be in one of the following states:
             <p>
                 <i>Transfer Queued</i><br/>
-                <p>
+                <span>
                     The storage deal proposal has been accepted, and Boost is
                     about to start the data transfer.
-                </p>
+                </span>
             </p>
             <p>
                 <i>Awaiting Offline Data Import</i><br/>
-                <p>
+                <span>
                     The client has made an offline deal proposal, and Boost is
                     waiting for the Storage Provider operator to import the deal
                     data.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Transferring</i>
-                <p>
+                <i>Transferring</i><br/>
+                <span>
                     The data for the deal is transferring.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Transfer Complete</i>
-                <p>
+                <i>Transfer Complete</i><br/>
+                <span>
                     The data transfer is complete and Boost is verifying the data matches commp.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Ready to Publish</i>
-                <p>
+                <i>Ready to Publish</i><br/>
+                <span>
                     The deal is in the batch publish queue, ready to be published.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Awaiting Publish Confirmation</i>
-                <p>
+                <i>Awaiting Publish Confirmation</i><br/>
+                <span>
                     Boost sent a publish deal message for the deal and is waiting for on-chain confirmation.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Adding to Sector</i>
-                <p>
+                <i>Adding to Sector</i><br/>
+                <span>
                     Boost is handing the deal off to the lotus-miner sealing subsystem
                     to be added to a sector.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Indexing</i>
-                <p>
+                <i>Indexing</i><br/>
+                <span>
                     Boost is indexing the deal in the Local Index Directory(LID)
                     and will be announcing the deal to the network so that clients know where to retrieve it from.
-                </p>
+                </span>
             </p>
             <p>
-                <i>IndexedAndAnnounced</i>
-                <p>
+                <i>IndexedAndAnnounced</i><br/>
+                <span>
                     The deal has been indexed locally and announced to the network indexers.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Complete</i>
-                <p>
+                <i>Complete</i><br/>
+                <span>
                     The deal has reached its duration and expired.
-                </p>
+                </span>
             </p>
             <p>
-                <i>Cancelled</i>
-                <p>
+                <i>Cancelled</i><br/>
+                <span>
                     The deal was cancelled.
-                </p>
+                </span>
             </p>
         </Info>
     </span>
