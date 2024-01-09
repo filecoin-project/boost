@@ -795,7 +795,7 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			// Seek to the section offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
 			// Read the block data
-			readCid, data, err := util.ReadNode(bufio.NewReaderSize(readerAt, int(offsetSize.Size)))
+			readCid, data, err := util.ReadNode(bufio.NewReader(readerAt))
 			if err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
 			}
