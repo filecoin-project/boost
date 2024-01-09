@@ -183,6 +183,14 @@ func (sm *BoostAPI) BoostIndexerAnnounceLatestHttp(ctx context.Context, announce
 	return sm.IndexProvider.IndexerAnnounceLatestHttp(ctx, announceUrls)
 }
 
+func (sm *BoostAPI) BoostIndexerAnnounceDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error) {
+	return sm.IndexProvider.AnnounceBoostDealRemoved(ctx, propCid)
+}
+
+func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (gfm_storagemarket.MinerDeal, error) {
+	return sm.LegacyStorageProvider.GetLocalDeal(propCid)
+}
+
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
 	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err
