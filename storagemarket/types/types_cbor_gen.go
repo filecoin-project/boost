@@ -375,13 +375,11 @@ func (t *DealParamsV120) UnmarshalCBOR(r io.Reader) (err error) {
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -631,13 +629,11 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -990,13 +986,11 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -1235,7 +1229,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if _, err := cw.Write(t.Params[:]); err != nil {
+	if _, err := cw.Write(t.Params); err != nil {
 		return err
 	}
 
@@ -1347,9 +1341,10 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) (err error) {
 				t.Params = make([]uint8, extra)
 			}
 
-			if _, err := io.ReadFull(cr, t.Params[:]); err != nil {
+			if _, err := io.ReadFull(cr, t.Params); err != nil {
 				return err
 			}
+
 			// t.ClientID (string) (string)
 		case "ClientID":
 
@@ -1605,13 +1600,11 @@ func (t *DealStatusRequest) UnmarshalCBOR(r io.Reader) (err error) {
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -1823,13 +1816,11 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) (err error) {
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
