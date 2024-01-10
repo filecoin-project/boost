@@ -311,15 +311,8 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
-	defer func() {
-		// This is a temporary workaround to handle "slice bounds out of range" errors in podsi indexing.
-		// The bug affects a minor number of deals, so recovering here will help to unblock the users.
-		// TODO: remove this recover when the underlying bug is figured out and fixed.
-		if err := recover(); err != nil {
-			log.Errorw("Recovered from panic and skipped indexing the piece.", "piece", pieceCid, "error", err)
-		}
-		reader.Close() //nolint:errcheck
-	}()
+
+	defer reader.Close() //nolint:errcheck
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
@@ -413,6 +406,15 @@ func (cr *countingReader) Read(p []byte) (n int, err error) {
 }
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+	defer func() {
+		// This is a temporary workaround to handle "slice bounds out of range" errors in podsi indexing.
+		// The bug affects a minor number of deals, so recovering here will help to unblock the users.
+		// TODO: remove this recover when the underlying bug is figured out and fixed.
+		if err := recover(); err != nil {
+			log.Errorw("Recovered from panic and skipped indexing the piece.", "piece", pieceCid, "error", err)
+		}
+	}()
+
 	concurrency := runtime.NumCPU()
 	if concurrency < PodsiMinConcurrency {
 		concurrency = PodsiMinConcurrency
