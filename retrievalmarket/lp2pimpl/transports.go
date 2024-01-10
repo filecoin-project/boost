@@ -7,6 +7,7 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
+	"github.com/filecoin-project/boost/safe"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -92,7 +93,7 @@ func NewTransportsListener(h host.Host, protos []types.Protocol) *TransportsList
 }
 
 func (p *TransportsListener) Start() {
-	p.host.SetStreamHandler(TransportsProtocolID, p.handleNewQueryStream)
+	p.host.SetStreamHandler(TransportsProtocolID, safe.Handle(p.handleNewQueryStream))
 }
 
 func (p *TransportsListener) Stop() {
