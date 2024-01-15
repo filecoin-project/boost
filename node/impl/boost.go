@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -172,8 +173,8 @@ func (sm *BoostAPI) BoostIndexerAnnounceDealRemoved(ctx context.Context, propCid
 	return sm.IndexProvider.AnnounceBoostDealRemoved(ctx, propCid)
 }
 
-func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (gfm_storagemarket.MinerDeal, error) {
-	return sm.LegacyStorageProvider.GetLocalDeal(propCid)
+func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (legacytypes.MinerDeal, error) {
+	return sm.LegacyDealManager.ByPropCid(propCid)
 }
 
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
