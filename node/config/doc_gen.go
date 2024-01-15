@@ -142,12 +142,6 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Comment: ``,
 		},
 		{
-			Name: "DAGStore",
-			Type: "lotus_config.DAGStoreConfig",
-
-			Comment: ``,
-		},
-		{
 			Name: "IndexProvider",
 			Type: "IndexProviderConfig",
 

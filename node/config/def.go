@@ -117,11 +117,6 @@ func DefaultBoost() *Boost {
 			FundsTaggingEnabled:             true,
 		},
 
-		DAGStore: lotus_config.DAGStoreConfig{
-			MaxConcurrentIndex:         5,
-			MaxConcurrencyStorageCalls: 100,
-			GCInterval:                 lotus_config.Duration(1 * time.Minute),
-		},
 		IndexProvider: IndexProviderConfig{
 			Enable:               true,
 			EntriesCacheCapacity: 1024,

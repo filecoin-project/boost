@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -45,7 +44,6 @@ import (
 )
 
 var log = logging.Logger("index-provider-wrapper")
-var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
 	enabled bool
@@ -75,10 +73,6 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		piecedirectory *piecedirectory.PieceDirectory,
 		ssm *sectorstatemgr.SectorStateMgr,
 		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
-
-		if cfg.DAGStore.RootDir == "" {
-			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
-		}
 
 		_, isDisabled := prov.(*DisabledIndexProvider)
 

@@ -50,7 +50,6 @@ type Boost struct {
 	ContractDeals       ContractDealsConfig
 	HttpDownload        HttpDownloadConfig
 	Retrievals          RetrievalConfig
-	DAGStore            lotus_config.DAGStoreConfig
 	IndexProvider       IndexProviderConfig
 }
 
