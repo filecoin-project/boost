@@ -86,6 +86,7 @@ func DefaultBoost() *Boost {
 			EmbeddedServicePort:   8042,
 			ServiceApiInfo:        "",
 			ServiceRPCTimeout:     Duration(15 * time.Minute),
+			EnablePieceDoctor:     true,
 		},
 
 		ContractDeals: ContractDealsConfig{

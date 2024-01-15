@@ -505,7 +505,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(server.RetrievalAskGetter), server.NewRetrievalAskGetter),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.Retrievals.Graphsync.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
-		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
+		Override(StartPieceDoctorKey, modules.NewPieceDoctor(cfg)),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),

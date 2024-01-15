@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
@@ -47,7 +48,7 @@ func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirector
 }
 
 func (qa *QueryAskHandler) Start() {
-	qa.host.SetStreamHandler(legacyretrievaltypes.QueryProtocolID, qa.HandleQueryStream)
+	qa.host.SetStreamHandler(legacyretrievaltypes.QueryProtocolID, safe.Handle(qa.HandleQueryStream))
 }
 
 func (qa *QueryAskHandler) Stop() {

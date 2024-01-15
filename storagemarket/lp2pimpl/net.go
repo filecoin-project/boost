@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/shared"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -197,25 +198,30 @@ func (p *DealProvider) Start(ctx context.Context) {
 	// set to false, which maintains the previous behaviour:
 	// - SkipIPNIAnnounce=false:    announce deal to IPNI
 	// - RemoveUnsealedCopy=false:  keep unsealed copy of deal data
-	p.host.SetStreamHandler(DealProtocolv121ID, p.handleNewDealStream)
-	p.host.SetStreamHandler(DealProtocolv120ID, p.handleNewDealStream)
+	p.host.SetStreamHandler(DealProtocolv121ID, safe.Handle(p.handleNewDealStream))
+	p.host.SetStreamHandler(DealProtocolv120ID, safe.Handle(p.handleNewDealStream))
 
-	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
+	p.host.SetStreamHandler(DealStatusV12ProtocolID, safe.Handle(p.handleNewDealStatusStream))
 
 	// Handle legacy deal stream here and reject all legacy deals
-	p.host.SetStreamHandler(legacytypes.DealProtocolID101, p.handleLegacyDealStream)
-	p.host.SetStreamHandler(legacytypes.DealProtocolID110, p.handleLegacyDealStream)
-	p.host.SetStreamHandler(legacytypes.DealProtocolID111, p.handleLegacyDealStream)
+	p.host.SetStreamHandler(legacytypes.DealProtocolID101, safe.Handle(p.handleLegacyDealStream))
+	p.host.SetStreamHandler(legacytypes.DealProtocolID110, safe.Handle(p.handleLegacyDealStream))
+	p.host.SetStreamHandler(legacytypes.DealProtocolID111, safe.Handle(p.handleLegacyDealStream))
 
 	// Handle Query Ask
-	p.host.SetStreamHandler(legacytypes.AskProtocolID, p.handleNewAskStream)
-	p.host.SetStreamHandler(legacytypes.OldAskProtocolID, p.handleOldAskStream)
+	p.host.SetStreamHandler(legacytypes.AskProtocolID, safe.Handle(p.handleNewAskStream))
+	p.host.SetStreamHandler(legacytypes.OldAskProtocolID, safe.Handle(p.handleOldAskStream))
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolv121ID)
 	p.host.RemoveStreamHandler(DealProtocolv120ID)
 	p.host.RemoveStreamHandler(DealStatusV12ProtocolID)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID101)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID110)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID111)
+	p.host.RemoveStreamHandler(legacytypes.AskProtocolID)
+	p.host.RemoveStreamHandler(legacytypes.OldAskProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal

@@ -288,6 +288,8 @@ type LocalIndexDirectoryConfig struct {
 	ServiceApiInfo string
 	// The RPC timeout when making requests to the boostd-data service
 	ServiceRPCTimeout Duration
+	// PieceDoctor runs a continuous background process to check each piece in LID for retrievability
+	EnablePieceDoctor bool
 }
 
 type LocalIndexDirectoryLeveldbConfig struct {

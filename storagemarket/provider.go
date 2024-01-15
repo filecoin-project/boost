@@ -494,9 +494,10 @@ func (p *Provider) Start() error {
 	// Start the transfer limiter
 	go p.xferLimiter.run(p.ctx)
 
-	// Start hourly deal log cleanup
+	// Start hourly deal and funds log cleanup
 	if p.config.DealLogDurationDays > 0 {
 		go p.dealLogger.LogCleanup(p.ctx, p.config.DealLogDurationDays)
+		go p.fundManager.LogCleanup(p.ctx, p.config.DealLogDurationDays)
 	}
 
 	log.Infow("storage provider: started")

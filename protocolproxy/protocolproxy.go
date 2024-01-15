@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost/protocolproxy/messages"
+	"github.com/filecoin-project/boost/safe"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -50,10 +51,10 @@ func NewProtocolProxy(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*Proto
 
 func (pp *ProtocolProxy) Start(ctx context.Context) {
 	pp.ctx = ctx
-	pp.h.SetStreamHandler(ForwardingProtocolID, pp.handleForwarding)
+	pp.h.SetStreamHandler(ForwardingProtocolID, safe.Handle(pp.handleForwarding))
 	msg := ""
 	for id, pid := range pp.supportedProtocols {
-		pp.h.SetStreamHandler(id, pp.handleIncoming)
+		pp.h.SetStreamHandler(id, safe.Handle(pp.handleIncoming))
 		msg += "  " + pid.String() + ": " + string(id) + "\n"
 	}
 	pp.h.Network().Notify(pp)

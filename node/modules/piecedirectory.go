@@ -147,18 +147,23 @@ func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.Min
 	}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(address.Address(maddr), store, ssm, fullnodeApi)
-	docctx, cancel := context.WithCancel(context.Background())
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go doc.Run(docctx)
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			cancel()
-			return nil
-		},
-	})
-	return doc
+func NewPieceDoctor(cfg *config.Boost) func(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+	return func(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+		if !cfg.LocalIndexDirectory.EnablePieceDoctor {
+			return &piecedirectory.Doctor{}
+		}
+		doc := piecedirectory.NewDoctor(address.Address(maddr), store, ssm, fullnodeApi)
+		docctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				go doc.Run(docctx)
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+		return doc
+	}
 }

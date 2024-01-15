@@ -8,6 +8,7 @@ import (
 	"time"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -47,11 +48,15 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerAnnounceDealRemoved func(p0 context.Context, p1 cid.Cid) (cid.Cid, error) `perm:"admin"`
+
 		BoostIndexerAnnounceLatest func(p0 context.Context) (cid.Cid, error) `perm:"admin"`
 
 		BoostIndexerAnnounceLatestHttp func(p0 context.Context, p1 []string) (cid.Cid, error) `perm:"admin"`
 
 		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+
+		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) `perm:"admin"`
 
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
@@ -276,6 +281,17 @@ func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
 }
 
+func (s *BoostStruct) BoostIndexerAnnounceDealRemoved(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceDealRemoved == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceDealRemoved(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceDealRemoved(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
 func (s *BoostStruct) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
 	if s.Internal.BoostIndexerAnnounceLatest == nil {
 		return *new(cid.Cid), ErrNotSupported
@@ -307,6 +323,17 @@ func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid
 
 func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
 	return *new([]multihash.Multihash), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {
+	if s.Internal.BoostLegacyDealByProposalCid == nil {
+		return *new(legacytypes.MinerDeal), ErrNotSupported
+	}
+	return s.Internal.BoostLegacyDealByProposalCid(p0, p1)
+}
+
+func (s *BoostStub) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {
+	return *new(legacytypes.MinerDeal), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {

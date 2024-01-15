@@ -4,6 +4,7 @@ import (
 	"context"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
@@ -33,6 +34,8 @@ type Boost interface {
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                                      //perm:admin
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                  //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                     //perm:admin
+	BoostIndexerAnnounceDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error)                                                      //perm:admin
+	BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (legacytypes.MinerDeal, error)                                           //perm:admin
 	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                      //perm:write
 	BoostDirectDeal(ctx context.Context, params smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error)                                   //perm:admin
 

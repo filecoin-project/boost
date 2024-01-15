@@ -74,7 +74,7 @@ require (
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/multiformats/go-multiaddr v0.11.0
+	github.com/multiformats/go-multiaddr v0.12.1
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
@@ -87,7 +87,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
-	github.com/whyrusleeping/cbor-gen v0.0.0-20230923211252-36a87e1ba72f
+	github.com/whyrusleeping/cbor-gen v0.0.0-20240109153615-66e95c3e8a87
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
@@ -95,10 +95,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/fx v1.20.0
-	golang.org/x/crypto v0.14.0
+	go.uber.org/multierr v1.11.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/sync v0.3.0
-	golang.org/x/text v0.13.0
+	golang.org/x/text v0.14.0
 	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
@@ -300,8 +301,8 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/term v0.14.0
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/term v0.15.0
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/grpc v1.56.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
@@ -332,7 +333,6 @@ require (
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/ipni/storetheindex v0.8.1
 	github.com/schollz/progressbar/v3 v3.14.1
-	go.uber.org/multierr v1.11.0
 )
 
 require (

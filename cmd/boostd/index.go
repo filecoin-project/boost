@@ -5,6 +5,7 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 )
@@ -17,6 +18,7 @@ var indexProvCmd = &cli.Command{
 		indexProvListMultihashesCmd,
 		indexProvAnnounceLatest,
 		indexProvAnnounceLatestHttp,
+		indexProvAnnounceDealRemovalAd,
 	},
 }
 
@@ -124,6 +126,64 @@ var indexProvAnnounceLatestHttp = &cli.Command{
 		}
 
 		fmt.Printf("Announced advertisement to indexers over http with cid %s\n", c)
+		return nil
+	},
+}
+
+var indexProvAnnounceDealRemovalAd = &cli.Command{
+	Name:  "announce-remove-deal",
+	Usage: "Published a removal ad for given deal UUID or Proposal CID (legacy deals)",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("must specify only one proposal CID / deal UUID")
+		}
+
+		id := cctx.Args().Get(0)
+
+		var proposalCid *cid.Cid
+		dealUuid, err := uuid.Parse(id)
+		if err != nil {
+			propCid, err := cid.Decode(id)
+			if err != nil {
+				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
+			}
+			proposalCid = &propCid
+		}
+
+		if proposalCid == nil {
+			deal, err := napi.BoostDeal(ctx, dealUuid)
+			if err != nil {
+				return fmt.Errorf("deal not found with UUID %s: %w", dealUuid.String(), err)
+			}
+			prop, err := deal.ClientDealProposal.Proposal.Cid()
+			if err != nil {
+				return fmt.Errorf("generating proposal cid for deal %s: %w", dealUuid.String(), err)
+			}
+			proposalCid = &prop
+		} else {
+			_, err = napi.BoostLegacyDealByProposalCid(ctx, *proposalCid)
+			if err != nil {
+				_, err := napi.BoostDealBySignedProposalCid(ctx, *proposalCid)
+				if err != nil {
+					return fmt.Errorf("no deal with proposal CID %s found in boost and legacy database", proposalCid.String())
+				}
+			}
+		}
+
+		cid, err := napi.BoostIndexerAnnounceDealRemoved(ctx, *proposalCid)
+		if err != nil {
+			return fmt.Errorf("failed to send removal ad: %w", err)
+		}
+		fmt.Printf("Announced the removal Ad with cid %s\n", cid)
+
 		return nil
 	},
 }
