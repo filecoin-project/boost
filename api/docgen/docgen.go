@@ -14,6 +14,7 @@ import (
 
 	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-jsonrpc/auth"
@@ -136,6 +137,7 @@ func init() {
 	allocationID := verifreg.AllocationId(0)
 	addExample(allocationID)
 	addExample(&allocationID)
+	addExample(filestore.Path(""))
 	addExample(map[string]int{"name": 42})
 	addExample(map[string]time.Time{"name": time.Unix(1615243938, 0).UTC()})
 	addExample(&types.ExecutionTrace{
