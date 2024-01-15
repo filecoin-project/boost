@@ -406,14 +406,6 @@ func (cr *countingReader) Read(p []byte) (n int, err error) {
 }
 
 func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
-	defer func() {
-		// This is a temporary workaround to handle "slice bounds out of range" errors in podsi indexing.
-		// The bug affects a minor number of deals, so recovering here will help to unblock the users.
-		// TODO: remove this recover when the underlying bug is figured out and fixed.
-		if err := recover(); err != nil {
-			log.Errorw("Recovered from panic and skipped indexing the piece.", "piece", pieceCid, "error", err)
-		}
-	}()
 
 	concurrency := runtime.NumCPU()
 	if concurrency < PodsiMinConcurrency {
@@ -437,9 +429,13 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		Reader: r,
 		cnt:    &readsCnt,
 	}
-	indexData, err := datasegment.ParseDataSegmentIndex(bufio.NewReaderSize(cr, PodsiBuffesrSize))
+	panicked := false
+	indexData, err := parseDataSegmentIndex(pieceCid, bufio.NewReaderSize(cr, PodsiBuffesrSize), &panicked)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+	}
+	if panicked {
+		return nil, fmt.Errorf("could not parse data segment index because of an internal panic")
 	}
 
 	log.Debugw("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
@@ -521,6 +517,21 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	log.Debugw("podsi: parsed records from data segments", "recs", len(recs), "reads", readsCnt, "time", time.Since(start).String())
 
 	return recs, nil
+}
+
+// parseDataSegmentIndex is a temporary wrapper around datasegment.ParseDataSegmentIndex that exists only as a workaround
+// for "slice bounds out of range" panic inside lotus. This funciton should be removed once the panic is fixed.
+func parseDataSegmentIndex(pieceCid cid.Cid, unpaddedReader io.Reader, panicked *bool) (datasegment.IndexData, error) {
+	defer func() {
+		// This is a temporary workaround to handle "slice bounds out of range" errors in podsi indexing.
+		// The bug affects a minor number of deals, so recovering here will help to unblock the users.
+		// TODO: remove this recover when the underlying bug is figured out and fixed.
+		if err := recover(); err != nil {
+			*panicked = true
+			log.Errorw("Recovered from panic and skipped indexing the piece.", "piece", pieceCid, "error", err)
+		}
+	}()
+	return datasegment.ParseDataSegmentIndex(unpaddedReader)
 }
 
 func validateEntries(entries []datasegment.SegmentDesc) ([]datasegment.SegmentDesc, error) {
