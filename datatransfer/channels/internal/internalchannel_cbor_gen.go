@@ -236,6 +236,7 @@ func (t *ChannelState) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 
 	// t.Initiator (peer.ID) (string)
@@ -362,6 +363,7 @@ func (t *ChannelState) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 
 	// t.SentBlocksTotal (int64) (int64)
@@ -628,15 +630,24 @@ func (t *ChannelState) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 
 			for i := 0; i < int(extra); i++ {
+				{
+					var maj byte
+					var extra uint64
+					var err error
+					_ = maj
+					_ = extra
+					_ = err
 
-				var v EncodedVoucher
-				if err := v.UnmarshalCBOR(cr); err != nil {
-					return err
+					{
+
+						if err := t.Vouchers[i].UnmarshalCBOR(cr); err != nil {
+							return xerrors.Errorf("unmarshaling t.Vouchers[i]: %w", err)
+						}
+
+					}
+
 				}
-
-				t.Vouchers[i] = v
 			}
-
 			// t.Initiator (peer.ID) (string)
 		case "Initiator":
 
@@ -721,15 +732,24 @@ func (t *ChannelState) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 
 			for i := 0; i < int(extra); i++ {
+				{
+					var maj byte
+					var extra uint64
+					var err error
+					_ = maj
+					_ = extra
+					_ = err
 
-				var v EncodedVoucherResult
-				if err := v.UnmarshalCBOR(cr); err != nil {
-					return err
+					{
+
+						if err := t.VoucherResults[i].UnmarshalCBOR(cr); err != nil {
+							return xerrors.Errorf("unmarshaling t.VoucherResults[i]: %w", err)
+						}
+
+					}
+
 				}
-
-				t.VoucherResults[i] = v
 			}
-
 			// t.SentBlocksTotal (int64) (int64)
 		case "SentBlocksTotal":
 			{

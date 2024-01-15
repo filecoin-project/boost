@@ -8,10 +8,10 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/ipfs/go-cid"
+	datatransfer "github.com/filecoin-project/boost/datatransfer"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf

@@ -152,6 +152,7 @@ func (t *ChannelStages) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -199,15 +200,34 @@ func (t *ChannelStages) UnmarshalCBOR(r io.Reader) (err error) {
 	}
 
 	for i := 0; i < int(extra); i++ {
+		{
+			var maj byte
+			var extra uint64
+			var err error
+			_ = maj
+			_ = extra
+			_ = err
 
-		var v ChannelStage
-		if err := v.UnmarshalCBOR(cr); err != nil {
-			return err
+			{
+
+				b, err := cr.ReadByte()
+				if err != nil {
+					return err
+				}
+				if b != cbg.CborNull[0] {
+					if err := cr.UnreadByte(); err != nil {
+						return err
+					}
+					t.Stages[i] = new(ChannelStage)
+					if err := t.Stages[i].UnmarshalCBOR(cr); err != nil {
+						return xerrors.Errorf("unmarshaling t.Stages[i] pointer: %w", err)
+					}
+				}
+
+			}
+
 		}
-
-		t.Stages[i] = &v
 	}
-
 	return nil
 }
 
@@ -271,6 +291,7 @@ func (t *ChannelStage) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -356,15 +377,34 @@ func (t *ChannelStage) UnmarshalCBOR(r io.Reader) (err error) {
 	}
 
 	for i := 0; i < int(extra); i++ {
+		{
+			var maj byte
+			var extra uint64
+			var err error
+			_ = maj
+			_ = extra
+			_ = err
 
-		var v Log
-		if err := v.UnmarshalCBOR(cr); err != nil {
-			return err
+			{
+
+				b, err := cr.ReadByte()
+				if err != nil {
+					return err
+				}
+				if b != cbg.CborNull[0] {
+					if err := cr.UnreadByte(); err != nil {
+						return err
+					}
+					t.Logs[i] = new(Log)
+					if err := t.Logs[i].UnmarshalCBOR(cr); err != nil {
+						return xerrors.Errorf("unmarshaling t.Logs[i] pointer: %w", err)
+					}
+				}
+
+			}
+
 		}
-
-		t.Logs[i] = &v
 	}
-
 	return nil
 }
 

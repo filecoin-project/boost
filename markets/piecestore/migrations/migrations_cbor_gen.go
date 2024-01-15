@@ -8,10 +8,10 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/ipfs/go-cid"
+	abi "github.com/filecoin-project/go-state-types/abi"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf
@@ -51,6 +51,7 @@ func (t *PieceInfo0) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -110,15 +111,24 @@ func (t *PieceInfo0) UnmarshalCBOR(r io.Reader) (err error) {
 	}
 
 	for i := 0; i < int(extra); i++ {
+		{
+			var maj byte
+			var extra uint64
+			var err error
+			_ = maj
+			_ = extra
+			_ = err
 
-		var v DealInfo0
-		if err := v.UnmarshalCBOR(cr); err != nil {
-			return err
+			{
+
+				if err := t.Deals[i].UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("unmarshaling t.Deals[i]: %w", err)
+				}
+
+			}
+
 		}
-
-		t.Deals[i] = v
 	}
-
 	return nil
 }
 
@@ -435,6 +445,7 @@ func (t *CIDInfo0) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -494,14 +505,23 @@ func (t *CIDInfo0) UnmarshalCBOR(r io.Reader) (err error) {
 	}
 
 	for i := 0; i < int(extra); i++ {
+		{
+			var maj byte
+			var extra uint64
+			var err error
+			_ = maj
+			_ = extra
+			_ = err
 
-		var v PieceBlockLocation0
-		if err := v.UnmarshalCBOR(cr); err != nil {
-			return err
+			{
+
+				if err := t.PieceBlockLocations[i].UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("unmarshaling t.PieceBlockLocations[i]: %w", err)
+				}
+
+			}
+
 		}
-
-		t.PieceBlockLocations[i] = v
 	}
-
 	return nil
 }

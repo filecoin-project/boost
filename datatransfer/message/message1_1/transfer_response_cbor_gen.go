@@ -5,16 +5,18 @@ package message1_1
 import (
 	"fmt"
 	"io"
+	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/ipfs/go-cid"
+	datatransfer "github.com/filecoin-project/boost/datatransfer"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf
 var _ = cid.Undef
+var _ = math.E
 var _ = sort.Sort
 
 func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
@@ -22,25 +24,10 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{166}); err != nil {
-		return err
-	}
 
-	scratch := make([]byte, 9)
+	cw := cbg.NewCborWriter(w)
 
-	// t.Type (uint64) (uint64)
-	if len("Type") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"Type\" was too long")
-	}
-
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Type"))); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, string("Type")); err != nil {
-		return err
-	}
-
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.Type)); err != nil {
+	if _, err := cw.Write([]byte{166}); err != nil {
 		return err
 	}
 
@@ -49,10 +36,10 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return xerrors.Errorf("Value in field \"Acpt\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Acpt"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Acpt"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Acpt")); err != nil {
+	if _, err := cw.WriteString(string("Acpt")); err != nil {
 		return err
 	}
 
@@ -65,10 +52,10 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return xerrors.Errorf("Value in field \"Paus\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Paus"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Paus"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Paus")); err != nil {
+	if _, err := cw.WriteString(string("Paus")); err != nil {
 		return err
 	}
 
@@ -76,19 +63,19 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.XferID (uint64) (uint64)
-	if len("XferID") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"XferID\" was too long")
+	// t.Type (uint64) (uint64)
+	if len("Type") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"Type\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("XferID"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Type"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("XferID")); err != nil {
+	if _, err := cw.WriteString(string("Type")); err != nil {
 		return err
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.XferID)); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Type)); err != nil {
 		return err
 	}
 
@@ -97,14 +84,14 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return xerrors.Errorf("Value in field \"VRes\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("VRes"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("VRes"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("VRes")); err != nil {
+	if _, err := cw.WriteString(string("VRes")); err != nil {
 		return err
 	}
 
-	if err := t.VRes.MarshalCBOR(w); err != nil {
+	if err := t.VRes.MarshalCBOR(cw); err != nil {
 		return err
 	}
 
@@ -113,10 +100,10 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return xerrors.Errorf("Value in field \"VTyp\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("VTyp"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("VTyp"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("VTyp")); err != nil {
+	if _, err := cw.WriteString(string("VTyp")); err != nil {
 		return err
 	}
 
@@ -124,25 +111,47 @@ func (t *TransferResponse1_1) MarshalCBOR(w io.Writer) error {
 		return xerrors.Errorf("Value in field t.VTyp was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len(t.VTyp))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.VTyp))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.VTyp)); err != nil {
+	if _, err := cw.WriteString(string(t.VTyp)); err != nil {
 		return err
 	}
+
+	// t.XferID (uint64) (uint64)
+	if len("XferID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"XferID\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("XferID"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("XferID")); err != nil {
+		return err
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.XferID)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
+func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) (err error) {
 	*t = TransferResponse1_1{}
 
-	br := cbg.GetPeeker(r)
-	scratch := make([]byte, 8)
+	cr := cbg.NewCborReader(r)
 
-	maj, extra, err := cbg.CborReadHeaderBuf(br, scratch)
+	maj, extra, err := cr.ReadHeader()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
 	if maj != cbg.MajMap {
 		return fmt.Errorf("cbor input should be of type map")
 	}
@@ -157,7 +166,7 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadStringBuf(br, scratch)
+			sval, err := cbg.ReadString(cr)
 			if err != nil {
 				return err
 			}
@@ -166,25 +175,10 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 		}
 
 		switch name {
-		// t.Type (uint64) (uint64)
-		case "Type":
-
-			{
-
-				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
-				if err != nil {
-					return err
-				}
-				if maj != cbg.MajUnsignedInt {
-					return fmt.Errorf("wrong type for uint64 field")
-				}
-				t.Type = uint64(extra)
-
-			}
-			// t.Acpt (bool) (bool)
+		// t.Acpt (bool) (bool)
 		case "Acpt":
 
-			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			maj, extra, err = cr.ReadHeader()
 			if err != nil {
 				return err
 			}
@@ -202,7 +196,7 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 			// t.Paus (bool) (bool)
 		case "Paus":
 
-			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			maj, extra, err = cr.ReadHeader()
 			if err != nil {
 				return err
 			}
@@ -217,19 +211,19 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 			default:
 				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 			}
-			// t.XferID (uint64) (uint64)
-		case "XferID":
+			// t.Type (uint64) (uint64)
+		case "Type":
 
 			{
 
-				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+				maj, extra, err = cr.ReadHeader()
 				if err != nil {
 					return err
 				}
 				if maj != cbg.MajUnsignedInt {
 					return fmt.Errorf("wrong type for uint64 field")
 				}
-				t.XferID = uint64(extra)
+				t.Type = uint64(extra)
 
 			}
 			// t.VRes (typegen.Deferred) (struct)
@@ -239,7 +233,7 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 
 				t.VRes = new(cbg.Deferred)
 
-				if err := t.VRes.UnmarshalCBOR(br); err != nil {
+				if err := t.VRes.UnmarshalCBOR(cr); err != nil {
 					return xerrors.Errorf("failed to read deferred field: %w", err)
 				}
 			}
@@ -247,12 +241,27 @@ func (t *TransferResponse1_1) UnmarshalCBOR(r io.Reader) error {
 		case "VTyp":
 
 			{
-				sval, err := cbg.ReadStringBuf(br, scratch)
+				sval, err := cbg.ReadString(cr)
 				if err != nil {
 					return err
 				}
 
 				t.VTyp = datatransfer.TypeIdentifier(sval)
+			}
+			// t.XferID (uint64) (uint64)
+		case "XferID":
+
+			{
+
+				maj, extra, err = cr.ReadHeader()
+				if err != nil {
+					return err
+				}
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
+				}
+				t.XferID = uint64(extra)
+
 			}
 
 		default:

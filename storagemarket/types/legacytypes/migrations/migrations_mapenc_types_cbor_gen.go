@@ -8,15 +8,15 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
+	datatransfer "github.com/filecoin-project/boost/datatransfer"
+	legacytypes "github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	filestore "github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
+	abi "github.com/filecoin-project/go-state-types/abi"
+	market "github.com/filecoin-project/specs-actors/actors/builtin/market"
+	cid "github.com/ipfs/go-cid"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf

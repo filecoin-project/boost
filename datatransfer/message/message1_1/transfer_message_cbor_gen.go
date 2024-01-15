@@ -8,9 +8,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/ipfs/go-cid"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf

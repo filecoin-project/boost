@@ -8,15 +8,15 @@ import (
 	"math"
 	"sort"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
+	datatransfer "github.com/filecoin-project/boost/datatransfer"
+	filestore "github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
+	abi "github.com/filecoin-project/go-state-types/abi"
+	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
+	crypto "github.com/filecoin-project/go-state-types/crypto"
+	cid "github.com/ipfs/go-cid"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf
@@ -2666,6 +2666,7 @@ func (t *DealStages) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -2729,13 +2730,33 @@ func (t *DealStages) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 
 			for i := 0; i < int(extra); i++ {
+				{
+					var maj byte
+					var extra uint64
+					var err error
+					_ = maj
+					_ = extra
+					_ = err
 
-				var v DealStage
-				if err := v.UnmarshalCBOR(cr); err != nil {
-					return err
+					{
+
+						b, err := cr.ReadByte()
+						if err != nil {
+							return err
+						}
+						if b != cbg.CborNull[0] {
+							if err := cr.UnreadByte(); err != nil {
+								return err
+							}
+							t.Stages[i] = new(DealStage)
+							if err := t.Stages[i].UnmarshalCBOR(cr); err != nil {
+								return xerrors.Errorf("unmarshaling t.Stages[i] pointer: %w", err)
+							}
+						}
+
+					}
+
 				}
-
-				t.Stages[i] = &v
 			}
 
 		default:
@@ -2781,6 +2802,7 @@ func (t *DealStage) MarshalCBOR(w io.Writer) error {
 		if err := v.MarshalCBOR(cw); err != nil {
 			return err
 		}
+
 	}
 
 	// t.Name (string) (string)
@@ -2945,15 +2967,34 @@ func (t *DealStage) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 
 			for i := 0; i < int(extra); i++ {
+				{
+					var maj byte
+					var extra uint64
+					var err error
+					_ = maj
+					_ = extra
+					_ = err
 
-				var v Log
-				if err := v.UnmarshalCBOR(cr); err != nil {
-					return err
+					{
+
+						b, err := cr.ReadByte()
+						if err != nil {
+							return err
+						}
+						if b != cbg.CborNull[0] {
+							if err := cr.UnreadByte(); err != nil {
+								return err
+							}
+							t.Logs[i] = new(Log)
+							if err := t.Logs[i].UnmarshalCBOR(cr); err != nil {
+								return xerrors.Errorf("unmarshaling t.Logs[i] pointer: %w", err)
+							}
+						}
+
+					}
+
 				}
-
-				t.Logs[i] = &v
 			}
-
 			// t.Name (string) (string)
 		case "Name":
 
