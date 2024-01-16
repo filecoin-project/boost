@@ -450,9 +450,11 @@ func (p *Provider) Start() error {
 		}
 
 		// Fail deals if start epoch has passed and deal has still not been added to a sector
-		if deal.Checkpoint < dealcheckpoints.AddedPiece && p.checkDealProposalStartEpoch(deal) != nil {
-			go p.failDeal(dh.Publisher, deal, err, false)
-			continue
+		if deal.Checkpoint < dealcheckpoints.AddedPiece {
+			if serr := p.checkDealProposalStartEpoch(deal); serr != nil {
+				go p.failDeal(dh.Publisher, deal, serr, false)
+				continue
+			}
 		}
 
 		// If it's an offline deal, and the deal data hasn't yet been
