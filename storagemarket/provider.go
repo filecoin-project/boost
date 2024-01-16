@@ -449,8 +449,8 @@ func (p *Provider) Start() error {
 			continue
 		}
 
-		// Fail deals if start epoch has passed
-		if err := p.checkDealProposalStartEpoch(deal); err != nil {
+		// Fail deals if start epoch has passed and deal has still not been added to a sector
+		if deal.Checkpoint < dealcheckpoints.AddedPiece && p.checkDealProposalStartEpoch(deal) != nil {
 			go p.failDeal(dh.Publisher, deal, err, false)
 			continue
 		}
