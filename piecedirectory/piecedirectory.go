@@ -885,21 +885,8 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 			return int(offsetSize.Size), nil
 		}
 
-		// The index is incomplete, so re-build the index on the fly
-		err = ps.BuildIndexForPiece(ctx, p)
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("re-building index for piece %s: %w", p, err))
-			continue
-		}
+		merr = multierror.Append(merr, fmt.Errorf("piece %s is not indexed correctly", p))
 
-		// Now get the size again
-		offsetSize, err = ps.GetOffsetSize(ctx, p, c.Hash())
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
-			continue
-		}
-
-		return int(offsetSize.Size), nil
 	}
 
 	return 0, merr
