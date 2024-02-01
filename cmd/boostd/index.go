@@ -19,6 +19,7 @@ var indexProvCmd = &cli.Command{
 		indexProvAnnounceLatest,
 		indexProvAnnounceLatestHttp,
 		indexProvAnnounceDealRemovalAd,
+		indexProvAnnounceDeal,
 	},
 }
 
@@ -183,6 +184,46 @@ var indexProvAnnounceDealRemovalAd = &cli.Command{
 			return fmt.Errorf("failed to send removal ad: %w", err)
 		}
 		fmt.Printf("Announced the removal Ad with cid %s\n", cid)
+
+		return nil
+	},
+}
+
+var indexProvAnnounceDeal = &cli.Command{
+	Name:  "announce-deal",
+	Usage: "Publish an ad for given deal UUID (Boost deals only)",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("must specify only one deal UUID")
+		}
+
+		id := cctx.Args().Get(0)
+
+		dealUuid, err := uuid.Parse(id)
+		if err != nil {
+			if err != nil {
+				return fmt.Errorf("could not parse '%s' as deal uuid", id)
+			}
+		}
+
+		deal, err := napi.BoostDeal(ctx, dealUuid)
+		if err != nil {
+			return fmt.Errorf("deal not found with UUID %s: %w", dealUuid.String(), err)
+		}
+
+		cid, err := napi.BoostIndexerAnnounceDeal(ctx, deal)
+		if err != nil {
+			return fmt.Errorf("failed to announce the deal: %w", err)
+		}
+		fmt.Printf("Announced the deal with Ad cid %s\n", cid)
 
 		return nil
 	},
