@@ -149,37 +149,39 @@ var indexProvAnnounceDealRemovalAd = &cli.Command{
 
 		id := cctx.Args().Get(0)
 
-		var proposalCid *cid.Cid
+		var proposalCid cid.Cid
 		dealUuid, err := uuid.Parse(id)
 		if err != nil {
 			propCid, err := cid.Decode(id)
 			if err != nil {
 				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
 			}
-			proposalCid = &propCid
+			proposalCid = propCid
 		}
 
-		if proposalCid == nil {
+		if !proposalCid.Defined() {
 			deal, err := napi.BoostDeal(ctx, dealUuid)
 			if err != nil {
 				return fmt.Errorf("deal not found with UUID %s: %w", dealUuid.String(), err)
 			}
-			prop, err := deal.ClientDealProposal.Proposal.Cid()
+			prop, err := deal.SignedProposalCid()
 			if err != nil {
 				return fmt.Errorf("generating proposal cid for deal %s: %w", dealUuid.String(), err)
 			}
-			proposalCid = &prop
+			proposalCid = prop
 		} else {
-			_, err = napi.BoostLegacyDealByProposalCid(ctx, *proposalCid)
+			_, err = napi.BoostLegacyDealByProposalCid(ctx, proposalCid)
 			if err != nil {
-				_, err := napi.BoostDealBySignedProposalCid(ctx, *proposalCid)
+				_, err := napi.BoostDealBySignedProposalCid(ctx, proposalCid)
 				if err != nil {
 					return fmt.Errorf("no deal with proposal CID %s found in boost and legacy database", proposalCid.String())
 				}
 			}
 		}
 
-		cid, err := napi.BoostIndexerAnnounceDealRemoved(ctx, *proposalCid)
+		fmt.Printf("the proposal cid is %s\n", proposalCid)
+
+		cid, err := napi.BoostIndexerAnnounceDealRemoved(ctx, proposalCid)
 		if err != nil {
 			return fmt.Errorf("failed to send removal ad: %w", err)
 		}
@@ -223,7 +225,12 @@ var indexProvAnnounceDeal = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to announce the deal: %w", err)
 		}
-		fmt.Printf("Announced the deal with Ad cid %s\n", cid)
+		if cid.Defined() {
+			fmt.Printf("Announced the deal with Ad cid %s\n", cid)
+			return nil
+		}
+
+		fmt.Printf("Deal already announced\n")
 
 		return nil
 	},
