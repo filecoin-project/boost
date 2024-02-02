@@ -61,6 +61,10 @@ var initCmd = &cli.Command{
 			Usage:       "manually specified actor address",
 			DefaultText: "<guessed from existing lotus-miner/market instance>",
 		},
+		&cli.BoolFlag{
+			Name:   "no-sync",
+			Hidden: true,
+		},
 	}...),
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -222,8 +226,10 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 
 	fmt.Println("Checking full node sync status")
 
-	if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
-		return nil, fmt.Errorf("sync wait: %w", err)
+	if !cctx.Bool("no-sync") {
+		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
+			return nil, fmt.Errorf("sync wait: %w", err)
+		}
 	}
 
 	repoPath := cctx.String(FlagBoostRepo)
