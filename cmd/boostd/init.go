@@ -65,6 +65,10 @@ var initCmd = &cli.Command{
 			Name:   "no-sync",
 			Hidden: true,
 		},
+		&cli.BoolFlag{
+			Name:   "no-dial-check",
+			Hidden: true,
+		},
 	}...),
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -96,7 +100,7 @@ var initCmd = &cli.Command{
 			}
 
 			rcfg.ConfigVersion = config.CurrentVersion
-			cerr = setMinerApiConfig(cctx, rcfg, true)
+			cerr = setMinerApiConfig(cctx, rcfg, !cctx.Bool("no-dial-check"))
 			if cerr != nil {
 				return
 			}
