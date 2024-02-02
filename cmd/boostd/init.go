@@ -56,6 +56,11 @@ var initCmd = &cli.Command{
 			Usage:    "max size for staging area in bytes",
 			Required: true,
 		},
+		&cli.StringFlag{
+			Name:        "actor-address",
+			Usage:       "manually specified actor address",
+			DefaultText: "<guessed from existing lotus-miner/market instance>",
+		},
 	}...),
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -178,32 +183,40 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	defer closer()
 
 	var minerActor address.Address
-	if marketsRepo == nil {
-		// If this is not a migration from an existing repo, just query the
-		// miner directly for the actor address
-		smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
-		if err != nil {
-			if strings.Contains(err.Error(), "could not get API info") {
-				err = fmt.Errorf("%w\nDo you need to set the environment variable MINER_API_INFO?", err)
-			}
-			return nil, err
-		}
-		defer smCloser()
 
-		minerActor, err = smApi.ActorAddress(ctx)
+	if cctx.IsSet("actor-address") {
+		minerActor, err = address.NewFromString(cctx.String("actor-address"))
 		if err != nil {
-			return nil, fmt.Errorf("getting miner actor address: %w", err)
+			return nil, fmt.Errorf("failed to parse actor-address: %s; err: %w", cctx.String("actor-address"), err)
 		}
 	} else {
-		// This is a migration from an existing repo, so get the miner address
-		// from the repo datastore
-		ds, err := marketsRepo.Datastore(context.Background(), metadataNamespace)
-		if err != nil {
-			return nil, fmt.Errorf("getting legacy repo datastore: %w", err)
-		}
-		minerActor, err = getMinerAddressFromDatastore(ds)
-		if err != nil {
-			return nil, fmt.Errorf("getting miner actor address: %w", err)
+		if marketsRepo == nil {
+			// If this is not a migration from an existing repo, just query the
+			// miner directly for the actor address
+			smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
+			if err != nil {
+				if strings.Contains(err.Error(), "could not get API info") {
+					err = fmt.Errorf("%w\nDo you need to set the environment variable MINER_API_INFO?", err)
+				}
+				return nil, err
+			}
+			defer smCloser()
+
+			minerActor, err = smApi.ActorAddress(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("getting miner actor address: %w", err)
+			}
+		} else {
+			// This is a migration from an existing repo, so get the miner address
+			// from the repo datastore
+			ds, err := marketsRepo.Datastore(context.Background(), metadataNamespace)
+			if err != nil {
+				return nil, fmt.Errorf("getting legacy repo datastore: %w", err)
+			}
+			minerActor, err = getMinerAddressFromDatastore(ds)
+			if err != nil {
+				return nil, fmt.Errorf("getting miner actor address: %w", err)
+			}
 		}
 	}
 
