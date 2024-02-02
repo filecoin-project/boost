@@ -187,6 +187,10 @@ func (sm *BoostAPI) BoostIndexerAnnounceDealRemoved(ctx context.Context, propCid
 	return sm.IndexProvider.AnnounceBoostDealRemoved(ctx, propCid)
 }
 
+func (sm *BoostAPI) BoostIndexerAnnounceDeal(ctx context.Context, deal *types.ProviderDealState) (cid.Cid, error) {
+	return sm.IndexProvider.AnnounceBoostDeal(ctx, deal)
+}
+
 func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (gfm_storagemarket.MinerDeal, error) {
 	return sm.LegacyStorageProvider.GetLocalDeal(propCid)
 }

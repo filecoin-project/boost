@@ -70,6 +70,8 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerAnnounceDeal func(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) `perm:"admin"`
+
 		BoostIndexerAnnounceDealRemoved func(p0 context.Context, p1 cid.Cid) (cid.Cid, error) `perm:"admin"`
 
 		BoostIndexerAnnounceLatest func(p0 context.Context) (cid.Cid, error) `perm:"admin"`
@@ -456,6 +458,17 @@ func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceDeal(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceDeal == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceDeal(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostIndexerAnnounceDealRemoved(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
