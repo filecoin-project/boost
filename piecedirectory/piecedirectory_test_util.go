@@ -119,7 +119,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 		PieceOffset: 0,
 		PieceLength: 0,
 	}
-	err = pm.AddDealForPiece(ctx, pieceCid, di)
+	err = pm.AddDealForPiece(ctx, pieceCid, di, "")
 	require.NoError(t, err)
 
 	// Create a CARv2 index over the CAR file
@@ -265,7 +265,7 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	}
 	// Adding the deal for the piece causes LID to fetch the piece data
 	// from the reader and index it
-	err = pm.AddDealForPiece(ctx, pieceCid, di)
+	err = pm.AddDealForPiece(ctx, pieceCid, di, "")
 	require.NoError(t, err)
 
 	// Load the index of blocks

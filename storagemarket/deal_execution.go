@@ -219,19 +219,6 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been handed over to the sealing subsystem")
 	}
 
-	// as deal has already been handed to the sealer, we can remove the inbound file and reclaim the tagged space
-	if deal.CleanupData {
-		_ = os.Remove(deal.InboundFilePath)
-		p.dealLogger.Infow(deal.DealUuid, "removed piece data from disk as deal has been added to a sector", "path", deal.InboundFilePath)
-	}
-	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
-		// If there's an error untagging storage space we should still try to continue,
-		// so just log the error
-		p.dealLogger.Warnw(deal.DealUuid, "failed to untag storage space after handing deal to sealer", "err", err)
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
-	}
-
 	// Index and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
@@ -245,6 +232,21 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		}
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
+	}
+
+	// todo wait for data to be fetched into lotus-provided in case we're dealing with it
+
+	// as deal has already been handed to the sealer, we can remove the inbound file and reclaim the tagged space
+	if deal.CleanupData {
+		_ = os.Remove(deal.InboundFilePath)
+		p.dealLogger.Infow(deal.DealUuid, "removed piece data from disk as deal has been added to a sector", "path", deal.InboundFilePath)
+	}
+	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
+		// If there's an error untagging storage space we should still try to continue,
+		// so just log the error
+		p.dealLogger.Warnw(deal.DealUuid, "failed to untag storage space after handing deal to sealer", "err", err)
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
 
 	return nil
@@ -613,7 +615,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		PieceLength:  deal.Length,
 		CarLength:    uint64(deal.NBytesReceived),
 		IsDirectDeal: false,
-	}); err != nil {
+	}, deal.InboundFilePath); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
 			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),

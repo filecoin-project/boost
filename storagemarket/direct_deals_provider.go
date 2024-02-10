@@ -424,17 +424,11 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.AddedPiece); err != nil {
 			return err
 		}
-
-		// The deal has been handed off to the sealer, so we can remove the inbound file
-		if entry.CleanupData {
-			_ = os.Remove(entry.InboundFilePath)
-			ddp.dealLogger.Infow(dealUuid, "removed piece data from disk as deal has been added to a sector", "path", entry.InboundFilePath)
-		}
 	}
 
 	// Index and announce the deal
 	if entry.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
-		if err := ddp.indexAndAnnounce(ctx, entry); err != nil {
+		if err := ddp.indexAndAnnounce(ctx, entry, entry.InboundFilePath); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
 			return err
 		}
@@ -445,6 +439,12 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		}
 	} else {
 		ddp.dealLogger.Infow(entry.ID, "deal has already been indexed and announced")
+	}
+
+	// The deal has been handed off to the sealer and indexed, so we can remove the inbound file
+	if entry.CleanupData {
+		_ = os.Remove(entry.InboundFilePath)
+		ddp.dealLogger.Infow(dealUuid, "removed piece data from disk as deal has been added to a sector", "path", entry.InboundFilePath)
 	}
 
 	if entry.Checkpoint < dealcheckpoints.Complete {
@@ -648,7 +648,7 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 	return nil
 }
 
-func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal) *dealMakingError {
+func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal, inFile string) *dealMakingError {
 	// add deal to piece metadata store
 	ddp.dealLogger.Infow(entry.ID, "about to add direct deal for piece in LID")
 	if err := ddp.pd.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
@@ -660,7 +660,7 @@ func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smt
 		PieceLength:  entry.Length,
 		CarLength:    uint64(entry.InboundFileSize),
 		IsDirectDeal: true,
-	}); err != nil {
+	}, inFile); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
 			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),

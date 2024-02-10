@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -224,7 +225,7 @@ func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, h
 	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo, inFile string) error {
 	defer func(start time.Time) {
 		log.Debugw("piece directory ; AddDealForPiece span", "piececid", pieceCid, "uuid", dealInfo.DealUuid, "took", time.Since(start))
 	}(time.Now())
@@ -240,7 +241,7 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 
 	if !isIndexed {
 		// Perform indexing of piece
-		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
+		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo, inFile); err != nil {
 			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 		}
 	} else {
@@ -260,7 +261,7 @@ type addIndexOperation struct {
 	err  error
 }
 
-func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo, inFile string) error {
 	// Check if there is already an add index operation in progress for the
 	// given piece cid. If not, create a new one.
 	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
@@ -302,21 +303,31 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 	// Note: Once we start the add index operation we don't want to cancel it
 	// if one of the waiting threads cancels its context. So instead we use the
 	// PieceDirectory's context.
-	op.err = ps.addIndexForPiece(ps.ctx, pieceCid, dealInfo)
+	op.err = ps.addIndexForPiece(ps.ctx, pieceCid, dealInfo, inFile)
 
 	// Return the result
 	log.Debugw("add index: completed", "pieceCid", pieceCid)
 	return op.err
 }
 
-func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo, inFile string) error {
 	// Get a reader over the piece data
 	log.Debugw("add index: get index", "pieceCid", pieceCid)
-	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.MinerAddr, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
-	log.Debugf("got the piece reader for piece %s and deal %s", pieceCid, dealInfo.DealUuid)
-	if err != nil {
-		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
+	var reader types.SectionReader
+
+	reader, err := os.OpenFile(inFile, os.O_RDONLY, 0)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("opening file %s: %w", inFile, err)
 	}
+
+	if reader == nil {
+		// try piece reader
+		reader, err = ps.pieceReader.GetReader(ctx, dealInfo.MinerAddr, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+		if err != nil {
+			return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
+		}
+	}
+	log.Debugf("got the piece reader for piece %s and deal %s", pieceCid, dealInfo.DealUuid)
 
 	defer reader.Close() //nolint:errcheck
 
@@ -598,7 +609,7 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 
 	// Iterate over all available deals in case first deal does not have an unsealed sector
 	for _, dl := range dls {
-		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl)
+		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl, "")
 		if err == nil {
 			return nil
 		}

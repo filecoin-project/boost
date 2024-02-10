@@ -648,7 +648,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 
 		timeAddIndex := time.Now()
 
-		err = pd.AddDealForPiece(ctx, piececid, di)
+		err = pd.AddDealForPiece(ctx, piececid, di, "")
 		if err != nil {
 			logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
 
