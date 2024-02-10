@@ -67,7 +67,7 @@ func testPieceDirectoryBlockstoreGetFuzz(ctx context.Context, t *testing.T, cl *
 			PieceOffset: 0,
 			PieceLength: 0,
 		}
-		err := pm.AddDealForPiece(ctx, pieceCid, di)
+		err := pm.AddDealForPiece(ctx, pieceCid, di, "")
 		require.NoError(t, err)
 	}
 

@@ -212,7 +212,7 @@ func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, proposalCid 
 		CarLength:    0,
 		IsDirectDeal: false, // There should be no direct deals from legacy code base
 	}
-	return pw.piecedirectory.AddDealForPiece(context.Background(), pieceCID, di)
+	return pw.piecedirectory.AddDealForPiece(context.Background(), pieceCID, di, "")
 }
 
 func (pw *boostPieceStoreWrapper) AddPieceBlockLocations(pieceCID cid.Cid, blockLocations map[cid.Cid]piecestore.BlockLocation) error {
