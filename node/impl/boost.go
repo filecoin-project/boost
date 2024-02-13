@@ -191,6 +191,10 @@ func (sm *BoostAPI) BoostIndexerAnnounceDeal(ctx context.Context, deal *types.Pr
 	return sm.IndexProvider.AnnounceBoostDeal(ctx, deal)
 }
 
+func (sm *BoostAPI) BoostIndexerAnnounceLegacyDeal(ctx context.Context, proposalCid cid.Cid) error {
+	return sm.LegacyStorageProvider.AnnounceDealToIndexer(ctx, proposalCid)
+}
+
 func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (gfm_storagemarket.MinerDeal, error) {
 	return sm.LegacyStorageProvider.GetLocalDeal(propCid)
 }

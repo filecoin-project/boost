@@ -43,6 +43,7 @@ type Boost interface {
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                     //perm:admin
 	BoostIndexerAnnounceDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error)                                                      //perm:admin
 	BoostIndexerAnnounceDeal(ctx context.Context, deal *smtypes.ProviderDealState) (cid.Cid, error)                                             //perm:admin
+	BoostIndexerAnnounceLegacyDeal(ctx context.Context, proposalCid cid.Cid) error                                                              //perm:admin
 	BoostLegacyDealByProposalCid(ctx context.Context, propCid cid.Cid) (storagemarket.MinerDeal, error)                                         //perm:admin
 	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                                           //perm:admin
 	BoostDagstoreDestroyShard(ctx context.Context, key string) error                                                                            //perm:admin

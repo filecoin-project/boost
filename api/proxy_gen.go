@@ -78,6 +78,8 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceLatestHttp func(p0 context.Context, p1 []string) (cid.Cid, error) `perm:"admin"`
 
+		BoostIndexerAnnounceLegacyDeal func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+
 		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
 
 		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (storagemarket.MinerDeal, error) `perm:"admin"`
@@ -502,6 +504,17 @@ func (s *BoostStruct) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []st
 
 func (s *BoostStub) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []string) (cid.Cid, error) {
 	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceLegacyDeal(p0 context.Context, p1 cid.Cid) error {
+	if s.Internal.BoostIndexerAnnounceLegacyDeal == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceLegacyDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceLegacyDeal(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
