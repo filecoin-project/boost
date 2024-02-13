@@ -28,6 +28,7 @@
   * [BoostIndexerAnnounceDealRemoved](#boostindexerannouncedealremoved)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
+  * [BoostIndexerAnnounceLegacyDeal](#boostindexerannouncelegacydeal)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
   * [BoostLegacyDealByProposalCid](#boostlegacydealbyproposalcid)
   * [BoostMakeDeal](#boostmakedeal)
@@ -722,6 +723,22 @@ Response:
   "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
 }
 ```
+
+### BoostIndexerAnnounceLegacyDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response: `{}`
 
 ### BoostIndexerListMultihashes
 
