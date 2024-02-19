@@ -1,8 +1,6 @@
 # Groups
 * [](#)
   * [Discover](#discover)
-* [Actor](#actor)
-  * [ActorSectorSize](#actorsectorsize)
 * [Auth](#auth)
   * [AuthNew](#authnew)
   * [AuthVerify](#authverify)
@@ -11,14 +9,6 @@
   * [BlockstoreGetSize](#blockstoregetsize)
   * [BlockstoreHas](#blockstorehas)
 * [Boost](#boost)
-  * [BoostDagstoreDestroyShard](#boostdagstoredestroyshard)
-  * [BoostDagstoreGC](#boostdagstoregc)
-  * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
-  * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
-  * [BoostDagstoreListShards](#boostdagstorelistshards)
-  * [BoostDagstorePiecesContainingMultihash](#boostdagstorepiecescontainingmultihash)
-  * [BoostDagstoreRecoverShard](#boostdagstorerecovershard)
-  * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDirectDeal](#boostdirectdeal)
@@ -33,39 +23,11 @@
   * [BoostLegacyDealByProposalCid](#boostlegacydealbyproposalcid)
   * [BoostMakeDeal](#boostmakedeal)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
-* [Deals](#deals)
-  * [DealsConsiderOfflineRetrievalDeals](#dealsconsiderofflineretrievaldeals)
-  * [DealsConsiderOfflineStorageDeals](#dealsconsiderofflinestoragedeals)
-  * [DealsConsiderOnlineRetrievalDeals](#dealsconsideronlineretrievaldeals)
-  * [DealsConsiderOnlineStorageDeals](#dealsconsideronlinestoragedeals)
-  * [DealsConsiderUnverifiedStorageDeals](#dealsconsiderunverifiedstoragedeals)
-  * [DealsConsiderVerifiedStorageDeals](#dealsconsiderverifiedstoragedeals)
-  * [DealsPieceCidBlocklist](#dealspiececidblocklist)
-  * [DealsSetConsiderOfflineRetrievalDeals](#dealssetconsiderofflineretrievaldeals)
-  * [DealsSetConsiderOfflineStorageDeals](#dealssetconsiderofflinestoragedeals)
-  * [DealsSetConsiderOnlineRetrievalDeals](#dealssetconsideronlineretrievaldeals)
-  * [DealsSetConsiderOnlineStorageDeals](#dealssetconsideronlinestoragedeals)
-  * [DealsSetConsiderUnverifiedStorageDeals](#dealssetconsiderunverifiedstoragedeals)
-  * [DealsSetConsiderVerifiedStorageDeals](#dealssetconsiderverifiedstoragedeals)
-  * [DealsSetPieceCidBlocklist](#dealssetpiececidblocklist)
 * [I](#i)
   * [ID](#id)
 * [Log](#log)
   * [LogList](#loglist)
   * [LogSetLevel](#logsetlevel)
-* [Market](#market)
-  * [MarketCancelDataTransfer](#marketcanceldatatransfer)
-  * [MarketDataTransferUpdates](#marketdatatransferupdates)
-  * [MarketGetAsk](#marketgetask)
-  * [MarketGetRetrievalAsk](#marketgetretrievalask)
-  * [MarketImportDealData](#marketimportdealdata)
-  * [MarketListDataTransfers](#marketlistdatatransfers)
-  * [MarketListIncompleteDeals](#marketlistincompletedeals)
-  * [MarketListRetrievalDeals](#marketlistretrievaldeals)
-  * [MarketPendingDeals](#marketpendingdeals)
-  * [MarketRestartDataTransfer](#marketrestartdatatransfer)
-  * [MarketSetAsk](#marketsetask)
-  * [MarketSetRetrievalAsk](#marketsetretrievalask)
 * [Net](#net)
   * [NetAddrsListen](#netaddrslisten)
   * [NetAgentVersion](#netagentversion)
@@ -94,10 +56,6 @@
   * [OnlineBackup](#onlinebackup)
 * [Pd](#pd)
   * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
-* [Runtime](#runtime)
-  * [RuntimeSubsystems](#runtimesubsystems)
-* [Sectors](#sectors)
-  * [SectorsRefs](#sectorsrefs)
 ## 
 
 
@@ -119,23 +77,6 @@ Response:
   "openrpc": "1.2.6"
 }
 ```
-
-## Actor
-
-
-### ActorSectorSize
-There are not yet any comments for this method.
-
-Perms: read
-
-Inputs:
-```json
-[
-  "f01234"
-]
-```
-
-Response: `34359738368`
 
 ## Auth
 
@@ -228,146 +169,6 @@ Response: `true`
 
 ## Boost
 
-
-### BoostDagstoreDestroyShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreGC
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-    "Success": false,
-    "Error": "\u003cerror\u003e"
-  }
-]
-```
-
-### BoostDagstoreInitializeAll
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  {
-    "MaxConcurrency": 123,
-    "IncludeSealed": true
-  }
-]
-```
-
-Response:
-```json
-{
-  "Key": "string value",
-  "Event": "string value",
-  "Success": true,
-  "Error": "string value",
-  "Total": 123,
-  "Current": 123
-}
-```
-
-### BoostDagstoreInitializeShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreListShards
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-    "State": "ShardStateAvailable",
-    "Error": "\u003cerror\u003e"
-  }
-]
-```
-
-### BoostDagstorePiecesContainingMultihash
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  "Bw=="
-]
-```
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-### BoostDagstoreRecoverShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreRegisterShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
 
 ### BoostDeal
 
@@ -738,7 +539,12 @@ Inputs:
 ]
 ```
 
-Response: `{}`
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
 
 ### BoostIndexerListMultihashes
 
@@ -805,8 +611,8 @@ Response:
   "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
   "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
   "State": 42,
-  "PiecePath": ".lotusminer/fstmp123",
-  "MetadataPath": ".lotusminer/fstmp123",
+  "PiecePath": "",
+  "MetadataPath": "",
   "SlashEpoch": 10101,
   "FastRetrieval": true,
   "Message": "string value",
@@ -910,181 +716,6 @@ Response:
 }
 ```
 
-## Deals
-
-
-### DealsConsiderOfflineRetrievalDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOfflineStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOnlineRetrievalDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOnlineStorageDeals
-There are not yet any comments for this method.
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderUnverifiedStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderVerifiedStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsPieceCidBlocklist
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-### DealsSetConsiderOfflineRetrievalDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOfflineStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOnlineRetrievalDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOnlineStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderUnverifiedStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderVerifiedStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetPieceCidBlocklist
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  [
-    {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    }
-  ]
-]
-```
-
-Response: `{}`
-
 ## I
 
 
@@ -1124,379 +755,6 @@ Inputs:
 [
   "string value",
   "string value"
-]
-```
-
-Response: `{}`
-
-## Market
-
-
-### MarketCancelDataTransfer
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  3,
-  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  true
-]
-```
-
-Response: `{}`
-
-### MarketDataTransferUpdates
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "TransferID": 3,
-  "Status": 1,
-  "BaseCID": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "IsInitiator": true,
-  "IsSender": true,
-  "Voucher": "string value",
-  "Message": "string value",
-  "OtherPeer": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "Transferred": 42,
-  "Stages": {
-    "Stages": [
-      {
-        "Name": "string value",
-        "Description": "string value",
-        "CreatedTime": "0001-01-01T00:00:00Z",
-        "UpdatedTime": "0001-01-01T00:00:00Z",
-        "Logs": [
-          {
-            "Log": "string value",
-            "UpdatedTime": "0001-01-01T00:00:00Z"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### MarketGetAsk
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "Ask": {
-    "Price": "0",
-    "VerifiedPrice": "0",
-    "MinPieceSize": 1032,
-    "MaxPieceSize": 1032,
-    "Miner": "f01234",
-    "Timestamp": 10101,
-    "Expiry": 10101,
-    "SeqNo": 42
-  },
-  "Signature": {
-    "Type": 2,
-    "Data": "Ynl0ZSBhcnJheQ=="
-  }
-}
-```
-
-### MarketGetRetrievalAsk
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "PricePerByte": "0",
-  "UnsealPrice": "0",
-  "PaymentInterval": 42,
-  "PaymentIntervalIncrease": 42
-}
-```
-
-### MarketImportDealData
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "string value"
-]
-```
-
-Response: `{}`
-
-### MarketListDataTransfers
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "TransferID": 3,
-    "Status": 1,
-    "BaseCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "IsInitiator": true,
-    "IsSender": true,
-    "Voucher": "string value",
-    "Message": "string value",
-    "OtherPeer": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "Transferred": 42,
-    "Stages": {
-      "Stages": [
-        {
-          "Name": "string value",
-          "Description": "string value",
-          "CreatedTime": "0001-01-01T00:00:00Z",
-          "UpdatedTime": "0001-01-01T00:00:00Z",
-          "Logs": [
-            {
-              "Log": "string value",
-              "UpdatedTime": "0001-01-01T00:00:00Z"
-            }
-          ]
-        }
-      ]
-    }
-  }
-]
-```
-
-### MarketListIncompleteDeals
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "PieceSize": 1032,
-      "VerifiedDeal": true,
-      "Client": "f01234",
-      "Provider": "f01234",
-      "Label": "",
-      "StartEpoch": 10101,
-      "EndEpoch": 10101,
-      "StoragePricePerEpoch": "0",
-      "ProviderCollateral": "0",
-      "ClientCollateral": "0"
-    },
-    "ClientSignature": {
-      "Type": 2,
-      "Data": "Ynl0ZSBhcnJheQ=="
-    },
-    "ProposalCid": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "AddFundsCid": null,
-    "PublishCid": null,
-    "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "State": 42,
-    "PiecePath": ".lotusminer/fstmp123",
-    "MetadataPath": ".lotusminer/fstmp123",
-    "SlashEpoch": 10101,
-    "FastRetrieval": true,
-    "Message": "string value",
-    "FundsReserved": "0",
-    "Ref": {
-      "TransferType": "string value",
-      "Root": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "PieceCid": null,
-      "PieceSize": 1024,
-      "RawBlockSize": 42
-    },
-    "AvailableForRetrieval": true,
-    "DealID": 5432,
-    "CreationTime": "0001-01-01T00:00:00Z",
-    "TransferChannelId": {
-      "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "ID": 3
-    },
-    "SectorNumber": 9,
-    "InboundCAR": "string value"
-  }
-]
-```
-
-### MarketListRetrievalDeals
-There are not yet any comments for this method.
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "PayloadCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "ID": 5,
-    "Selector": {
-      "Raw": "Ynl0ZSBhcnJheQ=="
-    },
-    "PieceCID": null,
-    "PricePerByte": "0",
-    "PaymentInterval": 42,
-    "PaymentIntervalIncrease": 42,
-    "UnsealPrice": "0",
-    "StoreID": 42,
-    "ChannelID": {
-      "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "ID": 3
-    },
-    "PieceInfo": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "Deals": [
-        {
-          "DealID": 5432,
-          "SectorID": 9,
-          "Offset": 1032,
-          "Length": 1032
-        }
-      ]
-    },
-    "Status": 0,
-    "Receiver": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "TotalSent": 42,
-    "FundsReceived": "0",
-    "Message": "string value",
-    "CurrentInterval": 42,
-    "LegacyProtocol": true
-  }
-]
-```
-
-### MarketPendingDeals
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "Deals": [
-    {
-      "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "PieceSize": 1032,
-        "VerifiedDeal": true,
-        "Client": "f01234",
-        "Provider": "f01234",
-        "Label": "",
-        "StartEpoch": 10101,
-        "EndEpoch": 10101,
-        "StoragePricePerEpoch": "0",
-        "ProviderCollateral": "0",
-        "ClientCollateral": "0"
-      },
-      "ClientSignature": {
-        "Type": 2,
-        "Data": "Ynl0ZSBhcnJheQ=="
-      }
-    }
-  ],
-  "PublishPeriodStart": "0001-01-01T00:00:00Z",
-  "PublishPeriod": 60000000000
-}
-```
-
-### MarketRestartDataTransfer
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  3,
-  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  true
-]
-```
-
-Response: `{}`
-
-### MarketSetAsk
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "0",
-  "0",
-  10101,
-  1032,
-  1032
-]
-```
-
-Response: `{}`
-
-### MarketSetRetrievalAsk
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  {
-    "PricePerByte": "0",
-    "UnsealPrice": "0",
-    "PaymentInterval": 42,
-    "PaymentIntervalIncrease": 42
-  }
 ]
 ```
 
@@ -2041,46 +1299,4 @@ Inputs:
 ```
 
 Response: `{}`
-
-## Runtime
-
-
-### RuntimeSubsystems
-RuntimeSubsystems returns the subsystems that are enabled
-in this instance.
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  "Markets"
-]
-```
-
-## Sectors
-
-
-### SectorsRefs
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "98000": [
-    {
-      "SectorID": 100,
-      "Offset": 10485760,
-      "Size": 1048576
-    }
-  ]
-}
-```
 

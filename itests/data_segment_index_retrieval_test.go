@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +24,6 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true))
 	opts = append(opts, framework.SetMaxStagingBytes(10000000)) // 10 MB
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
@@ -38,21 +38,6 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 
 	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
 	require.NoError(t, err)
-
-	//// Create a CAR file
-	//tempdir := t.TempDir()
-	//log.Debugw("using tempdir", "dir", tempdir)
-	//
-	//// Select the number of car segments to use in test
-	//seg := 2
-	//
-	//// Generate car file containing multiple car files
-	//segmentDetails, err := framework.GenerateDataSegmentFiles(t, tempdir, seg)
-	//require.NoError(t, err)
-	//
-	//p := segmentDetails.Piece.PieceCID.String()
-	//
-	//log.Info(p)
 
 	// Start a web server to serve the car files
 	log.Debug("starting webserver")
@@ -78,27 +63,19 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
-	////Retrieve and compare the all car files within the deal
-	//for i := 0; i < seg; i++ {
-	//	for _, r := range segmentDetails.Segments[i].Root {
-	//		outFile := f.RetrieveDirect(ctx, t, r, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
-	//		kit.AssertFilesEqual(t, segmentDetails.Segments[i].FilePath, outFile)
-	//	}
-	//}
-
 	r1, err := cid.Parse("bafykbzaceaqliwrg6y2bxrhhbbiz3nknhz43yj2bqog4rulu5km5qhkckffuw")
 	require.NoError(t, err)
 	r2, err := cid.Parse("bafykbzaceccq64xf6yadlbmqpfindtf5x3cssel2fozkhvdyrrtnjnutr5j52")
 	require.NoError(t, err)
 
-	outF1 := f.RetrieveDirect(ctx, t, r1, &pieceCid, false, nil)
+	outF1 := f.Retrieve(ctx, t, trustlessutils.Request{Root: r1, Scope: trustlessutils.DagScopeAll}, false)
 	r, err := carv2.OpenReader(outF1)
 	require.NoError(t, err)
 	rs, err := r.Roots()
 	require.NoError(t, err)
 	require.Equal(t, r1, rs[0])
 	r.Close()
-	outf2 := f.RetrieveDirect(ctx, t, r2, &pieceCid, false, nil)
+	outf2 := f.Retrieve(ctx, t, trustlessutils.Request{Root: r2, Scope: trustlessutils.DagScopeAll}, false)
 	r, err = carv2.OpenReader(outf2)
 	require.NoError(t, err)
 	rs, err = r.Roots()

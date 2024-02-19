@@ -3,18 +3,34 @@ package legacy
 import (
 	"context"
 	"errors"
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/filecoin-project/go-statemachine/fsm"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
-	"sync"
-	"time"
 )
+
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/legacy_manager_mock.go . LegacyDealManager
+
+type LegacyDealManager interface {
+	Run(ctx context.Context)
+	DealCount(ctx context.Context) (int, error)
+	ByPieceCid(ctx context.Context, pieceCid cid.Cid) ([]legacytypes.MinerDeal, error)
+	ByPayloadCid(ctx context.Context, payloadCid cid.Cid) ([]legacytypes.MinerDeal, error)
+	ByPublishCid(ctx context.Context, publishCid cid.Cid) ([]legacytypes.MinerDeal, error)
+	ListDeals() ([]legacytypes.MinerDeal, error)
+	ByPropCid(propCid cid.Cid) (legacytypes.MinerDeal, error)
+	ListLocalDealsPage(startPropCid *cid.Cid, offset int, limit int) ([]legacytypes.MinerDeal, error)
+}
 
 var log = logging.Logger("legacydeals")
 
-type LegacyDealsManager struct {
-	legacyProv gfm_storagemarket.StorageProvider
+type legacyDealsManager struct {
+	legacyFSM fsm.Group
 
 	startedOnce sync.Once
 	started     chan struct{}
@@ -26,9 +42,9 @@ type LegacyDealsManager struct {
 	publishCidIdx map[cid.Cid][]cid.Cid
 }
 
-func NewLegacyDealsManager(legacyProv gfm_storagemarket.StorageProvider) *LegacyDealsManager {
-	return &LegacyDealsManager{
-		legacyProv:    legacyProv,
+func NewLegacyDealsManager(legacyFSM fsm.Group) *legacyDealsManager {
+	return &legacyDealsManager{
+		legacyFSM:     legacyFSM,
 		started:       make(chan struct{}),
 		pieceCidIdx:   make(map[cid.Cid][]cid.Cid),
 		payloadCidIdx: make(map[cid.Cid][]cid.Cid),
@@ -36,7 +52,7 @@ func NewLegacyDealsManager(legacyProv gfm_storagemarket.StorageProvider) *Legacy
 	}
 }
 
-func (m *LegacyDealsManager) Run(ctx context.Context) {
+func (m *legacyDealsManager) Run(ctx context.Context) {
 	refresh := func() {
 		err := m.refresh()
 		if err != nil {
@@ -60,10 +76,10 @@ func (m *LegacyDealsManager) Run(ctx context.Context) {
 	}
 }
 
-func (m *LegacyDealsManager) refresh() error {
+func (m *legacyDealsManager) refresh() error {
 	start := time.Now()
 	log.Infow("refreshing legacy deals list")
-	dls, err := m.legacyProv.ListLocalDeals()
+	dls, err := m.ListDeals()
 	if err != nil {
 		return err
 	}
@@ -101,7 +117,7 @@ func (m *LegacyDealsManager) refresh() error {
 	return nil
 }
 
-func (m *LegacyDealsManager) waitStarted(ctx context.Context) error {
+func (m *legacyDealsManager) waitStarted(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -110,7 +126,7 @@ func (m *LegacyDealsManager) waitStarted(ctx context.Context) error {
 	}
 }
 
-func (m *LegacyDealsManager) DealCount(ctx context.Context) (int, error) {
+func (m *legacyDealsManager) DealCount(ctx context.Context) (int, error) {
 	if err := m.waitStarted(ctx); err != nil {
 		return 0, err
 	}
@@ -121,7 +137,7 @@ func (m *LegacyDealsManager) DealCount(ctx context.Context) (int, error) {
 	return m.dealCount, nil
 }
 
-func (m *LegacyDealsManager) ByPieceCid(ctx context.Context, pieceCid cid.Cid) ([]gfm_storagemarket.MinerDeal, error) {
+func (m *legacyDealsManager) ByPieceCid(ctx context.Context, pieceCid cid.Cid) ([]legacytypes.MinerDeal, error) {
 	if err := m.waitStarted(ctx); err != nil {
 		return nil, err
 	}
@@ -137,7 +153,7 @@ func (m *LegacyDealsManager) ByPieceCid(ctx context.Context, pieceCid cid.Cid) (
 	return m.byPropCids(propCids)
 }
 
-func (m *LegacyDealsManager) ByPayloadCid(ctx context.Context, payloadCid cid.Cid) ([]gfm_storagemarket.MinerDeal, error) {
+func (m *legacyDealsManager) ByPayloadCid(ctx context.Context, payloadCid cid.Cid) ([]legacytypes.MinerDeal, error) {
 	if err := m.waitStarted(ctx); err != nil {
 		return nil, err
 	}
@@ -153,7 +169,7 @@ func (m *LegacyDealsManager) ByPayloadCid(ctx context.Context, payloadCid cid.Ci
 	return m.byPropCids(propCids)
 }
 
-func (m *LegacyDealsManager) ByPublishCid(ctx context.Context, publishCid cid.Cid) ([]gfm_storagemarket.MinerDeal, error) {
+func (m *legacyDealsManager) ByPublishCid(ctx context.Context, publishCid cid.Cid) ([]legacytypes.MinerDeal, error) {
 	if err := m.waitStarted(ctx); err != nil {
 		return nil, err
 	}
@@ -170,12 +186,13 @@ func (m *LegacyDealsManager) ByPublishCid(ctx context.Context, publishCid cid.Ci
 }
 
 // Get deals by deal signed proposal cid
-func (m *LegacyDealsManager) byPropCids(propCids []cid.Cid) ([]gfm_storagemarket.MinerDeal, error) {
-	dls := make([]gfm_storagemarket.MinerDeal, 0, len(propCids))
+func (m *legacyDealsManager) byPropCids(propCids []cid.Cid) ([]legacytypes.MinerDeal, error) {
+	dls := make([]legacytypes.MinerDeal, 0, len(propCids))
 	for _, propCid := range propCids {
-		dl, err := m.legacyProv.GetLocalDeal(propCid)
+		var d legacytypes.MinerDeal
+		err := m.legacyFSM.Get(propCid).Get(&d)
 		if err == nil {
-			dls = append(dls, dl)
+			dls = append(dls, d)
 			continue
 		}
 
@@ -187,4 +204,63 @@ func (m *LegacyDealsManager) byPropCids(propCids []cid.Cid) ([]gfm_storagemarket
 	}
 
 	return dls, nil
+}
+
+func (m *legacyDealsManager) ListDeals() ([]legacytypes.MinerDeal, error) {
+	var list []legacytypes.MinerDeal
+	if err := m.legacyFSM.List(&list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// Get deal by deal signed proposal cid
+func (m *legacyDealsManager) ByPropCid(propCid cid.Cid) (legacytypes.MinerDeal, error) {
+	var d legacytypes.MinerDeal
+	err := m.legacyFSM.Get(propCid).Get(&d)
+	if err != nil {
+		return legacytypes.MinerDeal{}, err
+	}
+	return d, nil
+}
+
+func (m *legacyDealsManager) ListLocalDealsPage(startPropCid *cid.Cid, offset int, limit int) ([]legacytypes.MinerDeal, error) {
+	if limit == 0 {
+		return []legacytypes.MinerDeal{}, nil
+	}
+
+	// Get all deals
+	var deals []legacytypes.MinerDeal
+	if err := m.legacyFSM.List(&deals); err != nil {
+		return nil, err
+	}
+
+	// Sort by creation time descending
+	sort.Slice(deals, func(i, j int) bool {
+		return deals[i].CreationTime.Time().After(deals[j].CreationTime.Time())
+	})
+
+	// Iterate through deals until we reach the target signed proposal cid,
+	// find the offset from there, then add deals from that point up to limit
+	page := make([]legacytypes.MinerDeal, 0, limit)
+	startIndex := -1
+	if startPropCid == nil {
+		startIndex = 0
+	}
+	for i, dl := range deals {
+		// Find the deal with a proposal cid matching startPropCid
+		if startPropCid != nil && dl.ProposalCid == *startPropCid {
+			// Start adding deals from offset after the first matching deal
+			startIndex = i + offset
+		}
+
+		if startIndex >= 0 && i >= startIndex {
+			page = append(page, dl)
+		}
+		if len(page) == limit {
+			return page, nil
+		}
+	}
+
+	return page, nil
 }

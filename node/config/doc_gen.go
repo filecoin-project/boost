@@ -18,6 +18,44 @@ var Doc = map[string][]DocField{
 your node if metadata log is disabled`,
 		},
 	},
+	"BitswapRetrievalConfig": []DocField{
+		{
+			Name: "BitswapPeerID",
+			Type: "string",
+
+			Comment: `The libp2p peer id used by booster-bitswap.
+Run 'booster-bitswap init' to get the peer id.
+When BitswapPeerID is not empty boostd will:
+- listen on bitswap protocols on boostd's own peer id and proxy
+requests to booster-bitswap
+- advertise boostd's peer id in bitswap records to the content indexer
+(bitswap clients connect to boostd, which proxies the requests to
+booster-bitswap)
+- list bitswap as an available transport on the retrieval transport protocol`,
+		},
+		{
+			Name: "BitswapPublicAddresses",
+			Type: "[]string",
+
+			Comment: `Public multiaddresses for booster-bitswap.
+If empty
+- booster-bitswap is assumed to be running privately
+- boostd acts as a proxy: it listens on bitswap protocols on boostd's own
+peer id and forwards them to booster-bitswap
+If public addresses are set
+- boostd announces the booster-bitswap peer id to the indexer as an
+extended provider
+- clients make connections directly to the booster-bitswap process
+(boostd does not act as a proxy)`,
+		},
+		{
+			Name: "BitswapPrivKeyFile",
+			Type: "string",
+
+			Comment: `If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
+a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
+		},
+	},
 	"Boost": []DocField{
 		{
 			Name: "ConfigVersion",
@@ -46,6 +84,12 @@ your node if metadata log is disabled`,
 		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Dealpublish",
+			Type: "DealPublishConfig",
 
 			Comment: ``,
 		},
@@ -92,20 +136,8 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
-			Name: "LotusDealmaking",
-			Type: "lotus_config.DealmakingConfig",
-
-			Comment: `Lotus configs`,
-		},
-		{
-			Name: "LotusFees",
-			Type: "FeeConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "DAGStore",
-			Type: "lotus_config.DAGStoreConfig",
+			Name: "Retrievals",
+			Type: "RetrievalConfig",
 
 			Comment: ``,
 		},
@@ -160,6 +192,38 @@ your node if metadata log is disabled`,
 			Type: "string",
 
 			Comment: `From address for eth_ state call`,
+		},
+	},
+	"DealPublishConfig": []DocField{
+		{
+			Name: "ManualDealPublish",
+			Type: "bool",
+
+			Comment: `When set to true, the user is responsible for publishing deals manually.
+The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+ignored, and deals will remain in the pending state until manually published.`,
+		},
+		{
+			Name: "PublishMsgPeriod",
+			Type: "Duration",
+
+			Comment: `When a deal is ready to publish, the amount of time to wait for more
+deals to be ready to publish before publishing them all as a batch`,
+		},
+		{
+			Name: "MaxDealsPerPublishMsg",
+			Type: "uint64",
+
+			Comment: `The maximum number of deals to include in a single PublishStorageDeals
+message`,
+		},
+		{
+			Name: "MaxPublishDealsFee",
+			Type: "types.FIL",
+
+			Comment: `The maximum collateral that the provider will put up against a deal,
+as a multiplier of the minimum collateral bound
+The maximum fee to pay when sending the PublishStorageDeals message`,
 		},
 	},
 	"DealmakingConfig": []DocField{
@@ -268,51 +332,11 @@ Set this value to 0 to indicate there is no limit per host.`,
 			Comment: `The amount of time to keep deal proposal logs for before cleaning them up.`,
 		},
 		{
-			Name: "RetrievalLogDuration",
-			Type: "Duration",
-
-			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
-Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
-logs db is leveraged for pruning stalled retrievals.`,
-		},
-		{
-			Name: "StalledRetrievalTimeout",
-			Type: "Duration",
-
-			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
-		},
-		{
 			Name: "Filter",
 			Type: "string",
 
 			Comment: `A command used for fine-grained evaluation of storage deals
 see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalFilter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalPricing",
-			Type: "*lotus_config.RetrievalPricing",
-
-			Comment: ``,
-		},
-		{
-			Name: "BlockstoreCacheMaxShards",
-			Type: "int",
-
-			Comment: `The maximum number of shards cached by the Dagstore for retrieval
-Lower this limit if boostd memory is too high during retrievals`,
-		},
-		{
-			Name: "BlockstoreCacheExpiry",
-			Type: "Duration",
-
-			Comment: `How long a blockstore shard should be cached before expiring without use`,
 		},
 		{
 			Name: "IsUnsealedCacheExpiry",
@@ -341,70 +365,6 @@ Please note that this only works for v1.2.0 deals and not legacy deals`,
 boost process`,
 		},
 		{
-			Name: "HTTPRetrievalMultiaddr",
-			Type: "string",
-
-			Comment: `The public multi-address for retrieving deals with booster-http.
-Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
-		},
-		{
-			Name: "HttpTransferMaxConcurrentDownloads",
-			Type: "uint64",
-
-			Comment: `The maximum number of concurrent storage deal HTTP downloads.
-Note that this is a soft maximum; if some downloads stall,
-more downloads are allowed to start.`,
-		},
-		{
-			Name: "HttpTransferStallCheckPeriod",
-			Type: "Duration",
-
-			Comment: `The period between checking if downloads have stalled.`,
-		},
-		{
-			Name: "HttpTransferStallTimeout",
-			Type: "Duration",
-
-			Comment: `The time that can elapse before a download is considered stalled (and
-another concurrent download is allowed to start).`,
-		},
-		{
-			Name: "BitswapPeerID",
-			Type: "string",
-
-			Comment: `The libp2p peer id used by booster-bitswap.
-Run 'booster-bitswap init' to get the peer id.
-When BitswapPeerID is not empty boostd will:
-- listen on bitswap protocols on boostd's own peer id and proxy
-requests to booster-bitswap
-- advertise boostd's peer id in bitswap records to the content indexer
-(bitswap clients connect to boostd, which proxies the requests to
-booster-bitswap)
-- list bitswap as an available transport on the retrieval transport protocol`,
-		},
-		{
-			Name: "BitswapPublicAddresses",
-			Type: "[]string",
-
-			Comment: `Public multiaddresses for booster-bitswap.
-If empty
-- booster-bitswap is assumed to be running privately
-- boostd acts as a proxy: it listens on bitswap protocols on boostd's own
-peer id and forwards them to booster-bitswap
-If public addresses are set
-- boostd announces the booster-bitswap peer id to the indexer as an
-extended provider
-- clients make connections directly to the booster-bitswap process
-(boostd does not act as a proxy)`,
-		},
-		{
-			Name: "BitswapPrivKeyFile",
-			Type: "string",
-
-			Comment: `If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
-a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
-		},
-		{
 			Name: "DealLogDurationDays",
 			Type: "int",
 
@@ -427,44 +387,6 @@ Any value less than 0 will result in use of default`,
 accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
-		{
-			Name: "EnableLegacyStorageDeals",
-			Type: "bool",
-
-			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
-them disabled. These will be completely deprecated soon.`,
-		},
-		{
-			Name: "ManualDealPublish",
-			Type: "bool",
-
-			Comment: `When set to true, the user is responsible for publishing deals manually.
-The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
-ignored, and deals will remain in the pending state until manually published.`,
-		},
-		{
-			Name: "GraphsyncStorageAccessApiInfo",
-			Type: "[]string",
-
-			Comment: `The connect strings for the RPC APIs of each miner that boost can read
-sector data from when serving graphsync retrievals.
-If this parameter is not set, boost will serve data from the endpoint
-configured in SectorIndexApiInfo.`,
-		},
-	},
-	"FeeConfig": []DocField{
-		{
-			Name: "MaxPublishDealsFee",
-			Type: "types.FIL",
-
-			Comment: `The maximum fee to pay when sending the PublishStorageDeals message`,
-		},
-		{
-			Name: "MaxMarketBalanceAddFee",
-			Type: "types.FIL",
-
-			Comment: `The maximum fee to pay when sending the AddBalance message (used by legacy markets)`,
-		},
 	},
 	"GraphqlConfig": []DocField{
 		{
@@ -480,7 +402,75 @@ configured in SectorIndexApiInfo.`,
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
+	"GraphsyncRetrievalConfig": []DocField{
+		{
+			Name: "SimultaneousTransfersForRetrieval",
+			Type: "uint64",
+
+			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
+		},
+		{
+			Name: "RetrievalLogDuration",
+			Type: "Duration",
+
+			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
+Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+logs db is leveraged for pruning stalled retrievals.`,
+		},
+		{
+			Name: "StalledRetrievalTimeout",
+			Type: "Duration",
+
+			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
+		},
+		{
+			Name: "GraphsyncStorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from when serving graphsync retrievals.
+If this parameter is not set, boost will serve data from the endpoint
+configured in SectorIndexApiInfo.`,
+		},
+		{
+			Name: "RetrievalFilter",
+			Type: "string",
+
+			Comment: `A command used for fine-grained evaluation of retrieval deals
+see https://boost.filecoin.io/configuration/deal-filters for more details`,
+		},
+	},
+	"HTTPRetrievalConfig": []DocField{
+		{
+			Name: "HTTPRetrievalMultiaddr",
+			Type: "string",
+
+			Comment: `The public multi-address for retrieving deals with booster-http.
+Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
+		},
+	},
 	"HttpDownloadConfig": []DocField{
+		{
+			Name: "HttpTransferMaxConcurrentDownloads",
+			Type: "uint64",
+
+			Comment: `The maximum number of concurrent storage deal HTTP downloads.
+Note that this is a soft maximum; if some downloads stall,
+more downloads are allowed to start.`,
+		},
+		{
+			Name: "HttpTransferStallCheckPeriod",
+			Type: "Duration",
+
+			Comment: `The period between checking if downloads have stalled.`,
+		},
+		{
+			Name: "HttpTransferStallTimeout",
+			Type: "Duration",
+
+			Comment: `The time that can elapse before a download is considered stalled (and
+another concurrent download is allowed to start).`,
+		},
 		{
 			Name: "NChunks",
 			Type: "int",
@@ -701,105 +691,6 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
 	},
-	"LotusDealmakingConfig": []DocField{
-		{
-			Name: "PieceCidBlocklist",
-			Type: "[]cid.Cid",
-
-			Comment: `A list of Data CIDs to reject when making deals`,
-		},
-		{
-			Name: "ExpectedSealDuration",
-			Type: "Duration",
-
-			Comment: `Maximum expected amount of time getting the deal into a sealed sector will take
-This includes the time the deal will need to get transferred and published
-before being assigned to a sector`,
-		},
-		{
-			Name: "MaxDealStartDelay",
-			Type: "Duration",
-
-			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
-		},
-		{
-			Name: "PublishMsgPeriod",
-			Type: "Duration",
-
-			Comment: `When a deal is ready to publish, the amount of time to wait for more
-deals to be ready to publish before publishing them all as a batch`,
-		},
-		{
-			Name: "MaxDealsPerPublishMsg",
-			Type: "uint64",
-
-			Comment: `The maximum number of deals to include in a single PublishStorageDeals
-message`,
-		},
-		{
-			Name: "MaxProviderCollateralMultiplier",
-			Type: "uint64",
-
-			Comment: `The maximum collateral that the provider will put up against a deal,
-as a multiplier of the minimum collateral bound`,
-		},
-		{
-			Name: "MaxStagingDealsBytes",
-			Type: "int64",
-
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
-		},
-		{
-			Name: "SimultaneousTransfersForStorage",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForStoragePerClient",
-			Type: "uint64",
-
-			Comment: `The maximum number of simultaneous data transfers from any single client
-for storage deals.
-Unset by default (0), and values higher than SimultaneousTransfersForStorage
-will have no effect; i.e. the total number of simultaneous data transfers
-across all storage clients is bound by SimultaneousTransfersForStorage
-regardless of this number.`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
-		},
-		{
-			Name: "StartEpochSealingBuffer",
-			Type: "uint64",
-
-			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
-		},
-		{
-			Name: "Filter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of storage deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalFilter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalPricing",
-			Type: "*lotus_config.RetrievalPricing",
-
-			Comment: ``,
-		},
-	},
 	"MonitoringConfig": []DocField{
 		{
 			Name: "MpoolAlertEpochs",
@@ -807,6 +698,26 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 
 			Comment: `The number of epochs after which alert is generated for a local pending
 message in lotus mpool`,
+		},
+	},
+	"RetrievalConfig": []DocField{
+		{
+			Name: "Graphsync",
+			Type: "GraphsyncRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Bitswap",
+			Type: "BitswapRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "HTTP",
+			Type: "HTTPRetrievalConfig",
+
+			Comment: ``,
 		},
 	},
 	"StorageConfig": []DocField{

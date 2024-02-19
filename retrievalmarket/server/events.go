@@ -2,23 +2,24 @@ package server
 
 import (
 	"errors"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/hannahhoward/go-pubsub"
 	"time"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/hannahhoward/go-pubsub"
 )
 
-func (g *GraphsyncUnpaidRetrieval) SubscribeToDataTransferEvents(subscriber datatransfer.Subscriber) datatransfer.Unsubscribe {
-	return datatransfer.Unsubscribe(g.pubSubDT.Subscribe(subscriber))
+func (g *GraphsyncUnpaidRetrieval) SubscribeToDataTransferEvents(subscriber datatransfer2.Subscriber) datatransfer2.Unsubscribe {
+	return datatransfer2.Unsubscribe(g.pubSubDT.Subscribe(subscriber))
 }
 
 type dtEvent struct {
-	evt   datatransfer.Event
-	state datatransfer.ChannelState
+	evt   datatransfer2.Event
+	state datatransfer2.ChannelState
 }
 
-func (g *GraphsyncUnpaidRetrieval) publishDTEvent(evtCode datatransfer.EventCode, msg string, chst datatransfer.ChannelState) {
-	evt := datatransfer.Event{
+func (g *GraphsyncUnpaidRetrieval) publishDTEvent(evtCode datatransfer2.EventCode, msg string, chst datatransfer2.ChannelState) {
+	evt := datatransfer2.Event{
 		Code:      evtCode,
 		Message:   msg,
 		Timestamp: time.Now(),
@@ -34,7 +35,7 @@ func eventDispatcherDT(evt pubsub.Event, subscriberFn pubsub.SubscriberFn) error
 	if !ok {
 		return errors.New("wrong type of event")
 	}
-	cb, ok := subscriberFn.(datatransfer.Subscriber)
+	cb, ok := subscriberFn.(datatransfer2.Subscriber)
 	if !ok {
 		return errors.New("wrong type of subscriber function")
 	}
@@ -42,16 +43,16 @@ func eventDispatcherDT(evt pubsub.Event, subscriberFn pubsub.SubscriberFn) error
 	return nil
 }
 
-func (g *GraphsyncUnpaidRetrieval) SubscribeToMarketsEvents(subscriber retrievalmarket.ProviderSubscriber) retrievalmarket.Unsubscribe {
-	return retrievalmarket.Unsubscribe(g.pubSubMkts.Subscribe(subscriber))
+func (g *GraphsyncUnpaidRetrieval) SubscribeToMarketsEvents(subscriber ProviderSubscriber) legacyretrievaltypes.Unsubscribe {
+	return legacyretrievaltypes.Unsubscribe(g.pubSubMkts.Subscribe(subscriber))
 }
 
 type mktsEvent struct {
-	evt   retrievalmarket.ProviderEvent
-	state retrievalmarket.ProviderDealState
+	evt   legacyretrievaltypes.ProviderEvent
+	state legacyretrievaltypes.ProviderDealState
 }
 
-func (g *GraphsyncUnpaidRetrieval) publishMktsEvent(evt retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) {
+func (g *GraphsyncUnpaidRetrieval) publishMktsEvent(evt legacyretrievaltypes.ProviderEvent, state legacyretrievaltypes.ProviderDealState) {
 	err := g.pubSubMkts.Publish(mktsEvent{evt: evt, state: state})
 	if err != nil {
 		log.Warnf("err publishing markets event: %s", err.Error())
@@ -63,10 +64,19 @@ func eventDispatcherMkts(evt pubsub.Event, subscriberFn pubsub.SubscriberFn) err
 	if !ok {
 		return errors.New("wrong type of event")
 	}
-	cb, ok := subscriberFn.(retrievalmarket.ProviderSubscriber)
+	cb, ok := subscriberFn.(ProviderSubscriber)
 	if !ok {
 		return errors.New("wrong type of event")
 	}
 	cb(ie.evt, ie.state)
 	return nil
 }
+
+// ProviderSubscriber is a callback that is registered to listen for retrieval events on a provider
+type ProviderSubscriber func(event legacyretrievaltypes.ProviderEvent, state legacyretrievaltypes.ProviderDealState)
+
+// ProviderQueryEventSubscriber is a callback that is registered to listen for query message events
+type ProviderQueryEventSubscriber func(evt legacyretrievaltypes.ProviderQueryEvent)
+
+// ProviderValidationSubscriber is a callback that is registered to listen for validation events
+type ProviderValidationSubscriber func(evt legacyretrievaltypes.ProviderValidationEvent)

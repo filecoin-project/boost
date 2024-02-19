@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -31,12 +31,12 @@ type QueryAskHandler struct {
 	minerAddress address.Address
 	pd           *piecedirectory.PieceDirectory
 	sa           SectorAccessor
-	askStore     AskGetter
+	askStore     RetrievalAskGetter
 	full         v1api.FullNode
 	host         host.Host
 }
 
-func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirectory.PieceDirectory, sa SectorAccessor, askStore AskGetter, full v1api.FullNode) *QueryAskHandler {
+func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirectory.PieceDirectory, sa SectorAccessor, askStore RetrievalAskGetter, full v1api.FullNode) *QueryAskHandler {
 	return &QueryAskHandler{
 		host:         host,
 		minerAddress: maddr,
@@ -48,11 +48,11 @@ func NewQueryAskHandler(host host.Host, maddr address.Address, pd *piecedirector
 }
 
 func (qa *QueryAskHandler) Start() {
-	qa.host.SetStreamHandler(retrievalmarket.QueryProtocolID, safe.Handle(qa.HandleQueryStream))
+	qa.host.SetStreamHandler(legacyretrievaltypes.QueryProtocolID, safe.Handle(qa.HandleQueryStream))
 }
 
 func (qa *QueryAskHandler) Stop() {
-	qa.host.RemoveStreamHandler(retrievalmarket.QueryProtocolID)
+	qa.host.RemoveStreamHandler(legacyretrievaltypes.QueryProtocolID)
 }
 
 func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
@@ -61,7 +61,7 @@ func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
 	// Set a deadline on reading from the stream so it doesn't hang
 	_ = stream.SetReadDeadline(time.Now().Add(providerReadDeadline))
 
-	var query retrievalmarket.Query
+	var query legacyretrievaltypes.Query
 	err := query.UnmarshalCBOR(stream)
 	_ = stream.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
 	if err != nil {
@@ -73,13 +73,13 @@ func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
 	defer cancel()
 	answer, err := qa.getQueryResponse(ctx, query)
 	if err != nil {
-		status := retrievalmarket.QueryResponseError
-		if errors.Is(err, retrievalmarket.ErrNotFound) {
-			status = retrievalmarket.QueryResponseUnavailable
+		status := legacyretrievaltypes.QueryResponseError
+		if errors.Is(err, legacyretrievaltypes.ErrNotFound) {
+			status = legacyretrievaltypes.QueryResponseUnavailable
 		}
-		answer = &retrievalmarket.QueryResponse{
+		answer = &legacyretrievaltypes.QueryResponse{
 			Status:          status,
-			PieceCIDFound:   retrievalmarket.QueryItemUnavailable,
+			PieceCIDFound:   legacyretrievaltypes.QueryItemUnavailable,
 			PaymentAddress:  qa.minerAddress,
 			MinPricePerByte: big.Zero(),
 			UnsealPrice:     big.Zero(),
@@ -96,7 +96,7 @@ func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
 	}
 }
 
-func (qa *QueryAskHandler) getQueryResponse(ctx context.Context, query retrievalmarket.Query) (*retrievalmarket.QueryResponse, error) {
+func (qa *QueryAskHandler) getQueryResponse(ctx context.Context, query legacyretrievaltypes.Query) (*legacyretrievaltypes.QueryResponse, error) {
 	// Fetch the payment address the client should send the payment to
 	head, err := qa.full.ChainHead(ctx)
 	if err != nil {
@@ -122,10 +122,10 @@ func (qa *QueryAskHandler) getQueryResponse(ctx context.Context, query retrieval
 
 	pieceInfo, _ := GetBestPieceInfoMatch(ctx, qa.sa, pieces, pieceCID)
 	if !pieceInfo.PieceCID.Defined() {
-		if piecesErr != nil && !errors.Is(piecesErr, retrievalmarket.ErrNotFound) {
+		if piecesErr != nil && !errors.Is(piecesErr, legacyretrievaltypes.ErrNotFound) {
 			return nil, fmt.Errorf("fetching piece to retrieve from: %w", piecesErr)
 		}
-		return nil, fmt.Errorf("getting pieces for payload cid %s: %w", query.PayloadCID, retrievalmarket.ErrNotFound)
+		return nil, fmt.Errorf("getting pieces for payload cid %s: %w", query.PayloadCID, legacyretrievaltypes.ErrNotFound)
 	}
 
 	if len(pieceInfo.Deals) == 0 {
@@ -145,11 +145,11 @@ func (qa *QueryAskHandler) getQueryResponse(ctx context.Context, query retrieval
 		return nil, errors.New("no ask configured in ask-store")
 	}
 
-	return &retrievalmarket.QueryResponse{
+	return &legacyretrievaltypes.QueryResponse{
 		PaymentAddress:             minerInfo.Worker,
-		Status:                     retrievalmarket.QueryResponseAvailable,
+		Status:                     legacyretrievaltypes.QueryResponseAvailable,
 		Size:                       uint64(pieceInfo.Deals[0].PieceLength.Unpadded()),
-		PieceCIDFound:              retrievalmarket.QueryItemAvailable,
+		PieceCIDFound:              legacyretrievaltypes.QueryItemAvailable,
 		MinPricePerByte:            currAsk.PricePerByte,
 		MaxPaymentInterval:         currAsk.PaymentInterval,
 		MaxPaymentIntervalIncrease: currAsk.PaymentIntervalIncrease,

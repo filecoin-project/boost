@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
@@ -20,13 +18,13 @@ import (
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
+	"github.com/filecoin-project/boost/storagemarket/storedask"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
@@ -65,11 +63,8 @@ type resolver struct {
 	fundMgr        *fundmanager.FundManager
 	storageMgr     *storagemanager.StorageManager
 	provider       *storagemarket.Provider
+	legacyDeals    legacy.LegacyDealManager
 	ddProvider     *storagemarket.DirectDealsProvider
-	legacyDeals    *legacy.LegacyDealsManager
-	legacyProv     gfm_storagemarket.StorageProvider
-	legacyDT       dtypes.ProviderDataTransfer
-	ps             piecestore.PieceStore
 	ssm            *sectorstatemgr.SectorStateMgr
 	piecedirectory *piecedirectory.PieceDirectory
 	publisher      *storageadapter.DealPublisher
@@ -79,9 +74,10 @@ type resolver struct {
 	fullNode       v1api.FullNode
 	mpool          *mpoolmonitor.MpoolMonitor
 	mma            *lib.MultiMinerAccessor
+	askProv        storedask.StoredAsk
 }
 
-func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, assk storedask.StoredAsk) *resolver {
 	return &resolver{
 		ctx:            ctx,
 		cfg:            cfg,
@@ -98,9 +94,6 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		provider:       provider,
 		ddProvider:     ddProvider,
 		legacyDeals:    legacyDeals,
-		legacyProv:     legacyProv,
-		legacyDT:       legacyDT,
-		ps:             ps,
 		piecedirectory: piecedirectory,
 		publisher:      publisher,
 		spApi:          spApi,
@@ -110,6 +103,7 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		ssm:            ssm,
 		mpool:          mpool,
 		mma:            mma,
+		askProv:        assk,
 	}
 }
 

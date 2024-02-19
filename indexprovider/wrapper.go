@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 
+	"github.com/filecoin-project/boost/lib/legacy"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/filecoin-project/go-statemachine/fsm"
 	"github.com/google/uuid"
 	"go.uber.org/fx"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipld/go-ipld-prime"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/markets/idxprov"
@@ -43,15 +44,14 @@ import (
 )
 
 var log = logging.Logger("index-provider-wrapper")
-var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
 	enabled bool
 
 	cfg            *config.Boost
 	dealsDB        *db.DealsDB
+	legacyProv     legacy.LegacyDealManager
 	directDealsDB  *db.DirectDealsDB
-	legacyProv     storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
 	ssm            *sectorstatemgr.SectorStateMgr
@@ -65,25 +65,21 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
+	ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
 	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
+		ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
 		ssm *sectorstatemgr.SectorStateMgr,
 		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
-		if cfg.DAGStore.RootDir == "" {
-			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
-		}
-
 		_, isDisabled := prov.(*DisabledIndexProvider)
 
 		// bitswap is enabled if there is a bitswap peer id
-		bitswapEnabled := cfg.Dealmaking.BitswapPeerID != ""
+		bitswapEnabled := cfg.Retrievals.Bitswap.BitswapPeerID != ""
 		// http is considered enabled if there is an http retrieval multiaddr set
-		httpEnabled := cfg.Dealmaking.HTTPRetrievalMultiaddr != ""
+		httpEnabled := cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr != ""
 
 		// setup bitswap extended provider if there is a public multi addr for bitswap
 		w := &Wrapper{
@@ -208,7 +204,7 @@ func (w *Wrapper) handleUpdates(ctx context.Context, sectorUpdates map[abi.Secto
 }
 
 // Get deals by sector ID, whether they're legacy or boost deals
-func (w *Wrapper) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]storagemarket.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
+func (w *Wrapper) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]legacytypes.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
 	// First query the boost database
 	deals, err := w.dealsDB.BySectorID(ctx, sectorID)
 	if err != nil {
@@ -244,13 +240,13 @@ func (w *Wrapper) dealsBySectorID(ctx context.Context, legacyDeals map[abi.Secto
 // Iterate over all legacy deals and make a map of sector ID -> legacy deal.
 // To save memory, only include legacy deals with a sector ID that we know
 // we're going to query, ie the set of sector IDs in the stateUpdates map.
-func (w *Wrapper) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]storagemarket.MinerDeal, error) {
-	legacyDeals, err := w.legacyProv.ListLocalDeals()
+func (w *Wrapper) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]legacytypes.MinerDeal, error) {
+	legacyDeals, err := w.legacyProv.ListDeals()
 	if err != nil {
 		return nil, err
 	}
 
-	bySectorID := make(map[abi.SectorID][]storagemarket.MinerDeal, len(legacyDeals))
+	bySectorID := make(map[abi.SectorID][]legacytypes.MinerDeal, len(legacyDeals))
 	for _, deal := range legacyDeals {
 		minerID, err := address.IDFromAddress(deal.Proposal.Provider)
 		if err != nil {
@@ -373,26 +369,26 @@ func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xprovi
 			return err
 		}
 		var ep xproviders.Info
-		if len(w.cfg.Dealmaking.BitswapPublicAddresses) > 0 {
-			if w.cfg.Dealmaking.BitswapPrivKeyFile == "" {
+		if len(w.cfg.Retrievals.Bitswap.BitswapPublicAddresses) > 0 {
+			if w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile == "" {
 				return fmt.Errorf("missing required configuration key BitswapPrivKeyFile: " +
 					"boost is configured with BitswapPublicAddresses but the BitswapPrivKeyFile configuration key is empty")
 			}
 
 			// we need the private key for bitswaps peerID in order to announce publicly
-			keyFile, err := os.ReadFile(w.cfg.Dealmaking.BitswapPrivKeyFile)
+			keyFile, err := os.ReadFile(w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile)
 			if err != nil {
-				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
+				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile, err)
 			}
 			privKey, err := crypto.UnmarshalPrivateKey(keyFile)
 			if err != nil {
-				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
+				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Retrievals.Bitswap.BitswapPrivKeyFile, err)
 			}
 			// setup an extended provider record, containing the booster-bitswap multi addr,
 			// peer ID, private key for signing, and metadata
 			ep = xproviders.Info{
-				ID:       w.cfg.Dealmaking.BitswapPeerID,
-				Addrs:    w.cfg.Dealmaking.BitswapPublicAddresses,
+				ID:       w.cfg.Retrievals.Bitswap.BitswapPeerID,
+				Addrs:    w.cfg.Retrievals.Bitswap.BitswapPublicAddresses,
 				Priv:     privKey,
 				Metadata: mbytes,
 			}
@@ -430,7 +426,7 @@ func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xprovi
 		}
 		var ep = xproviders.Info{
 			ID:       w.h.ID().String(),
-			Addrs:    []string{w.cfg.Dealmaking.HTTPRetrievalMultiaddr},
+			Addrs:    []string{w.cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr},
 			Metadata: mbytes,
 			Priv:     key,
 		}
@@ -449,12 +445,48 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 	}
 
 	log.Info("announcing all legacy deals to Indexer")
-	err := w.legacyProv.AnnounceAllDealsToIndexer(ctx)
-	if err == nil {
-		log.Infof("finished announcing all legacy deals to Indexer")
-	} else {
-		log.Warnw("failed to announce legacy deals to Indexer", "err", err)
+
+	legacyDeals, err := w.legacyProv.ListDeals()
+	if err != nil {
+		return fmt.Errorf("failed to get the list of legacy deals: %w", err)
 	}
+
+	inSealingSubsystem := make(map[fsm.StateKey]struct{}, len(legacytypes.StatesKnownBySealingSubsystem))
+	for _, s := range legacytypes.StatesKnownBySealingSubsystem {
+		inSealingSubsystem[s] = struct{}{}
+	}
+
+	expiredStates := make(map[fsm.StateKey]struct{}, len(legacytypes.ProviderFinalityStates))
+	for _, s := range legacytypes.ProviderFinalityStates {
+		expiredStates[s] = struct{}{}
+	}
+
+	shards := make(map[string]struct{})
+	var nSuccess int
+	var merr error
+
+	for _, d := range legacyDeals {
+		// only announce deals that have been handed off to the sealing subsystem as the rest will get announced anyways
+		if _, ok := inSealingSubsystem[d.State]; !ok {
+			continue
+		}
+		// only announce deals that have not expired
+		if _, ok := expiredStates[d.State]; ok {
+			continue
+		}
+
+		adCid, lerr := w.AnnounceLegcayDealToIndexer(ctx, d.ProposalCid)
+		if lerr != nil {
+			merr = multierror.Append(merr, lerr)
+			log.Errorw("failed to announce deal to Index provider", "proposalCid", d.ProposalCid, "err", lerr)
+			continue
+		}
+		log.Infof("announce legacy deal with proposal CID %s to the indexer with announcement-cid: %s", d.ProposalCid.String(), adCid.String())
+		shards[d.Proposal.PieceCID.String()] = struct{}{}
+		nSuccess++
+	}
+
+	log.Infow("finished announcing active deals to index provider", "number of deals", nSuccess, "number of shards", shards)
 
 	log.Info("announcing all Boost deals to Indexer")
 	deals, err := w.dealsDB.ListActive(ctx)
@@ -462,9 +494,8 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		return fmt.Errorf("failed to list deals: %w", err)
 	}
 
-	shards := make(map[string]struct{})
-	var nSuccess int
-	var merr error
+	bshards := make(map[string]struct{})
+	var bnSuccess int
 
 	for _, d := range deals {
 		// filter out deals that will announce automatically at a later
@@ -484,11 +515,11 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 			}
 			continue
 		}
-		shards[d.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-		nSuccess++
+		bshards[d.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
+		bnSuccess++
 	}
 
-	log.Infow("finished announcing all boost deals to Indexer", "number of deals", nSuccess, "number of shards", len(shards))
+	log.Infow("finished announcing all boost deals to Indexer", "number of deals", bnSuccess, "number of shards", len(bshards))
 	return merr
 }
 
@@ -598,7 +629,7 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 		}
 
 		// Deal was not found in boost DB - check in legacy markets
-		md, legacyErr := w.legacyProv.GetLocalDeal(proposalCid)
+		md, legacyErr := w.legacyProv.ByPropCid(proposalCid)
 		if legacyErr == nil {
 			// Found the deal, get an interator over the piece
 			return provideF(proposalCid.String(), false, md.Proposal.PieceCID)
@@ -716,7 +747,23 @@ type basicDealInfo struct {
 	AnnounceToIPNI bool
 	DealID         string
 	SectorID       abi.SectorID
-	DealProposal   storagemarket.ClientDealProposal
+	DealProposal   legacytypes.ClientDealProposal
+}
+
+func (w *Wrapper) AnnounceLegcayDealToIndexer(ctx context.Context, proposalCid cid.Cid) (cid.Cid, error) {
+	var deal legacytypes.MinerDeal
+	deal, err := w.legacyProv.ByPropCid(proposalCid)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed getting deal %s: %w", proposalCid, err)
+	}
+
+	mt := metadata.GraphsyncFilecoinV1{
+		PieceCID:      deal.Proposal.PieceCID,
+		FastRetrieval: deal.FastRetrieval,
+		VerifiedDeal:  deal.Proposal.VerifiedDeal,
+	}
+
+	return w.AnnounceBoostDealMetadata(ctx, mt, proposalCid.Bytes())
 }
 
 func (w *Wrapper) AnnounceBoostDirectDeal(ctx context.Context, entry *types.DirectDeal) (cid.Cid, error) {

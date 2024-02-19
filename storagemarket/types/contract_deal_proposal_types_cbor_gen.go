@@ -40,7 +40,7 @@ func (t *ContractParamsVersion1) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.LocationRef))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.LocationRef)); err != nil {
+	if _, err := cw.WriteString(string(t.LocationRef)); err != nil {
 		return err
 	}
 

@@ -31,7 +31,7 @@ func TestTrustlessGateway(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 
-	boostAndMiner := framework.NewTestFramework(ctx, t, framework.EnableLegacyDeals(true), framework.SetMaxStagingBytes(10485760))
+	boostAndMiner := framework.NewTestFramework(ctx, t, framework.SetMaxStagingBytes(10485760))
 	req.NoError(boostAndMiner.Start())
 	defer boostAndMiner.Stop()
 

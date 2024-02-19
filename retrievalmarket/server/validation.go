@@ -6,9 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket/migrations"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
+
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/hannahhoward/go-pubsub"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
@@ -39,19 +40,20 @@ func newRequestValidator(vdeps ValidationDeps) *requestValidator {
 // request to pull data or a new request created when the data transfer is
 // restarted (eg after a connection failure).
 func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	proposal, ok := voucher.(*retrievalmarket.DealProposal)
+	proposal, ok := voucher.(*legacyretrievaltypes.DealProposal)
 	var legacyProtocol bool
 	if !ok {
-		legacyProposal, ok := voucher.(*migrations.DealProposal0)
-		if !ok {
-			return nil, errors.New("wrong voucher type")
-		}
-		newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
-		proposal = &newProposal
-		legacyProtocol = true
+		return nil, errors.New("wrong voucher type")
+		//legacyProposal, ok := voucher.(*migrations.DealProposal0)
+		//if !ok {
+		//	return nil, errors.New("wrong voucher type")
+		//}
+		//newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
+		//proposal = &newProposal
+		//legacyProtocol = true
 	}
 	response, err := rv.validatePull(receiver, proposal, legacyProtocol, baseCid, selector)
-	_ = rv.psub.Publish(retrievalmarket.ProviderValidationEvent{
+	_ = rv.psub.Publish(legacyretrievaltypes.ProviderValidationEvent{
 		IsRestart: isRestart,
 		Receiver:  receiver,
 		Proposal:  proposal,
@@ -72,16 +74,16 @@ func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID
 	return &response, err
 }
 
-func (rv *requestValidator) validatePull(receiver peer.ID, proposal *retrievalmarket.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) (retrievalmarket.DealResponse, error) {
-	response := retrievalmarket.DealResponse{
+func (rv *requestValidator) validatePull(receiver peer.ID, proposal *legacyretrievaltypes.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) (legacyretrievaltypes.DealResponse, error) {
+	response := legacyretrievaltypes.DealResponse{
 		ID:     proposal.ID,
-		Status: retrievalmarket.DealStatusAccepted,
+		Status: legacyretrievaltypes.DealStatusAccepted,
 	}
 
 	// Decide whether to accept the deal
 	err := rv.acceptDeal(receiver, proposal, legacyProtocol, baseCid, selector)
 	if err != nil {
-		response.Status = retrievalmarket.DealStatusRejected
+		response.Status = legacyretrievaltypes.DealStatusRejected
 		response.Message = err.Error()
 		return response, err
 	}
@@ -89,7 +91,7 @@ func (rv *requestValidator) validatePull(receiver peer.ID, proposal *retrievalma
 	return response, nil
 }
 
-func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmarket.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) error {
+func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretrievaltypes.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) error {
 	// Check the proposal CID matches
 	if proposal.PayloadCID != baseCid {
 		return errors.New("incorrect CID for this proposal")
@@ -112,7 +114,7 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmark
 	// Check if the piece is unsealed
 	_, isUnsealed, err := rv.getPiece(proposal.PayloadCID, proposal.PieceCID)
 	if err != nil {
-		if err == retrievalmarket.ErrNotFound {
+		if errors.Is(err, legacyretrievaltypes.ErrNotFound) {
 			return fmt.Errorf("there is no piece containing payload cid %s: %w", proposal.PayloadCID, err)
 		}
 		return err
@@ -139,7 +141,7 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmark
 
 	// Check the deal filter
 	if rv.DealDecider != nil {
-		state := retrievalmarket.ProviderDealState{
+		state := legacyretrievaltypes.ProviderDealState{
 			DealProposal:    *proposal,
 			Receiver:        receiver,
 			LegacyProtocol:  legacyProtocol,
@@ -175,16 +177,16 @@ func (rv *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (Pie
 	return PieceInfo{}, false, fmt.Errorf("piece cid not found for payload cid %s", payloadCid.String())
 }
 
-func (rv *requestValidator) Subscribe(subscriber retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {
-	return retrievalmarket.Unsubscribe(rv.psub.Subscribe(subscriber))
+func (rv *requestValidator) Subscribe(subscriber ProviderValidationSubscriber) legacyretrievaltypes.Unsubscribe {
+	return legacyretrievaltypes.Unsubscribe(rv.psub.Subscribe(subscriber))
 }
 
 func queryValidationDispatcher(evt pubsub.Event, subscriberFn pubsub.SubscriberFn) error {
-	e, ok := evt.(retrievalmarket.ProviderValidationEvent)
+	e, ok := evt.(legacyretrievaltypes.ProviderValidationEvent)
 	if !ok {
 		return errors.New("wrong type of event")
 	}
-	cb, ok := subscriberFn.(retrievalmarket.ProviderValidationSubscriber)
+	cb, ok := subscriberFn.(ProviderValidationSubscriber)
 	if !ok {
 		return errors.New("wrong type of callback")
 	}

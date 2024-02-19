@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -143,7 +143,7 @@ func isNotFoundError(err error) bool {
 	switch {
 	case errors.Is(err, ErrNotFound),
 		errors.Is(err, datastore.ErrNotFound),
-		errors.Is(err, retrievalmarket.ErrNotFound),
+		errors.Is(err, legacyretrievaltypes.ErrNotFound),
 		strings.Contains(strings.ToLower(err.Error()), "not found"):
 		return true
 	default:

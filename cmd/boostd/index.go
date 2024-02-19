@@ -262,11 +262,15 @@ var indexProvAnnounceDeal = &cli.Command{
 			return nil
 		}
 		// Announce legacy deal
-		err = napi.BoostIndexerAnnounceLegacyDeal(ctx, proposalCid)
+		ad, err := napi.BoostIndexerAnnounceLegacyDeal(ctx, proposalCid)
 		if err != nil {
 			return fmt.Errorf("announcing legacy deal with proposal CID %s: %w", proposalCid, err)
 		}
-		fmt.Printf("Announced the legacy deal")
+		if ad.Defined() {
+			fmt.Printf("Announced the legacy deal with Ad cid %s\n", ad)
+			return nil
+		}
+		fmt.Printf("Legacy deal already announced\n")
 		return nil
 	},
 }

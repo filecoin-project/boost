@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +23,6 @@ func TestDummydealOnline(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)
@@ -94,6 +94,11 @@ func TestDummydealOnline(t *testing.T) {
 	require.NoError(t, err)
 
 	// rootCid is an identity CID
-	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true, nil)
+	outFile := f.Retrieve(
+		ctx,
+		t,
+		trustlessutils.Request{Root: rootCid, Scope: trustlessutils.DagScopeAll},
+		true,
+	)
 	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

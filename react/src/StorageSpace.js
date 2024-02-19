@@ -1,5 +1,5 @@
 import {useQuery} from "@apollo/react-hooks";
-import {LegacyStorageQuery, StorageQuery} from "./gql";
+import {StorageQuery} from "./gql";
 import React from "react";
 import {addCommas, humanFileSize} from "./util";
 import './StorageSpace.css'
@@ -12,7 +12,6 @@ import {Info} from "./Info"
 export function StorageSpacePage(props) {
     return <PageContainer pageType="storage-space" title="Storage Space">
         <StorageSpaceContent />
-        <LegacyStorageSpaceContent />
     </PageContainer>
 }
 
@@ -79,61 +78,6 @@ function StorageSpaceContent(props) {
             </tbody>
         </table>
     </>
-}
-
-function LegacyStorageSpaceContent(props) {
-    const {loading, error, data} = useQuery(LegacyStorageQuery, { pollInterval: 10000 })
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    var storage = data.legacyStorage
-    if (storage.Capacity === 0n) {
-        return null
-    }
-
-    const bars = [{
-        name: 'Used',
-        className: 'used',
-        amount: storage.Used,
-    }, {
-        name: 'Free',
-        className: 'free',
-        amount: storage.Capacity - storage.Used,
-    }]
-
-    return <div className="legacy-deal-transfers">
-        <h3>Legacy Deal transfers</h3>
-
-        <div className="storage-chart">
-            <CumulativeBarChart bars={bars} unit="byte" />
-            <CumulativeBarLabels bars={bars} unit="byte" />
-        </div>
-
-        <table className="storage-fields">
-            <tbody>
-            {bars.map(bar => (
-                <tr key={bar.name}>
-                    <td>
-                        {bar.name}
-                    </td>
-                    <td>{humanFileSize(bar.amount)} <span className="aux">({addCommas(bar.amount)} bytes)</span></td>
-                </tr>
-            ))}
-            <tr>
-                <td>
-                    Mount Point
-                    <Info>The path to the directory where downloaded data is kept until the deal is added to a sector</Info>
-                </td>
-                <td>{storage.MountPoint}</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
 }
 
 export function StorageSpaceMenuItem(props) {
