@@ -14,9 +14,11 @@
   * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
+  * [BoostIndexerAnnounceDeal](#boostindexerannouncedeal)
   * [BoostIndexerAnnounceDealRemoved](#boostindexerannouncedealremoved)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
+  * [BoostIndexerAnnounceLegacyDeal](#boostindexerannouncelegacydeal)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
   * [BoostLegacyDealByProposalCid](#boostlegacydealbyproposalcid)
   * [BoostMakeDeal](#boostmakedeal)
@@ -399,6 +401,74 @@ Inputs: `null`
 
 Response: `{}`
 
+### BoostIndexerAnnounceDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "DealUuid": "07070707-0707-0707-0707-070707070707",
+    "CreatedAt": "0001-01-01T00:00:00Z",
+    "ClientDealProposal": {
+      "Proposal": {
+        "PieceCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "PieceSize": 1032,
+        "VerifiedDeal": true,
+        "Client": "f01234",
+        "Provider": "f01234",
+        "Label": "",
+        "StartEpoch": 10101,
+        "EndEpoch": 10101,
+        "StoragePricePerEpoch": "0",
+        "ProviderCollateral": "0",
+        "ClientCollateral": "0"
+      },
+      "ClientSignature": {
+        "Type": 2,
+        "Data": "Ynl0ZSBhcnJheQ=="
+      }
+    },
+    "IsOffline": true,
+    "CleanupData": true,
+    "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "DealDataRoot": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "InboundFilePath": "string value",
+    "Transfer": {
+      "Type": "string value",
+      "ClientID": "string value",
+      "Params": "Ynl0ZSBhcnJheQ==",
+      "Size": 42
+    },
+    "ChainDealID": 5432,
+    "PublishCID": null,
+    "SectorID": 9,
+    "Offset": 1032,
+    "Length": 1032,
+    "Checkpoint": 1,
+    "CheckpointAt": "0001-01-01T00:00:00Z",
+    "Err": "string value",
+    "Retry": "auto",
+    "NBytesReceived": 9,
+    "FastRetrieval": true,
+    "AnnounceToIPNI": true
+  }
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
 ### BoostIndexerAnnounceDealRemoved
 
 
@@ -445,6 +515,27 @@ Inputs:
   [
     "string value"
   ]
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
+### BoostIndexerAnnounceLegacyDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
 ]
 ```
 

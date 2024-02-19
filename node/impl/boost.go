@@ -177,6 +177,14 @@ func (sm *BoostAPI) BoostLegacyDealByProposalCid(ctx context.Context, propCid ci
 	return sm.LegacyDealManager.ByPropCid(propCid)
 }
 
+func (sm *BoostAPI) BoostIndexerAnnounceDeal(ctx context.Context, deal *types.ProviderDealState) (cid.Cid, error) {
+	return sm.IndexProvider.AnnounceBoostDeal(ctx, deal)
+}
+
+func (sm *BoostAPI) BoostIndexerAnnounceLegacyDeal(ctx context.Context, proposalCid cid.Cid) (cid.Cid, error) {
+	return sm.IndexProvider.AnnounceLegcayDealToIndexer(ctx, proposalCid)
+}
+
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
 	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err
