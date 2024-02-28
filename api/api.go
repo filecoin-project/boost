@@ -47,7 +47,8 @@ type Boost interface {
 	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
 
 	// MethodGroup: PieceDirectory
-	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error //perm:admin
+	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error             //perm:admin
+	PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, dealID string) error //perm:admin
 
 	// MethodGroup: Misc
 	OnlineBackup(context.Context, string) error //perm:admin

@@ -223,3 +223,11 @@ func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Ci
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {
 	return sm.Bkp.Backup(ctx, dstDir)
 }
+
+func (sm *BoostAPI) PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, dealID string) error {
+	ctx, span := tracing.Tracer.Start(ctx, "Boost.PdRemoveDealForPiece")
+	span.SetAttributes(attribute.String("piececid", piececid.String()))
+	defer span.End()
+
+	return sm.Pd.RemoveDealForPiece(ctx, piececid, dealID)
+}

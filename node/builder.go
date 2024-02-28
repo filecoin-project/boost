@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
+	"github.com/filecoin-project/boost/lib/pdcleaner"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
@@ -555,6 +556,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
 		Override(new(*backupmgr.BackupMgr), modules.NewOnlineBackupMgr(cfg)),
+		Override(new(pdcleaner.PieceDirectoryCleanup), pdcleaner.NewPieceDirectoryCleaner(cfg)),
 
 		// Dynamic Boost configs
 		Override(new(dtypes.ConsiderOnlineStorageDealsConfigFunc), modules.NewConsiderOnlineStorageDealsConfigFunc),
