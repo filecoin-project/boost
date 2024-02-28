@@ -32,7 +32,7 @@ type Store struct {
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
-		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
+		RemoveDealForPiece        func(context.Context, address.Address, cid.Cid, string) error
 		RemovePieceMetadata       func(context.Context, cid.Cid) error
 		RemoveIndexes             func(context.Context, cid.Cid) error
 		NextPiecesToCheck         func(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
@@ -154,8 +154,8 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	return s.client.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
-	return s.client.RemoveDealForPiece(ctx, pieceCid, dealId)
+func (s *Store) RemoveDealForPiece(ctx context.Context, minerID address.Address, pieceCid cid.Cid, dealId string) error {
+	return s.client.RemoveDealForPiece(ctx, minerID, pieceCid, dealId)
 }
 
 func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {

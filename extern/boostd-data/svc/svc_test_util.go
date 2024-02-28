@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/testutils"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -393,7 +394,9 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.Len(t, dis, 2)
 
 	// Remove one deal for the piece
-	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
+	maddr, err := address.NewFromString("")
+	require.NoError(t, err)
+	err = cl.RemoveDealForPiece(ctx, maddr, pieceCid, di.DealUuid)
 	require.NoError(t, err)
 
 	dis, err = cl.GetPieceDeals(ctx, pieceCid)
@@ -422,7 +425,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	// Remove the other deal for the piece.
 	// After this call there are no deals left, so it should also cause the
 	// piece metadata and indexes to be removed.
-	err = cl.RemoveDealForPiece(ctx, pieceCid, di2.DealUuid)
+	err = cl.RemoveDealForPiece(ctx, maddr, pieceCid, di2.DealUuid)
 	require.NoError(t, err)
 
 	_, err = cl.GetPieceDeals(ctx, pieceCid)

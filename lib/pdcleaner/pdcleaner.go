@@ -36,10 +36,10 @@ type pdcleaner struct {
 	full          v1api.FullNode
 }
 
-func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
+func NewPieceDirectoryCleaner(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 	return func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 
-		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full)
+		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full, provAddr)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -64,13 +64,14 @@ func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *
 	}
 }
 
-func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) *pdcleaner {
+func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode, provAddr address.Address) *pdcleaner {
 	return &pdcleaner{
 		dealsDB:       dealsDB,
 		directDealsDB: directDealsDB,
 		legacyDeals:   legacyDeals,
 		pd:            pd,
 		full:          full,
+		miner:         provAddr,
 	}
 }
 
@@ -100,7 +101,7 @@ func (p *pdcleaner) clean() {
 	}
 }
 
-// CleanOnce generates a list of all Expired-Boost, Legacy and Direct deals. It then attempts to clean up these deals.
+// CleanOnce generates a list of all Boost, Legacy and Direct deals. It then attempts to clean up the expired/slashed deals.
 // It also generated a list of all pieces in LID and tries to find any pieceMetadata with no deals in Boost, Direct or Legacy DB.
 // If such a deal is found, it is cleaned up as well
 func (p *pdcleaner) CleanOnce() error {
@@ -146,7 +147,7 @@ func (p *pdcleaner) CleanOnce() error {
 			if ok {
 				// If deal is slashed or end epoch has passed. No other reason for deal to reach termination
 				if md.Proposal.EndEpoch < head.Height() || md.State.SlashEpoch > 0 {
-					err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
+					err = p.pd.RemoveDealForPiece(p.ctx, p.miner, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
 					if err != nil {
 						// Don't return if cleaning up a deal results in error. Try them all.
 						log.Errorf("cleaning up boost deal %s for piece %s: %s", d.DealUuid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
@@ -165,7 +166,7 @@ func (p *pdcleaner) CleanOnce() error {
 			if ok {
 				// If deal is slashed or end epoch has passed. No other reason for deal to reach termination
 				if md.Proposal.EndEpoch < head.Height() || md.State.SlashEpoch > 0 {
-					err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
+					err = p.pd.RemoveDealForPiece(p.ctx, p.miner, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
 					if err != nil {
 						// Don't return if cleaning up a deal results in error. Try them all.
 						log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ProposalCid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
@@ -187,7 +188,7 @@ func (p *pdcleaner) CleanOnce() error {
 		if ok {
 			// TODO: Figure out slashing mechanism in Direct Deals and add that condition here
 			if c.TermMax < head.Height() {
-				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+				err = p.pd.RemoveDealForPiece(p.ctx, p.miner, d.PieceCID, d.ID.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
 					log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
@@ -235,7 +236,7 @@ func (p *pdcleaner) CleanOnce() error {
 					continue
 				}
 
-				err = p.pd.RemoveDealForPiece(p.ctx, piece, deal.DealUuid)
+				err = p.pd.RemoveDealForPiece(p.ctx, p.miner, piece, deal.DealUuid)
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
 					log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())

@@ -801,7 +801,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 }
 
 // RemoveDealForPiece removes Single deal for pieceCID.
-func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
+func (s *Store) RemoveDealForPiece(ctx context.Context, minerID address.Address, pieceCid cid.Cid, dealId string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
 	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.remove_deal_for_piece"))
@@ -816,8 +816,8 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 		}
 	}()
 
-	qry := `DELETE FROM PieceDeal WHERE DealUuid = ?`
-	err := s.session.Query(qry, dealId).WithContext(ctx).Exec()
+	qry := `DELETE FROM PieceDeal WHERE DealUuid = ? AND MinerAddr =?`
+	err := s.session.Query(qry, dealId, minerID.String()).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("removing deal %s for piece %s: %w", dealId, pieceCid, err)
 	}

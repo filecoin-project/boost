@@ -57,7 +57,7 @@ type Service interface {
 	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
 	IndexedAt(context.Context, cid.Cid) (time.Time, error)
 	PiecesContainingMultihash(context.Context, mh.Multihash) ([]cid.Cid, error)
-	RemoveDealForPiece(context.Context, cid.Cid, string) error
+	RemoveDealForPiece(context.Context, address.Address, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error
 	NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
