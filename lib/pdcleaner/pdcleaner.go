@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
@@ -21,6 +22,8 @@ import (
 var log = logging.Logger("pdcleaner")
 
 type PieceDirectoryCleanup interface {
+	Start(ctx context.Context)
+	CleanOnce() error
 }
 
 type pdcleaner struct {
@@ -36,24 +39,17 @@ type pdcleaner struct {
 func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 	return func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 
-		mid, err := address.NewFromString(cfg.Wallets.Miner)
-		if err != nil {
-			return fmt.Errorf("failed to parse the miner ID %s: %w", cfg.Wallets.Miner, err)
-		}
-
-		pdc := &pdcleaner{
-			miner:         mid,
-			dealsDB:       dealsDB,
-			directDealsDB: directDealsDB,
-			legacyDeals:   legacyDeals,
-			pd:            pd,
-			full:          full,
-		}
+		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
 		lc.Append(fx.Hook{
 			OnStart: func(_ context.Context) error {
+				mid, err := address.NewFromString(cfg.Wallets.Miner)
+				if err != nil {
+					return fmt.Errorf("failed to parse the miner ID %s: %w", cfg.Wallets.Miner, err)
+				}
+				pdc.miner = mid
 				go pdc.Start(ctx)
 				return nil
 			},
@@ -65,6 +61,16 @@ func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *
 
 		return pdc
 
+	}
+}
+
+func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) *pdcleaner {
+	return &pdcleaner{
+		dealsDB:       dealsDB,
+		directDealsDB: directDealsDB,
+		legacyDeals:   legacyDeals,
+		pd:            pd,
+		full:          full,
 	}
 }
 
@@ -82,7 +88,7 @@ func (p *pdcleaner) clean() {
 		select {
 		case <-ticker.C:
 			log.Infof("Starting LID clean up")
-			err := p.cleanOnce()
+			err := p.CleanOnce()
 			if err != nil {
 				log.Errorf("Failed to cleanup LID: %s", err)
 				continue
@@ -94,10 +100,10 @@ func (p *pdcleaner) clean() {
 	}
 }
 
-// cleanOnce generates a list of all Expired-Boost, Legacy and Direct deals. It then attempts to clean up these deals.
+// CleanOnce generates a list of all Expired-Boost, Legacy and Direct deals. It then attempts to clean up these deals.
 // It also generated a list of all pieces in LID and tries to find any pieceMetadata with no deals in Boost, Direct or Legacy DB.
 // If such a deal is found, it is cleaned up as well
-func (p *pdcleaner) cleanOnce() error {
+func (p *pdcleaner) CleanOnce() error {
 	head, err := p.full.ChainHead(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting chain head: %w", err)
@@ -107,15 +113,32 @@ func (p *pdcleaner) cleanOnce() error {
 	if err != nil {
 		return fmt.Errorf("getting market deals: %w", err)
 	}
+
+	var boostDeals []*types.ProviderDealState
+
 	boostCompleteDeals, err := p.dealsDB.ListCompleted(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting complete boost deals: %w", err)
 	}
-	legacyDeals, err := p.legacyDeals.ListDeals()
-	completeDirectDeals, err := p.directDealsDB.ListCompleted(p.ctx)
+	boostActiveDeals, err := p.dealsDB.ListActive(p.ctx)
+	if err != nil {
+		return fmt.Errorf("getting active boost deals: %w", err)
+	}
 
-	// Clean up completed Boost deals
-	for _, d := range boostCompleteDeals {
+	boostDeals = append(boostDeals, boostCompleteDeals...)
+	boostDeals = append(boostDeals, boostActiveDeals...)
+
+	legacyDeals, err := p.legacyDeals.ListDeals()
+	if err != nil {
+		return fmt.Errorf("getting legacy deals: %w", err)
+	}
+	completeDirectDeals, err := p.directDealsDB.ListCompleted(p.ctx)
+	if err != nil {
+		return fmt.Errorf("getting complete direct deals: %w", err)
+	}
+
+	// Clean up completed/slashed Boost deals
+	for _, d := range boostDeals {
 		// Confirm deal did not reach termination before Publishing. Otherwise, no need to clean up
 		if d.ChainDealID > abi.DealID(0) {
 			// If deal exists online
@@ -162,6 +185,7 @@ func (p *pdcleaner) cleanOnce() error {
 		cID := verifregtypes.ClaimId(d.AllocationID)
 		c, ok := claims[cID]
 		if ok {
+			// TODO: Figure out slashing mechanism in Direct Deals and add that condition here
 			if c.TermMax < head.Height() {
 				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
 				if err != nil {
@@ -186,14 +210,12 @@ func (p *pdcleaner) cleanOnce() error {
 		for _, deal := range pdeals {
 			// Remove only if the miner ID matches to avoid removing for other miners in case of shared LID
 			if deal.MinerAddr == p.miner {
-				remove := true
 
 				bd, err := p.dealsDB.ByPieceCID(p.ctx, piece)
 				if err != nil {
 					return err
 				}
 				if len(bd) > 0 {
-					remove = false
 					continue
 				}
 
@@ -202,7 +224,6 @@ func (p *pdcleaner) cleanOnce() error {
 					return err
 				}
 				if len(ld) > 0 {
-					remove = false
 					continue
 				}
 
@@ -211,16 +232,13 @@ func (p *pdcleaner) cleanOnce() error {
 					return err
 				}
 				if len(dd) > 0 {
-					remove = false
 					continue
 				}
 
-				if remove {
-					err = p.pd.RemoveDealForPiece(p.ctx, piece, deal.DealUuid)
-					if err != nil {
-						// Don't return if cleaning up a deal results in error. Try them all.
-						log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
-					}
+				err = p.pd.RemoveDealForPiece(p.ctx, piece, deal.DealUuid)
+				if err != nil {
+					// Don't return if cleaning up a deal results in error. Try them all.
+					log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
 				}
 			}
 		}
