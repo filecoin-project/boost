@@ -695,8 +695,8 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 }
 
 // RemoveDealForPiece remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
-func (s *Store) RemoveDealForPiece(ctx context.Context, minerID address.Address, pieceCid cid.Cid, dealUuid string) error {
-	log.Debugw("handle.remove-deal-for-piece", "miner", minerID, "piece-cid", pieceCid, "deal-uuid", dealUuid)
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealUuid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
@@ -731,13 +731,10 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, minerID address.Address,
 	}
 
 	for i, v := range md.Deals {
-		// Compare MinerID here to avoid an extreme corner case where 2 miners have a deal with same UUID
-		if v.MinerAddr == minerID {
-			if v.DealUuid == dealUuid {
-				md.Deals[i] = md.Deals[len(md.Deals)-1]
-				md.Deals = md.Deals[:len(md.Deals)-1]
-				break
-			}
+		if v.DealUuid == dealUuid {
+			md.Deals[i] = md.Deals[len(md.Deals)-1]
+			md.Deals = md.Deals[:len(md.Deals)-1]
+			break
 		}
 	}
 

@@ -612,13 +612,13 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 	return merr
 }
 
-func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, minerID address.Address, pieceCid cid.Cid, dealUuid string) error {
+func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
 	defer span.End()
 
 	//Delete deal from list of deals for this piece
 	//It removes metadata and indexes if []deal is empty
-	err := ps.store.RemoveDealForPiece(ctx, minerID, pieceCid, dealUuid)
+	err := ps.store.RemoveDealForPiece(ctx, pieceCid, dealUuid)
 	if err != nil {
 		return fmt.Errorf("deleting deal from piece metadata: %w", err)
 	}

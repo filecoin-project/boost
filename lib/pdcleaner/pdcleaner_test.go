@@ -33,9 +33,6 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	provAddr, err := address.NewIDAddress(1523)
-	require.NoError(t, err)
-
 	sqldb := bdb.CreateTestTmpDB(t)
 	require.NoError(t, bdb.CreateAllBoostTables(ctx, sqldb, sqldb))
 	require.NoError(t, migrations.Migrate(sqldb))
@@ -94,7 +91,6 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	}
 
 	// Add deals to LID and note down details to update SQL DB
-	iter := 0
 	for sectorNumber, reader := range readers {
 		pieceCid := piecedirectory.CalculateCommp(t, reader).PieceCID
 
@@ -113,13 +109,6 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 			}
 		}
 
-		prov := provAddr
-		if iter == 0 {
-			paddr, err := address.NewIDAddress(1524)
-			require.NoError(t, err)
-			prov = paddr
-		}
-
 		// Add deal info for each piece
 		di := model.DealInfo{
 			DealUuid:    uid.String(),
@@ -127,20 +116,20 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 			SectorID:    sectorNumber,
 			PieceOffset: 0,
 			PieceLength: 0,
-			MinerAddr:   prov,
 		}
 		err := pm.AddDealForPiece(ctx, pieceCid, di)
 		require.NoError(t, err)
-		iter++
 	}
 
 	// Setup Full node, legacy manager
 	ctrl := gomock.NewController(t)
 	fn := lotusmocks.NewMockFullNode(ctrl)
 	legacyProv := mocks_legacy.NewMockLegacyDealManager(ctrl)
+	provAddr, err := address.NewIDAddress(1523)
+	require.NoError(t, err)
 
 	// Start a new PieceDirectoryCleaner
-	pdc := newPDC(dealsDB, directDB, legacyProv, pm, fn, provAddr)
+	pdc := newPDC(dealsDB, directDB, legacyProv, pm, fn)
 	pdc.ctx = ctx
 
 	chainHead, err := test.MockTipset(provAddr, 1)
@@ -158,7 +147,9 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 		deal.ClientDealProposal.Proposal.PieceCID = data.piece
 		deal.ClientDealProposal.Proposal.EndEpoch = 3 // because chain head is always 5
 		deal.Checkpoint = dealcheckpoints.Complete
-
+		p, err := deal.SignedProposalCid()
+		require.NoError(t, err)
+		t.Logf("signed p %s", p.String())
 		// Test a slashed deal
 		if i == 0 {
 			deal.Checkpoint = dealcheckpoints.Accepted
@@ -197,8 +188,8 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	err = pdc.CleanOnce()
 	require.NoError(t, err)
 
-	// Confirm we have 1 piece in LID after clean up. This one piece will be left due to minerID mismatch
+	// Confirm we have 5 pieces in LID after clean up
 	pl, err = pm.ListPieces(ctx)
 	require.NoError(t, err)
-	require.Len(t, pl, 1)
+	require.Len(t, pl, 0)
 }

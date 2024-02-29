@@ -556,7 +556,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
 		Override(new(*backupmgr.BackupMgr), modules.NewOnlineBackupMgr(cfg)),
-		Override(new(pdcleaner.PieceDirectoryCleanup), pdcleaner.NewPieceDirectoryCleaner(walletMiner, cfg)),
+		Override(new(pdcleaner.PieceDirectoryCleanup), pdcleaner.NewPieceDirectoryCleaner(cfg)),
 
 		// Dynamic Boost configs
 		Override(new(dtypes.ConsiderOnlineStorageDealsConfigFunc), modules.NewConsiderOnlineStorageDealsConfigFunc),

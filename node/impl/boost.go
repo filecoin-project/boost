@@ -229,8 +229,5 @@ func (sm *BoostAPI) PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, 
 	span.SetAttributes(attribute.String("piececid", piececid.String()))
 	defer span.End()
 
-	// Use the miner address from Provider
-	maddr := sm.StorageProvider.Address
-
-	return sm.Pd.RemoveDealForPiece(ctx, maddr, piececid, dealID)
+	return sm.Pd.RemoveDealForPiece(ctx, piececid, dealID)
 }
