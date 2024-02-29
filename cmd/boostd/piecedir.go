@@ -82,30 +82,30 @@ var removeDealCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("parsing piece CID: %w", err)
 		}
-		fmt.Println("Generating index for piece", piececid)
 
 		id := cctx.Args().Get(1)
 
 		// Parse to avoid sending garbage data to API
 		dealUuid, err := uuid.Parse(id)
-		if err == nil {
-			err = napi.PdRemoveDealForPiece(ctx, piececid, dealUuid.String())
+		if err != nil {
+			propCid, err := cid.Decode(id)
+			if err != nil {
+				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
+			}
+			err = napi.PdRemoveDealForPiece(ctx, piececid, propCid.String())
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Deal %s removed for piece %s\n", dealUuid.String(), piececid.String())
+			fmt.Printf("Deal %s removed for piece %s\n", propCid, piececid)
 			return nil
 		}
 
-		propCid, err := cid.Decode(id)
-		if err != nil {
-			return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
-		}
-		err = napi.PdRemoveDealForPiece(ctx, piececid, propCid.String())
+		err = napi.PdRemoveDealForPiece(ctx, piececid, dealUuid.String())
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Deal %s removed for piece %s\n", propCid.String(), piececid.String())
+		fmt.Printf("Deal %s removed for piece %s\n", dealUuid, piececid)
 		return nil
+
 	},
 }

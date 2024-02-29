@@ -289,6 +289,9 @@ type LocalIndexDirectoryConfig struct {
 	ServiceRPCTimeout Duration
 	// PieceDoctor runs a continuous background process to check each piece in LID for retrievability
 	EnablePieceDoctor bool
+	// Interval in hours after which LID clean up job should rerun. The cleanup entails removing indices and metadata
+	// for the expired/slashed deals. Disabled if set to 0.
+	LidCleanupInterval int
 }
 
 type LocalIndexDirectoryLeveldbConfig struct {

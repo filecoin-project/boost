@@ -3,6 +3,7 @@ package pdcleaner
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -27,24 +28,31 @@ type PieceDirectoryCleanup interface {
 }
 
 type pdcleaner struct {
-	ctx           context.Context
-	miner         address.Address
-	dealsDB       *db.DealsDB
-	directDealsDB *db.DirectDealsDB
-	legacyDeals   legacy.LegacyDealManager
-	pd            *piecedirectory.PieceDirectory
-	full          v1api.FullNode
+	ctx             context.Context
+	miner           address.Address
+	dealsDB         *db.DealsDB
+	directDealsDB   *db.DirectDealsDB
+	legacyDeals     legacy.LegacyDealManager
+	pd              *piecedirectory.PieceDirectory
+	full            v1api.FullNode
+	startOnce       sync.Once
+	lk              sync.Mutex
+	cleanupInterval int
 }
 
 func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 	return func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 
-		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full)
+		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full, cfg.LocalIndexDirectory.LidCleanupInterval)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
 		lc.Append(fx.Hook{
 			OnStart: func(_ context.Context) error {
+				// Don't start cleanup loop if duration is 0
+				if cfg.LocalIndexDirectory.LidCleanupInterval == 0 {
+					return nil
+				}
 				mid, err := address.NewFromString(cfg.Wallets.Miner)
 				if err != nil {
 					return fmt.Errorf("failed to parse the miner ID %s: %w", cfg.Wallets.Miner, err)
@@ -64,24 +72,28 @@ func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *
 	}
 }
 
-func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) *pdcleaner {
+func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode, cleanupInterval int) *pdcleaner {
 	return &pdcleaner{
-		dealsDB:       dealsDB,
-		directDealsDB: directDealsDB,
-		legacyDeals:   legacyDeals,
-		pd:            pd,
-		full:          full,
+		dealsDB:         dealsDB,
+		directDealsDB:   directDealsDB,
+		legacyDeals:     legacyDeals,
+		pd:              pd,
+		full:            full,
+		cleanupInterval: cleanupInterval,
 	}
 }
 
 func (p *pdcleaner) Start(ctx context.Context) {
-	p.ctx = ctx
-	go p.clean()
+	p.startOnce.Do(func() {
+		p.ctx = ctx
+		go p.clean()
+	})
+
 }
 
 func (p *pdcleaner) clean() {
 	// Create a ticker with an hour tick
-	ticker := time.NewTicker(time.Hour * 6)
+	ticker := time.NewTicker(time.Hour * time.Duration(p.cleanupInterval))
 	defer ticker.Stop()
 
 	for {
@@ -93,7 +105,7 @@ func (p *pdcleaner) clean() {
 				log.Errorf("Failed to cleanup LID: %s", err)
 				continue
 			}
-			log.Info("Finished cleaning up LID")
+			log.Debugf("Finished cleaning up LID")
 		case <-p.ctx.Done():
 			return
 		}
@@ -104,6 +116,9 @@ func (p *pdcleaner) clean() {
 // It also generated a list of all pieces in LID and tries to find any pieceMetadata with no deals in Boost, Direct or Legacy DB.
 // If such a deal is found, it is cleaned up as well
 func (p *pdcleaner) CleanOnce() error {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+
 	head, err := p.full.ChainHead(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting chain head: %w", err)
@@ -114,8 +129,6 @@ func (p *pdcleaner) CleanOnce() error {
 		return fmt.Errorf("getting market deals: %w", err)
 	}
 
-	var boostDeals []*types.ProviderDealState
-
 	boostCompleteDeals, err := p.dealsDB.ListCompleted(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting complete boost deals: %w", err)
@@ -124,6 +137,8 @@ func (p *pdcleaner) CleanOnce() error {
 	if err != nil {
 		return fmt.Errorf("getting active boost deals: %w", err)
 	}
+
+	boostDeals := make([]*types.ProviderDealState, 0, len(boostActiveDeals)+len(boostCompleteDeals))
 
 	boostDeals = append(boostDeals, boostCompleteDeals...)
 	boostDeals = append(boostDeals, boostActiveDeals...)

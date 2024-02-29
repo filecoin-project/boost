@@ -30,7 +30,6 @@ import (
 )
 
 func TestPieceDirectoryCleaner(t *testing.T) {
-	req := require.New(t)
 	ctx := context.Background()
 
 	sqldb := bdb.CreateTestTmpDB(t)
@@ -82,7 +81,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	}
 
 	deals, err := bdb.GenerateDeals()
-	req.NoError(err)
+	require.NoError(t, err)
 
 	// Create and update a map to keep track of chainDealID and UUID bindings
 	dealMap := make(map[uuid.UUID]*dealData)
@@ -161,7 +160,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 				},
 			}
 			err = dealsDB.Insert(ctx, &deal)
-			req.NoError(err)
+			require.NoError(t, err)
 			continue
 		}
 		cDealMap[strconv.FormatInt(int64(deal.ChainDealID), 10)] = &api.MarketDeal{
@@ -171,7 +170,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 			},
 		}
 		err = dealsDB.Insert(ctx, &deal)
-		req.NoError(err)
+		require.NoError(t, err)
 	}
 
 	// Confirm we have 5 pieces in LID
@@ -188,7 +187,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	err = pdc.CleanOnce()
 	require.NoError(t, err)
 
-	// Confirm we have 5 pieces in LID after clean up
+	// Confirm we have 0 pieces in LID after clean up
 	pl, err = pm.ListPieces(ctx)
 	require.NoError(t, err)
 	require.Len(t, pl, 0)

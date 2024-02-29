@@ -662,6 +662,13 @@ Set this value to "" if the local index directory data service is embedded.`,
 
 			Comment: `PieceDoctor runs a continuous background process to check each piece in LID for retrievability`,
 		},
+		{
+			Name: "LidCleanupInterval",
+			Type: "int",
+
+			Comment: `Interval in hours after which LID clean up job should rerun. The cleanup entails removing indices and metadata
+for the expired/slashed deals. Disabled if set to 0.`,
+		},
 	},
 	"LocalIndexDirectoryLeveldbConfig": []DocField{
 		{
