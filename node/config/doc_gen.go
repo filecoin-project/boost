@@ -664,10 +664,11 @@ Set this value to "" if the local index directory data service is embedded.`,
 		},
 		{
 			Name: "LidCleanupInterval",
-			Type: "int",
+			Type: "Duration",
 
-			Comment: `Interval in hours after which LID clean up job should rerun. The cleanup entails removing indices and metadata
-for the expired/slashed deals. Disabled if set to 0.`,
+			Comment: `Interval at which LID clean up job should rerun. The cleanup entails removing indices and metadata
+for the expired/slashed deals. Disabled if set to '0s'. Please DO NOT set a value lower than 6 hours
+as this task consumes considerable resources and time`,
 		},
 	},
 	"LocalIndexDirectoryLeveldbConfig": []DocField{

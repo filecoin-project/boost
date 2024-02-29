@@ -15,6 +15,10 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 	"golang.org/x/net/context"
@@ -37,31 +41,32 @@ type pdcleaner struct {
 	full            v1api.FullNode
 	startOnce       sync.Once
 	lk              sync.Mutex
-	cleanupInterval int
+	cleanupInterval time.Duration
 }
 
 func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 	return func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
 
-		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full, cfg.LocalIndexDirectory.LidCleanupInterval)
+		// Don't start cleanup loop if duration is '0s'
+		if time.Duration(cfg.LocalIndexDirectory.LidCleanupInterval).Seconds() == 0 {
+			return nil
+		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		pdc := newPDC(dealsDB, directDealsDB, legacyDeals, pd, full, time.Duration(cfg.LocalIndexDirectory.LidCleanupInterval))
+
+		cctx, cancel := context.WithCancel(context.Background())
 
 		lc.Append(fx.Hook{
-			OnStart: func(_ context.Context) error {
-				// Don't start cleanup loop if duration is 0
-				if cfg.LocalIndexDirectory.LidCleanupInterval == 0 {
-					return nil
-				}
+			OnStart: func(ctx context.Context) error {
 				mid, err := address.NewFromString(cfg.Wallets.Miner)
 				if err != nil {
 					return fmt.Errorf("failed to parse the miner ID %s: %w", cfg.Wallets.Miner, err)
 				}
 				pdc.miner = mid
-				go pdc.Start(ctx)
+				go pdc.Start(cctx)
 				return nil
 			},
-			OnStop: func(_ context.Context) error {
+			OnStop: func(ctx context.Context) error {
 				cancel()
 				return nil
 			},
@@ -72,7 +77,7 @@ func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *
 	}
 }
 
-func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode, cleanupInterval int) *pdcleaner {
+func newPDC(dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode, cleanupInterval time.Duration) *pdcleaner {
 	return &pdcleaner{
 		dealsDB:         dealsDB,
 		directDealsDB:   directDealsDB,
@@ -93,7 +98,7 @@ func (p *pdcleaner) Start(ctx context.Context) {
 
 func (p *pdcleaner) clean() {
 	// Create a ticker with an hour tick
-	ticker := time.NewTicker(time.Hour * time.Duration(p.cleanupInterval))
+	ticker := time.NewTicker(p.cleanupInterval)
 	defer ticker.Stop()
 
 	for {
@@ -160,7 +165,9 @@ func (p *pdcleaner) CleanOnce() error {
 			md, ok := deals[strconv.FormatInt(int64(d.ChainDealID), 10)]
 			if ok {
 				// If deal is slashed or end epoch has passed. No other reason for deal to reach termination
-				if md.Proposal.EndEpoch < head.Height() || md.State.SlashEpoch > 0 {
+				// Same is true for verified deals. We rely on EndEpoch/SlashEpoch for verified deals created by f05
+				toCheck := termOrSlash(md.Proposal.EndEpoch, md.State.SlashEpoch)
+				if toCheck < head.Height() {
 					err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
 					if err != nil {
 						// Don't return if cleaning up a deal results in error. Try them all.
@@ -171,7 +178,7 @@ func (p *pdcleaner) CleanOnce() error {
 		}
 	}
 
-	// Clean up completed Boost deals
+	// Clean up completed/slashed legacy deals
 	for _, d := range legacyDeals {
 		// Confirm deal did not reach termination before Publishing. Otherwise, no need to clean up
 		if d.DealID > abi.DealID(0) {
@@ -179,7 +186,8 @@ func (p *pdcleaner) CleanOnce() error {
 			md, ok := deals[strconv.FormatInt(int64(d.DealID), 10)]
 			if ok {
 				// If deal is slashed or end epoch has passed. No other reason for deal to reach termination
-				if md.Proposal.EndEpoch < head.Height() || md.State.SlashEpoch > 0 {
+				toCheck := termOrSlash(md.Proposal.EndEpoch, md.State.SlashEpoch)
+				if toCheck < head.Height() {
 					err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
 					if err != nil {
 						// Don't return if cleaning up a deal results in error. Try them all.
@@ -193,15 +201,38 @@ func (p *pdcleaner) CleanOnce() error {
 	// Clean up direct deals
 	claims, err := p.full.StateGetClaims(p.ctx, p.miner, tskey)
 	if err != nil {
-		return fmt.Errorf("getting claims for the miner %s: %w", p.miner.String(), err)
+		return fmt.Errorf("getting claims for the miner %s: %w", p.miner, err)
 	}
+	// Loading miner actor locally is preferred to avoid getting unnecessary data from full.StateMinerActiveSectors()
+	mActor, err := p.full.StateGetActor(p.ctx, p.miner, tskey)
+	if err != nil {
+		return fmt.Errorf("getting actor for the miner %s: %w", p.miner, err)
+	}
+	store := adt.WrapStore(p.ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(p.full)))
+	mas, err := miner.Load(store, mActor)
+	if err != nil {
+		return fmt.Errorf("loading miner actor state %s: %w", p.miner, err)
+	}
+	activeSectors, err := miner.AllPartSectors(mas, miner.Partition.ActiveSectors)
+	if err != nil {
+		return fmt.Errorf("getting active sector sets for miner %s: %w", p.miner, err)
+	}
+
 	for _, d := range completeDirectDeals {
 		// AllocationID and ClaimID should match
 		cID := verifregtypes.ClaimId(d.AllocationID)
 		c, ok := claims[cID]
 		if ok {
-			// TODO: Figure out slashing mechanism in Direct Deals and add that condition here
-			if c.TermMax < head.Height() {
+			present, err := activeSectors.IsSet(uint64(c.Sector))
+			if err != nil {
+				return fmt.Errorf("checking if bitfield is set: %w", err)
+			}
+			// Each claim is created with ProveCommit message. So, a sector in claim cannot be unproven.
+			// it must be either Active(Proving, Faulty, Recovering) or terminated. If bitfield is not set
+			// then sector must have been terminated. This method will also account for future change in sector numbers
+			// of a claim. Even if the sector is changed then it must be Active as this change will require a
+			// ProveCommit message
+			if !present {
 				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
@@ -209,6 +240,10 @@ func (p *pdcleaner) CleanOnce() error {
 				}
 			}
 		}
+		// TODO: Account for a final sealing state other than proving (Depends on v1.26.0)
+		// 1. We can either check allocation list for all client (Lotus v1.26.0) and cleanup LID if found
+		// 2. If not found in allocation list then either claim expired or allocation. We should clean up in this case
+		// 3. Account for Curio as it will have redundant sealing until proven
 	}
 
 	// Clean up dangling LID deals with no Boost, Direct or Legacy deals attached to them
@@ -260,4 +295,12 @@ func (p *pdcleaner) CleanOnce() error {
 	}
 
 	return nil
+}
+
+func termOrSlash(term, slash abi.ChainEpoch) abi.ChainEpoch {
+	if term > slash && slash > 0 {
+		return slash
+	}
+
+	return term
 }
