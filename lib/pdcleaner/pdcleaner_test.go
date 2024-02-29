@@ -128,7 +128,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a new PieceDirectoryCleaner
-	pdc := newPDC(dealsDB, directDB, legacyProv, pm, fn)
+	pdc := newPDC(dealsDB, directDB, legacyProv, pm, fn, 1)
 	pdc.ctx = ctx
 
 	chainHead, err := test.MockTipset(provAddr, 1)
