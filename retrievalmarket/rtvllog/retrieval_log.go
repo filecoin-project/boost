@@ -2,14 +2,12 @@ package rtvllog
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -18,7 +16,6 @@ var log = logging.Logger("rtrvlog")
 type RetrievalLog struct {
 	db             *RetrievalLogDB
 	duration       time.Duration
-	dataTransfer   dtypes.ProviderDataTransfer
 	gsur           *server.GraphsyncUnpaidRetrieval
 	stalledTimeout time.Duration
 	ctx            context.Context
@@ -29,7 +26,7 @@ type RetrievalLog struct {
 	lastUpdate   map[string]time.Time
 }
 
-func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt dtypes.ProviderDataTransfer, stalledTimeout time.Duration, gsur *server.GraphsyncUnpaidRetrieval) *RetrievalLog {
+func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, stalledTimeout time.Duration, gsur *server.GraphsyncUnpaidRetrieval) *RetrievalLog {
 	if duration < stalledTimeout {
 		log.Warnf("the RetrievalLogDuration (%s) should exceed the StalledRetrievalTimeout (%s)", duration.String(), stalledTimeout.String())
 	}
@@ -37,7 +34,6 @@ func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt dtypes.Provi
 	return &RetrievalLog{
 		db:             db,
 		duration:       duration,
-		dataTransfer:   dt,
 		gsur:           gsur,
 		stalledTimeout: stalledTimeout,
 		dbUpdates:      make(chan func(), 256),
@@ -49,12 +45,11 @@ func (r *RetrievalLog) Start(ctx context.Context) {
 	r.ctx = ctx
 	go r.gcUpdateMap(ctx)
 	go r.gcDatabase(ctx)
-	go r.gcRetrievals(ctx)
 	go r.processDBUpdates(ctx)
 }
 
 // Called when there is a retrieval ask query
-func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
+func (r *RetrievalLog) OnQueryEvent(evt legacyretrievaltypes.ProviderQueryEvent) {
 	log.Debugw("query-event",
 		"status", evt.Response.Status,
 		"msg", evt.Response.Message,
@@ -71,10 +66,10 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 			st.Message = evt.Error.Error()
 		}
 	} else {
-		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
+		if evt.Response.Status == legacyretrievaltypes.QueryResponseUnavailable {
 			st.Status = "unavailable"
 		}
-		if evt.Response.Status == retrievalmarket.QueryResponseError {
+		if evt.Response.Status == legacyretrievaltypes.QueryResponseError {
 			st.Status = "errored"
 		}
 	}
@@ -92,10 +87,10 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 // This occurs when the client makes a graphsync retrieval request, and the
 // Storage Provider validates the request (eg checking its parameters for
 // validity, checking for acceptance against the retrieval filter, etc)
-func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationEvent) {
+func (r *RetrievalLog) OnValidationEvent(evt legacyretrievaltypes.ProviderValidationEvent) {
 	// Ignore ErrPause and ErrResume because they are signalling errors, not
 	// actual errors because of incorrect behaviour.
-	if evt.Error == nil || evt.Error == datatransfer.ErrPause || evt.Error == datatransfer.ErrResume {
+	if evt.Error == nil || evt.Error == datatransfer2.ErrPause || evt.Error == datatransfer2.ErrResume {
 		return
 	}
 
@@ -103,7 +98,7 @@ func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationE
 	st := &RetrievalDealState{
 		PeerID:     evt.Receiver,
 		PayloadCID: evt.BaseCid,
-		Status:     retrievalmarket.DealStatusErrored.String(),
+		Status:     legacyretrievaltypes.DealStatusErrored.String(),
 		Message:    evt.Error.Error(),
 	}
 	if evt.Response != nil {
@@ -132,10 +127,10 @@ func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationE
 }
 
 // Called when there is an event from the data-transfer subsystem
-func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datatransfer.ChannelState) {
+func (r *RetrievalLog) OnDataTransferEvent(event datatransfer2.Event, state datatransfer2.ChannelState) {
 	log.Debugw("dt-event",
-		"evt", datatransfer.Events[event.Code],
-		"status", datatransfer.Statuses[state.Status()],
+		"evt", datatransfer2.Events[event.Code],
+		"status", datatransfer2.Statuses[state.Status()],
 		"message", state.Message(),
 		"is-pull", state.IsPull())
 
@@ -145,10 +140,10 @@ func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datat
 	}
 
 	switch event.Code {
-	case datatransfer.DataQueued, datatransfer.DataQueuedProgress, datatransfer.DataSentProgress,
-		datatransfer.DataReceived, datatransfer.DataReceivedProgress:
+	case datatransfer2.DataQueued, datatransfer2.DataQueuedProgress, datatransfer2.DataSentProgress,
+		datatransfer2.DataReceived, datatransfer2.DataReceivedProgress:
 		return
-	case datatransfer.DataSent:
+	case datatransfer2.DataSent:
 		// To prevent too frequent updates, only allow data sent updates if it's
 		// been more than half a second since the last one
 		if !r.allowUpdate(state.ChannelID().String()) {
@@ -165,29 +160,29 @@ func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datat
 }
 
 // Called when there is a markets event
-func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) {
+func (r *RetrievalLog) OnRetrievalEvent(event legacyretrievaltypes.ProviderEvent, state legacyretrievaltypes.ProviderDealState) {
 	// To prevent too frequent updates, only allow block sent updates if it's
 	// been more than half a second since the last one
-	if event == retrievalmarket.ProviderEventBlockSent && !r.allowUpdate(state.ChannelID.String()) {
+	if event == legacyretrievaltypes.ProviderEventBlockSent && !r.allowUpdate(state.ChannelID.String()) {
 		return
 	}
 
-	var transferID datatransfer.TransferID
+	var transferID datatransfer2.TransferID
 	if state.ChannelID != nil {
 		log.Debugw("event",
-			"evt", retrievalmarket.ProviderEvents[event],
+			"evt", legacyretrievaltypes.ProviderEvents[event],
 			"status", state.Status,
 			"initiator", state.ChannelID.Initiator,
 			"responder", state.ChannelID.Responder,
 			"transfer id", state.ChannelID.ID)
 		transferID = state.ChannelID.ID
 	} else {
-		log.Debugw("event", "evt", retrievalmarket.ProviderEvents[event], "status", state.Status)
+		log.Debugw("event", "evt", legacyretrievaltypes.ProviderEvents[event], "status", state.Status)
 	}
 
 	r.dbUpdate(func() {
 		var err error
-		if event == retrievalmarket.ProviderEventOpen {
+		if event == legacyretrievaltypes.ProviderEventOpen {
 			err = r.db.Insert(r.ctx, &RetrievalDealState{
 				PeerID:                  state.Receiver,
 				DealID:                  state.ID,
@@ -274,58 +269,6 @@ func (r *RetrievalLog) gcDatabase(ctx context.Context) {
 			} else if count > 0 {
 				log.Infof("Deleted %d retrieval logs older than %s", count, r.duration)
 			}
-		}
-	}
-}
-
-// Periodically cancels stalled retrievals older than 30mins
-func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case now := <-ticker.C:
-			// Get retrievals last updated
-			rows, err := r.db.ListLastUpdatedAndOpen(ctx, now.Add(-r.stalledTimeout))
-
-			if err != nil {
-				log.Errorw("error fetching open, stalled retrievals", "err", err)
-				continue
-			}
-
-			var wg sync.WaitGroup
-			for _, row := range rows {
-				if row.TransferID <= 0 {
-					continue
-				}
-				wg.Add(1)
-				go func(s RetrievalDealState) {
-					// Don't wait for more than 5 seconds for the cancel
-					// message to be sent when cancelling an unpaid retrieval
-					unpaidRtrvCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-					defer cancel()
-					defer wg.Done()
-
-					// Try to cancel an unpaid retrieval with the given transfer id first
-					err := r.gsur.CancelTransfer(unpaidRtrvCtx, s.TransferID, &s.PeerID)
-					if err != nil && errors.Is(err, server.ErrRetrievalNotFound) {
-						// Couldn't find an unpaid retrieval with that id, try
-						// to cancel a legacy, paid retrieval
-						chid := datatransfer.ChannelID{Initiator: s.PeerID, Responder: s.LocalPeerID, ID: s.TransferID}
-						err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
-					}
-
-					if err != nil {
-						log.Debugw("error canceling retrieval", "dealID", s.DealID, "err", err)
-					} else {
-						log.Infof("Canceled retrieval %s, older than %s", s.DealID, r.stalledTimeout)
-					}
-				}(row)
-			}
-			wg.Wait()
 		}
 	}
 }

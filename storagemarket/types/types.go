@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -168,7 +168,7 @@ type DealPublisher interface {
 }
 
 type ChainDealManager interface {
-	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
+	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*PublishDealsWaitResult, error)
 }
 
 type IndexProvider interface {
@@ -178,9 +178,16 @@ type IndexProvider interface {
 }
 
 type AskGetter interface {
-	GetAsk() *storagemarket.SignedStorageAsk
+	GetAsk(miner address.Address) *legacytypes.SignedStorageAsk
 }
 
 type SignatureVerifier interface {
 	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
+}
+
+// PublishDealsWaitResult is the result of a call to wait for publish deals to
+// appear on chain
+type PublishDealsWaitResult struct {
+	DealID   abi.DealID
+	FinalCid cid.Cid
 }

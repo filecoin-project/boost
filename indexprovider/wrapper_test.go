@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
-	"github.com/filecoin-project/boost/indexprovider/mock"
+	_ "github.com/filecoin-project/boost/lib/legacy/mocks"
+	mocks_legacy "github.com/filecoin-project/boost/lib/legacy/mocks"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -21,7 +22,7 @@ import (
 
 func TestWrapperEmptyStorageListAndNoUpdates(t *testing.T) {
 	wrapper, legacyStorageProvider, _, _ := setup(t)
-	legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
+	legacyStorageProvider.EXPECT().ListDeals().AnyTimes().Return(nil, nil)
 
 	// handleUpdates with an empty response from MinerAPI.StorageList() and no updates
 	err := wrapper.handleUpdates(context.Background(), nil)
@@ -52,7 +53,7 @@ func TestSectorStateManagerMatchingDealOnly(t *testing.T) {
 
 	t.Run("deal in boost db", func(t *testing.T) {
 		wrapper, legacyStorageProvider, storageMiner, prov := setup(t)
-		legacyStorageProvider.EXPECT().ListLocalDeals().Return(nil, nil)
+		legacyStorageProvider.EXPECT().ListDeals().Return(nil, nil)
 
 		// Add a deal to the database
 		deals, err := db.GenerateNDeals(1)
@@ -73,11 +74,11 @@ func TestSectorStateManagerMatchingDealOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		sectorNum := abi.SectorNumber(10)
-		deals := []storagemarket.MinerDeal{{
+		deals := []legacytypes.MinerDeal{{
 			ClientDealProposal: boostDeals[0].ClientDealProposal,
 			SectorNumber:       sectorNum,
 		}}
-		legacyStorageProvider.EXPECT().ListLocalDeals().Return(deals, nil)
+		legacyStorageProvider.EXPECT().ListDeals().Return(deals, nil)
 
 		provAddr := deals[0].ClientDealProposal.Proposal.Provider
 		runTest(t, wrapper, storageMiner, prov, provAddr, sectorNum)
@@ -266,7 +267,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			wrapper, legacyStorageProvider, storageMiner, prov := setup(t)
-			legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
+			legacyStorageProvider.EXPECT().ListDeals().AnyTimes().Return(nil, nil)
 
 			// Add a deal to the database
 			deals, err := db.GenerateNDeals(1)
@@ -295,7 +296,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMiner, *mock_provider.MockInterface) {
+func setup(t *testing.T) (*Wrapper, *mocks_legacy.MockLegacyDealManager, *mockApiStorageMiner, *mock_provider.MockInterface) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	prov := mock_provider.NewMockInterface(ctrl)
@@ -304,19 +305,20 @@ func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMi
 	require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
 	require.NoError(t, migrations.Migrate(sqldb))
 
+	legacyProv := mocks_legacy.NewMockLegacyDealManager(ctrl)
+
 	dealsDB := db.NewDealsDB(sqldb)
 	storageMiner := &mockApiStorageMiner{}
-	storageProvider := mock.NewMockStorageProvider(ctrl)
 
 	wrapper := &Wrapper{
 		enabled:     true,
 		dealsDB:     dealsDB,
 		prov:        prov,
-		legacyProv:  storageProvider,
+		legacyProv:  legacyProv,
 		meshCreator: &meshCreatorStub{},
 	}
 
-	return wrapper, storageProvider, storageMiner, prov
+	return wrapper, legacyProv, storageMiner, prov
 }
 
 type mockApiStorageMiner struct {

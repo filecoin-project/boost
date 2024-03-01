@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/stores"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boost/cmd/lib/stores"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/testutil"

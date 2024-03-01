@@ -104,7 +104,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	// If there are any legacy deals to look up
 	if len(legacyDealIDs) > 0 {
 		// Get all deals from the legacy provider
-		legacyDeals, err := r.legacyProv.ListLocalDeals()
+		legacyDeals, err := r.legacyDeals.ListDeals()
 		if err != nil {
 			return nil, fmt.Errorf("getting legacy deals: %w", err)
 		}
@@ -158,7 +158,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 		Deals:          basicDeals,
 		Period:         int32(pending.PublishPeriod.Seconds()),
 		Start:          graphql.Time{Time: pending.PublishPeriodStart},
-		MaxDealsPerMsg: int32(r.cfg.LotusDealmaking.MaxDealsPerPublishMsg),
+		MaxDealsPerMsg: int32(r.cfg.Dealpublish.MaxDealsPerPublishMsg),
 	}, nil
 }
 

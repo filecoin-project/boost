@@ -1,0 +1,37 @@
+type PeerID string # peer.ID, really should be bytes (this is non-utf8) but is string for backward compat
+type TransferID int
+type TypeIdentifier string
+
+type ChannelID struct {
+	Initiator PeerID
+	Responder PeerID
+	ID        TransferID
+} representation tuple
+
+type TransferRequest struct {
+	BaseCidPtr nullable            Link           (rename "BCid")
+	MessageType                    Int            (rename "Type")
+	Pause                          Bool           (rename "Paus")
+	Partial                        Bool           (rename "Part")
+	Pull                           Bool           (rename "Pull")
+	SelectorPtr           nullable Any            (rename "Stor")
+	VoucherPtr            nullable Any            (rename "Vouch")
+	VoucherTypeIdentifier          TypeIdentifier (rename "VTyp")
+	TransferId                     Int            (rename "XferID")
+	RestartChannel                 ChannelID
+}
+
+type TransferResponse struct {
+	MessageType                    Int            (rename "Type")
+	RequestAccepted                Bool           (rename "Acpt")
+	Paused                         Bool           (rename "Paus")
+	TransferId                     Int            (rename "XferID")
+	VoucherResultPtr      nullable Any            (rename "VRes")
+	VoucherTypeIdentifier          TypeIdentifier (rename "VTyp")
+}
+
+type TransferMessage struct {
+	IsRequest         Bool             (rename "IsRq")
+	Request  nullable TransferRequest
+	Response nullable TransferResponse
+}

@@ -4,10 +4,12 @@ package storageadapter
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/raulk/clock"
 	"github.com/stretchr/testify/require"
@@ -482,4 +484,16 @@ func getWorkerActor(t *testing.T) address.Address {
 
 func getProviderActor(t *testing.T) address.Address {
 	return tutils.NewActorAddr(t, "provider")
+}
+
+var seq int
+
+func generateCids(n int) []cid.Cid {
+	cids := make([]cid.Cid, 0, n)
+	for i := 0; i < n; i++ {
+		c := blocks.NewBlock([]byte(fmt.Sprint(seq))).Cid()
+		seq++
+		cids = append(cids, c)
+	}
+	return cids
 }

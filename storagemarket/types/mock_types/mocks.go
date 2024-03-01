@@ -9,7 +9,6 @@ import (
 	io "io"
 	reflect "reflect"
 
-	storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	types "github.com/filecoin-project/boost/storagemarket/types"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -157,10 +156,10 @@ func (m *MockChainDealManager) EXPECT() *MockChainDealManagerMockRecorder {
 }
 
 // WaitForPublishDeals mocks base method.
-func (m *MockChainDealManager) WaitForPublishDeals(arg0 context.Context, arg1 cid.Cid, arg2 market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (m *MockChainDealManager) WaitForPublishDeals(arg0 context.Context, arg1 cid.Cid, arg2 market.DealProposal) (*types.PublishDealsWaitResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForPublishDeals", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*storagemarket.PublishDealsWaitResult)
+	ret0, _ := ret[0].(*types.PublishDealsWaitResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -16,6 +16,7 @@ var pieceDirCmd = &cli.Command{
 	Usage: "Manage Local Index Directory",
 	Subcommands: []*cli.Command{
 		pdIndexGenerate,
+		recoverCmd,
 	},
 }
 

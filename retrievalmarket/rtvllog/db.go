@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
@@ -32,8 +32,8 @@ type RetrievalDealState struct {
 	UpdatedAt               time.Time
 	LocalPeerID             peer.ID
 	PeerID                  peer.ID
-	DealID                  retrievalmarket.DealID
-	TransferID              datatransfer.TransferID
+	DealID                  legacyretrievaltypes.DealID
+	TransferID              datatransfer2.TransferID
 	PayloadCID              cid.Cid
 	PieceCID                *cid.Cid
 	PaymentInterval         uint64
@@ -278,7 +278,7 @@ func (d *RetrievalLogDB) Count(ctx context.Context, isIndexer *bool) (int, error
 	return count, err
 }
 
-func (d *RetrievalLogDB) Update(ctx context.Context, state retrievalmarket.ProviderDealState) error {
+func (d *RetrievalLogDB) Update(ctx context.Context, state legacyretrievaltypes.ProviderDealState) error {
 	fields := map[string]interface{}{
 		"Status":    state.Status.String(),
 		"TotalSent": state.TotalSent,
@@ -297,7 +297,7 @@ func (d *RetrievalLogDB) Update(ctx context.Context, state retrievalmarket.Provi
 	return d.update(ctx, fields, where, args...)
 }
 
-func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event datatransfer.Event, state datatransfer.ChannelState) error {
+func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event datatransfer2.Event, state datatransfer2.ChannelState) error {
 	peerID := state.OtherPeer().String()
 	transferID := state.TransferID()
 	if err := d.insertDTEvent(ctx, peerID, transferID, event); err != nil {
@@ -305,7 +305,7 @@ func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event data
 	}
 
 	fields := map[string]interface{}{
-		"DTStatus":  datatransfer.Statuses[state.Status()],
+		"DTStatus":  datatransfer2.Statuses[state.Status()],
 		"DTMessage": state.Message(),
 		"UpdatedAt": time.Now(),
 	}
@@ -326,10 +326,10 @@ func (d *RetrievalLogDB) update(ctx context.Context, fields map[string]interface
 	return err
 }
 
-func (d *RetrievalLogDB) insertDTEvent(ctx context.Context, peerID string, transferID datatransfer.TransferID, event datatransfer.Event) error {
+func (d *RetrievalLogDB) insertDTEvent(ctx context.Context, peerID string, transferID datatransfer2.TransferID, event datatransfer2.Event) error {
 	qry := "INSERT INTO RetrievalDataTransferEvents (PeerID, TransferID, CreatedAt, Name, Message) " +
 		"VALUES (?, ?, ?, ?, ?)"
-	_, err := d.db.ExecContext(ctx, qry, peerID, transferID, event.Timestamp, datatransfer.Events[event.Code], event.Message)
+	_, err := d.db.ExecContext(ctx, qry, peerID, transferID, event.Timestamp, datatransfer2.Events[event.Code], event.Message)
 	return err
 }
 
@@ -339,7 +339,7 @@ type DTEvent struct {
 	Message   string
 }
 
-func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transferID datatransfer.TransferID) ([]DTEvent, error) {
+func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transferID datatransfer2.TransferID) ([]DTEvent, error) {
 	qry := "SELECT CreatedAt, Name, Message " +
 		"FROM RetrievalDataTransferEvents " +
 		"WHERE PeerID = ? AND TransferID = ? " +
@@ -372,10 +372,10 @@ func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transf
 	return dtEvents, nil
 }
 
-func (d *RetrievalLogDB) InsertMarketsEvent(ctx context.Context, event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) error {
+func (d *RetrievalLogDB) InsertMarketsEvent(ctx context.Context, event legacyretrievaltypes.ProviderEvent, state legacyretrievaltypes.ProviderDealState) error {
 	// Ignore block sent events as we are recording the equivalent event for
 	// data-transfer, and it's a high-frequency event
-	if event == retrievalmarket.ProviderEventBlockSent {
+	if event == legacyretrievaltypes.ProviderEventBlockSent {
 		return nil
 	}
 
@@ -385,7 +385,7 @@ func (d *RetrievalLogDB) InsertMarketsEvent(ctx context.Context, event retrieval
 		state.Receiver.String(),
 		state.ID,
 		time.Now(),
-		retrievalmarket.ProviderEvents[event],
+		legacyretrievaltypes.ProviderEvents[event],
 		state.Status.String(),
 		state.Message)
 	return err
@@ -398,7 +398,7 @@ type MarketEvent struct {
 	Message   string
 }
 
-func (d *RetrievalLogDB) ListMarketEvents(ctx context.Context, peerID string, dealID retrievalmarket.DealID) ([]MarketEvent, error) {
+func (d *RetrievalLogDB) ListMarketEvents(ctx context.Context, peerID string, dealID legacyretrievaltypes.DealID) ([]MarketEvent, error) {
 	qry := "SELECT CreatedAt, Name, Status, Message " +
 		"FROM RetrievalMarketEvents " +
 		"WHERE PeerID = ? AND DealID = ? " +

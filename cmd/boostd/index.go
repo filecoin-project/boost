@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -133,7 +134,7 @@ var indexProvAnnounceLatestHttp = &cli.Command{
 
 var indexProvAnnounceDealRemovalAd = &cli.Command{
 	Name:  "announce-remove-deal",
-	Usage: "Published a removal ad for given deal UUID or Proposal CID (legacy deals)",
+	Usage: "Published a removal ad for given deal UUID or Signed Proposal CID (legacy deals)",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
@@ -193,7 +194,7 @@ var indexProvAnnounceDealRemovalAd = &cli.Command{
 
 var indexProvAnnounceDeal = &cli.Command{
 	Name:  "announce-deal",
-	Usage: "Publish an ad for given deal UUID (Boost deals only)",
+	Usage: "Publish an ad for for given deal UUID or Signed Proposal CID (legacy deals)",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
@@ -209,29 +210,67 @@ var indexProvAnnounceDeal = &cli.Command{
 
 		id := cctx.Args().Get(0)
 
+		var proposalCid cid.Cid
 		dealUuid, err := uuid.Parse(id)
 		if err != nil {
+			propCid, err := cid.Decode(id)
 			if err != nil {
-				return fmt.Errorf("could not parse '%s' as deal uuid", id)
+				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
 			}
+			proposalCid = propCid
 		}
 
-		deal, err := napi.BoostDeal(ctx, dealUuid)
-		if err != nil {
-			return fmt.Errorf("deal not found with UUID %s: %w", dealUuid.String(), err)
-		}
-
-		cid, err := napi.BoostIndexerAnnounceDeal(ctx, deal)
-		if err != nil {
-			return fmt.Errorf("failed to announce the deal: %w", err)
-		}
-		if cid.Defined() {
-			fmt.Printf("Announced the deal with Ad cid %s\n", cid)
+		if !proposalCid.Defined() {
+			deal, err := napi.BoostDeal(ctx, dealUuid)
+			if err != nil {
+				return fmt.Errorf("deal not found with UUID %s: %w", dealUuid.String(), err)
+			}
+			ad, err := napi.BoostIndexerAnnounceDeal(ctx, deal)
+			if err != nil {
+				return fmt.Errorf("failed to announce the deal: %w", err)
+			}
+			if ad.Defined() {
+				fmt.Printf("Announced the deal with Ad cid %s\n", ad)
+				return nil
+			}
+			fmt.Printf("Deal already announced\n")
 			return nil
 		}
 
-		fmt.Printf("Deal already announced\n")
-
+		_, err = napi.BoostLegacyDealByProposalCid(ctx, proposalCid)
+		if err != nil {
+			// If the error is anything other than a Not Found error,
+			// return the error
+			if !strings.Contains(err.Error(), "not found") {
+				return fmt.Errorf("locating legacy deal %s: %w", proposalCid, err)
+			}
+			// If not found, check for Boost deals by proposal CID
+			deal, err := napi.BoostDealBySignedProposalCid(ctx, proposalCid)
+			if err != nil {
+				return fmt.Errorf("locating Boost or legacy deal by proposal CID %s: %w", proposalCid, err)
+			}
+			// Announce Boost deal
+			ad, err := napi.BoostIndexerAnnounceDeal(ctx, deal)
+			if err != nil {
+				return fmt.Errorf("failed to announce the deal: %w", err)
+			}
+			if ad.Defined() {
+				fmt.Printf("Announced the deal with Ad cid %s\n", ad)
+				return nil
+			}
+			fmt.Printf("Deal already announced\n")
+			return nil
+		}
+		// Announce legacy deal
+		ad, err := napi.BoostIndexerAnnounceLegacyDeal(ctx, proposalCid)
+		if err != nil {
+			return fmt.Errorf("announcing legacy deal with proposal CID %s: %w", proposalCid, err)
+		}
+		if ad.Defined() {
+			fmt.Printf("Announced the legacy deal with Ad cid %s\n", ad)
+			return nil
+		}
+		fmt.Printf("Legacy deal already announced\n")
 		return nil
 	},
 }

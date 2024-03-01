@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -220,10 +220,10 @@ func (m *FundManager) MoveFundsToEscrow(ctx context.Context, amt abi.TokenAmount
 
 // BalanceMarket returns available and locked amounts in escrow
 // (on chain with the Storage Market Actor)
-func (m *FundManager) BalanceMarket(ctx context.Context) (storagemarket.Balance, error) {
+func (m *FundManager) BalanceMarket(ctx context.Context) (legacytypes.Balance, error) {
 	bal, err := m.api.StateMarketBalance(ctx, m.cfg.StorageMiner, types.EmptyTSK)
 	if err != nil {
-		return storagemarket.Balance{}, err
+		return legacytypes.Balance{}, err
 	}
 
 	return toSharedBalance(bal), nil
@@ -249,8 +249,8 @@ func (m *FundManager) AddressPublishMsg() address.Address {
 	return m.cfg.PubMsgWallet
 }
 
-func toSharedBalance(bal api.MarketBalance) storagemarket.Balance {
-	return storagemarket.Balance{
+func toSharedBalance(bal api.MarketBalance) legacytypes.Balance {
+	return legacytypes.Balance{
 		Locked:    bal.Locked,
 		Available: big.Sub(bal.Escrow, bal.Locked),
 	}

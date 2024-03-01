@@ -25,7 +25,6 @@ func TestIPNIPublish(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)

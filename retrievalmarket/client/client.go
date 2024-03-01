@@ -9,27 +9,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/shared"
 	gsimpl "github.com/filecoin-project/boost-graphsync/impl"
 	gsnet "github.com/filecoin-project/boost-graphsync/network"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	dtnet "github.com/filecoin-project/boost/datatransfer/network"
+	gst "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
+	"github.com/filecoin-project/boost/markets/shared"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-data-transfer/channelmonitor"
-	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
-	dtnet "github.com/filecoin-project/go-data-transfer/network"
-	gst "github.com/filecoin-project/go-data-transfer/transport/graphsync"
+
+	"github.com/filecoin-project/boost/datatransfer/channelmonitor"
+	dtimpl "github.com/filecoin-project/boost/datatransfer/impl"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
-	blockstore "github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
@@ -61,7 +63,7 @@ type Client struct {
 	host         host.Host
 	ClientAddr   address.Address
 	blockstore   blockstore.Blockstore
-	dataTransfer datatransfer.Manager
+	dataTransfer datatransfer2.Manager
 
 	logRetrievalProgressEvents bool
 }
@@ -76,7 +78,7 @@ type Config struct {
 	Datastore                  datastore.Batching
 	Host                       host.Host
 	ChannelMonitorConfig       channelmonitor.Config
-	RetrievalConfigurer        datatransfer.TransportConfigurer
+	RetrievalConfigurer        datatransfer2.TransportConfigurer
 	LogRetrievalProgressEvents bool
 }
 
@@ -138,28 +140,45 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		return nil, err
 	}
 
-	err = mgr.RegisterVoucherType(&retrievalmarket.DealProposal{}, nil)
+	err = mgr.RegisterVoucherType(&legacyretrievaltypes.DealProposal{}, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = mgr.RegisterVoucherType(&retrievalmarket.DealPayment{}, nil)
+	err = mgr.RegisterVoucherType(&legacyretrievaltypes.DealPayment{}, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = mgr.RegisterVoucherResultType(&retrievalmarket.DealResponse{})
+	err = mgr.RegisterVoucherResultType(&legacyretrievaltypes.DealResponse{})
 	if err != nil {
 		return nil, err
 	}
 
 	if cfg.RetrievalConfigurer != nil {
-		if err := mgr.RegisterTransportConfigurer(&retrievalmarket.DealProposal{}, cfg.RetrievalConfigurer); err != nil {
+		if err := mgr.RegisterTransportConfigurer(&legacyretrievaltypes.DealProposal{}, cfg.RetrievalConfigurer); err != nil {
 			return nil, err
 		}
 	}
 
+	errCh := make(chan error)
+	startedCh := make(chan struct{})
+
+	mgr.OnReady(func(err error) {
+		if err != nil {
+			errCh <- err
+			return
+		}
+		close(startedCh)
+	})
+
 	if err := mgr.Start(context.Background()); err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-startedCh:
+	case err := <-errCh:
 		return nil, err
 	}
 
@@ -297,7 +316,7 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	return nil
 }
 
-func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
+func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*legacyretrievaltypes.QueryResponse, error) {
 	ctx, span := Tracer.Start(ctx, "retrievalQuery", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
 	))
@@ -316,11 +335,11 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 
 	// We have connected
 
-	q := &retrievalmarket.Query{
+	q := &legacyretrievaltypes.Query{
 		PayloadCID: pcid,
 	}
 
-	var resp retrievalmarket.QueryResponse
+	var resp legacyretrievaltypes.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
@@ -341,7 +360,7 @@ type RetrievalStats struct {
 func (c *Client) RetrieveContentWithProgressCallback(
 	ctx context.Context,
 	miner address.Address,
-	proposal *retrievalmarket.DealProposal,
+	proposal *legacyretrievaltypes.DealProposal,
 	progressCallback func(bytesReceived uint64),
 ) (*RetrievalStats, error) {
 
@@ -362,7 +381,7 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
-	proposal *retrievalmarket.DealProposal,
+	proposal *legacyretrievaltypes.DealProposal,
 	progressCallback func(bytesReceived uint64),
 	gracefulShutdownRequested <-chan struct{},
 ) (*RetrievalStats, error) {
@@ -380,7 +399,7 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	totalPayment := abi.NewTokenAmount(0)
 
 	rootCid := proposal.PayloadCID
-	var chanid datatransfer.ChannelID
+	var chanid datatransfer2.ChannelID
 	var chanidLk sync.Mutex
 
 	pchRequired := !proposal.PricePerByte.IsZero() || !proposal.UnsealPrice.IsZero()
@@ -409,8 +428,8 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	dealComplete := false
 	receivedFirstByte := false
 
-	unsubscribe := c.dataTransfer.SubscribeToEvents(func(event datatransfer.Event, state datatransfer.ChannelState) {
-		// Copy chanid so it can be used later in the callback
+	unsubscribe := c.dataTransfer.SubscribeToEvents(func(event datatransfer2.Event, state datatransfer2.ChannelState) {
+		// Copy chanid so, it can be used later in the callback
 		chanidLk.Lock()
 		chanidCopy := chanid
 		chanidLk.Unlock()
@@ -424,24 +443,24 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 		eventCodeNotHandled := false
 
 		switch event.Code {
-		case datatransfer.Open:
-		case datatransfer.Accept:
-		case datatransfer.Restart:
-		case datatransfer.DataReceived:
+		case datatransfer2.Open:
+		case datatransfer2.Accept:
+		case datatransfer2.Restart:
+		case datatransfer2.DataReceived:
 			silenceEventCode = true
-		case datatransfer.DataSent:
-		case datatransfer.Cancel:
-		case datatransfer.Error:
+		case datatransfer2.DataSent:
+		case datatransfer2.Cancel:
+		case datatransfer2.Error:
 			finish(fmt.Errorf("datatransfer error: %s", event.Message))
 			return
-		case datatransfer.CleanupComplete:
+		case datatransfer2.CleanupComplete:
 			finish(nil)
 			return
-		case datatransfer.NewVoucher:
-		case datatransfer.NewVoucherResult:
+		case datatransfer2.NewVoucher:
+		case datatransfer2.NewVoucherResult:
 
 			switch resType := state.LastVoucherResult().(type) {
-			case *retrievalmarket.DealResponse:
+			case *legacyretrievaltypes.DealResponse:
 				if len(resType.Message) != 0 {
 					log.Debugf("Received deal response voucher result %s (%v): %s\n\t%+v", resType.Status, resType.Status, resType.Message, resType)
 				} else {
@@ -449,11 +468,11 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 				}
 
 				switch resType.Status {
-				case retrievalmarket.DealStatusAccepted:
+				case legacyretrievaltypes.DealStatusAccepted:
 					log.Info("Deal accepted")
 
 				// Respond with a payment voucher when funds are requested
-				case retrievalmarket.DealStatusFundsNeeded, retrievalmarket.DealStatusFundsNeededLastPayment:
+				case legacyretrievaltypes.DealStatusFundsNeeded, legacyretrievaltypes.DealStatusFundsNeededLastPayment:
 					if pchRequired {
 						finish(errors.New("payment channel required"))
 						return
@@ -461,19 +480,19 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 						finish(fmt.Errorf("the miner requested payment even though this transaction was determined to be zero cost"))
 						return
 					}
-				case retrievalmarket.DealStatusRejected:
+				case legacyretrievaltypes.DealStatusRejected:
 					finish(fmt.Errorf("deal rejected: %s", resType.Message))
 					return
-				case retrievalmarket.DealStatusFundsNeededUnseal, retrievalmarket.DealStatusUnsealing:
+				case legacyretrievaltypes.DealStatusFundsNeededUnseal, legacyretrievaltypes.DealStatusUnsealing:
 					finish(fmt.Errorf("data is sealed"))
 					return
-				case retrievalmarket.DealStatusCancelled:
+				case legacyretrievaltypes.DealStatusCancelled:
 					finish(fmt.Errorf("deal cancelled: %s", resType.Message))
 					return
-				case retrievalmarket.DealStatusErrored:
+				case legacyretrievaltypes.DealStatusErrored:
 					finish(fmt.Errorf("deal errored: %s", resType.Message))
 					return
-				case retrievalmarket.DealStatusCompleted:
+				case legacyretrievaltypes.DealStatusCompleted:
 					if allBytesReceived {
 						finish(nil)
 						return
@@ -481,26 +500,26 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 					dealComplete = true
 				}
 			}
-		case datatransfer.PauseInitiator:
-		case datatransfer.ResumeInitiator:
-		case datatransfer.PauseResponder:
-		case datatransfer.ResumeResponder:
-		case datatransfer.FinishTransfer:
+		case datatransfer2.PauseInitiator:
+		case datatransfer2.ResumeInitiator:
+		case datatransfer2.PauseResponder:
+		case datatransfer2.ResumeResponder:
+		case datatransfer2.FinishTransfer:
 			if dealComplete {
 				finish(nil)
 				return
 			}
 			allBytesReceived = true
-		case datatransfer.ResponderCompletes:
-		case datatransfer.ResponderBeginsFinalization:
-		case datatransfer.BeginFinalizing:
-		case datatransfer.Disconnected:
-		case datatransfer.Complete:
-		case datatransfer.CompleteCleanupOnRestart:
-		case datatransfer.DataQueued:
-		case datatransfer.DataQueuedProgress:
-		case datatransfer.DataSentProgress:
-		case datatransfer.DataReceivedProgress:
+		case datatransfer2.ResponderCompletes:
+		case datatransfer2.ResponderBeginsFinalization:
+		case datatransfer2.BeginFinalizing:
+		case datatransfer2.Disconnected:
+		case datatransfer2.Complete:
+		case datatransfer2.CompleteCleanupOnRestart:
+		case datatransfer2.DataQueued:
+		case datatransfer2.DataQueuedProgress:
+		case datatransfer2.DataSentProgress:
+		case datatransfer2.DataReceivedProgress:
 			// First byte has been received
 
 			// publish first byte event
@@ -510,17 +529,17 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 
 			progressCallback(state.Received())
 			silenceEventCode = true
-		case datatransfer.RequestTimedOut:
-		case datatransfer.SendDataError:
-		case datatransfer.ReceiveDataError:
-		case datatransfer.TransferRequestQueued:
-		case datatransfer.RequestCancelled:
-		case datatransfer.Opened:
+		case datatransfer2.RequestTimedOut:
+		case datatransfer2.SendDataError:
+		case datatransfer2.ReceiveDataError:
+		case datatransfer2.TransferRequestQueued:
+		case datatransfer2.RequestCancelled:
+		case datatransfer2.Opened:
 		default:
 			eventCodeNotHandled = true
 		}
 
-		name := datatransfer.Events[event.Code]
+		name := datatransfer2.Events[event.Code]
 		code := event.Code
 		msg := event.Message
 		blocksIndex := state.ReceivedCidsTotal()
@@ -536,7 +555,15 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	defer unsubscribe()
 
 	// Submit the retrieval deal proposal to the miner
-	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, selectorparse.CommonSelector_ExploreAllRecursively)
+	selector := selectorparse.CommonSelector_ExploreAllRecursively
+	if proposal.SelectorSpecified() {
+		var err error
+		selector, err = ipld.Decode(proposal.Selector.Raw, dagcbor.Decode)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode selector from proposal: %w", err)
+		}
+	}
+	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, selector)
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure
@@ -602,12 +629,12 @@ awaitfinished:
 	}, nil
 }
 
-func RetrievalProposalForAsk(ask *retrievalmarket.QueryResponse, c cid.Cid, optionalSelector ipld.Node) (*retrievalmarket.DealProposal, error) {
+func RetrievalProposalForAsk(ask *legacyretrievaltypes.QueryResponse, c cid.Cid, optionalSelector ipld.Node) (*legacyretrievaltypes.DealProposal, error) {
 	if optionalSelector == nil {
 		optionalSelector = selectorparse.CommonSelector_ExploreAllRecursively
 	}
 
-	params, err := retrievalmarket.NewParamsV1(
+	params, err := legacyretrievaltypes.NewParamsV1(
 		ask.MinPricePerByte,
 		ask.MaxPaymentInterval,
 		ask.MaxPaymentIntervalIncrease,
@@ -618,9 +645,9 @@ func RetrievalProposalForAsk(ask *retrievalmarket.QueryResponse, c cid.Cid, opti
 	if err != nil {
 		return nil, err
 	}
-	return &retrievalmarket.DealProposal{
+	return &legacyretrievaltypes.DealProposal{
 		PayloadCID: c,
-		ID:         retrievalmarket.DealID(dealIdGen.Next()),
+		ID:         legacyretrievaltypes.DealID(dealIdGen.Next()),
 		Params:     params,
 	}, nil
 }

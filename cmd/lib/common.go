@@ -9,10 +9,10 @@ import (
 	"os"
 
 	"github.com/chzyer/readline"
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	piecestoreimpl "github.com/filecoin-project/boost-gfm/piecestore/impl"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	piecestoreimpl "github.com/filecoin-project/boost/markets/piecestore/impl"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -72,7 +72,7 @@ func GetPropCidByChainDealID(ctx context.Context, ds *backupds.Datastore) (map[a
 	}
 
 	// Build a mapping of chain deal ID to proposal CID
-	var list []storagemarket.MinerDeal
+	var list []legacytypes.MinerDeal
 	if err := deals.List(&list); err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	// Get the deals FSM
 	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
 	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
-		StateType:     storagemarket.MinerDeal{},
+		StateType:     legacytypes.MinerDeal{},
 		StateKeyField: "State",
 	}, nil, "2")
 	if err != nil {
