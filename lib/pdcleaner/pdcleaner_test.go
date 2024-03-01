@@ -180,7 +180,6 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 
 	fn.EXPECT().ChainHead(gomock.Any()).DoAndReturn(chainHeadFn).AnyTimes()
 	fn.EXPECT().StateMarketDeals(gomock.Any(), gomock.Any()).Return(cDealMap, nil).AnyTimes()
-	fn.EXPECT().StateGetClaims(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	legacyProv.EXPECT().ListDeals().Return(nil, nil).AnyTimes()
 	legacyProv.EXPECT().ByPieceCid(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 

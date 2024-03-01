@@ -198,52 +198,54 @@ func (p *pdcleaner) CleanOnce() error {
 		}
 	}
 
-	// Clean up direct deals
-	claims, err := p.full.StateGetClaims(p.ctx, p.miner, tskey)
-	if err != nil {
-		return fmt.Errorf("getting claims for the miner %s: %w", p.miner, err)
-	}
-	// Loading miner actor locally is preferred to avoid getting unnecessary data from full.StateMinerActiveSectors()
-	mActor, err := p.full.StateGetActor(p.ctx, p.miner, tskey)
-	if err != nil {
-		return fmt.Errorf("getting actor for the miner %s: %w", p.miner, err)
-	}
-	store := adt.WrapStore(p.ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(p.full)))
-	mas, err := miner.Load(store, mActor)
-	if err != nil {
-		return fmt.Errorf("loading miner actor state %s: %w", p.miner, err)
-	}
-	activeSectors, err := miner.AllPartSectors(mas, miner.Partition.ActiveSectors)
-	if err != nil {
-		return fmt.Errorf("getting active sector sets for miner %s: %w", p.miner, err)
-	}
+	// Clean up direct deals if there are any otherwise skip this step
+	if len(completeDirectDeals) > 0 {
+		claims, err := p.full.StateGetClaims(p.ctx, p.miner, tskey)
+		if err != nil {
+			return fmt.Errorf("getting claims for the miner %s: %w", p.miner, err)
+		}
+		// Loading miner actor locally is preferred to avoid getting unnecessary data from full.StateMinerActiveSectors()
+		mActor, err := p.full.StateGetActor(p.ctx, p.miner, tskey)
+		if err != nil {
+			return fmt.Errorf("getting actor for the miner %s: %w", p.miner, err)
+		}
+		store := adt.WrapStore(p.ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(p.full)))
+		mas, err := miner.Load(store, mActor)
+		if err != nil {
+			return fmt.Errorf("loading miner actor state %s: %w", p.miner, err)
+		}
+		activeSectors, err := miner.AllPartSectors(mas, miner.Partition.ActiveSectors)
+		if err != nil {
+			return fmt.Errorf("getting active sector sets for miner %s: %w", p.miner, err)
+		}
 
-	for _, d := range completeDirectDeals {
-		// AllocationID and ClaimID should match
-		cID := verifregtypes.ClaimId(d.AllocationID)
-		c, ok := claims[cID]
-		if ok {
-			present, err := activeSectors.IsSet(uint64(c.Sector))
-			if err != nil {
-				return fmt.Errorf("checking if bitfield is set: %w", err)
-			}
-			// Each claim is created with ProveCommit message. So, a sector in claim cannot be unproven.
-			// it must be either Active(Proving, Faulty, Recovering) or terminated. If bitfield is not set
-			// then sector must have been terminated. This method will also account for future change in sector numbers
-			// of a claim. Even if the sector is changed then it must be Active as this change will require a
-			// ProveCommit message
-			if !present {
-				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+		for _, d := range completeDirectDeals {
+			// AllocationID and ClaimID should match
+			cID := verifregtypes.ClaimId(d.AllocationID)
+			c, ok := claims[cID]
+			if ok {
+				present, err := activeSectors.IsSet(uint64(c.Sector))
 				if err != nil {
-					// Don't return if cleaning up a deal results in error. Try them all.
-					log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+					return fmt.Errorf("checking if bitfield is set: %w", err)
+				}
+				// Each claim is created with ProveCommit message. So, a sector in claim cannot be unproven.
+				// it must be either Active(Proving, Faulty, Recovering) or terminated. If bitfield is not set
+				// then sector must have been terminated. This method will also account for future change in sector numbers
+				// of a claim. Even if the sector is changed then it must be Active as this change will require a
+				// ProveCommit message
+				if !present {
+					err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+					if err != nil {
+						// Don't return if cleaning up a deal results in error. Try them all.
+						log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+					}
 				}
 			}
+			// TODO: Account for a final sealing state other than proving (Depends on v1.26.0)
+			// 1. We can either check allocation list for all client (Lotus v1.26.0) and cleanup LID if found
+			// 2. If not found in allocation list then either claim expired or allocation. We should clean up in this case
+			// 3. Account for Curio as it will have redundant sealing until proven
 		}
-		// TODO: Account for a final sealing state other than proving (Depends on v1.26.0)
-		// 1. We can either check allocation list for all client (Lotus v1.26.0) and cleanup LID if found
-		// 2. If not found in allocation list then either claim expired or allocation. We should clean up in this case
-		// 3. Account for Curio as it will have redundant sealing until proven
 	}
 
 	// Clean up dangling LID deals with no Boost, Direct or Legacy deals attached to them
