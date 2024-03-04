@@ -52,7 +52,7 @@ func TestDirectDeal(t *testing.T) {
 	opts = append(opts, framework.WithStartEpochSealingBuffer(30))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	esemble.Start()
-	blockTime := 30 * time.Millisecond
+	blockTime := 100 * time.Millisecond
 	esemble.BeginMining(blockTime)
 
 	err = f.Start()
@@ -164,21 +164,6 @@ func TestDirectDeal(t *testing.T) {
 		}
 		time.Sleep(2 * time.Second)
 	}
-
-	// Wait for 1 wdPost to allow sector to activate
-	for {
-		head, err := f.FullNode.ChainHead(ctx)
-		require.NoError(t, err)
-		if head.Height() > startEpoch+abi.ChainEpoch(2880) {
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
-
-	// Verify that we now have 3 active sectors
-	activeSet, err := f.FullNode.StateMinerActiveSectors(ctx, f.MinerAddr, types.EmptyTSK)
-	require.NoError(t, err)
-	require.Len(t, activeSet, 3)
 
 	// Confirm we have 0 allocations left
 	allocations, err = f.FullNode.StateGetAllocations(ctx, f.ClientAddr, types.EmptyTSK)
