@@ -253,7 +253,7 @@ jobs:
         default: golang
       golangci-lint-version:
         type: string
-        default: 1.52.2
+        default: 1.56.2
       concurrency:
         type: string
         default: '2'
