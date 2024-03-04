@@ -10,7 +10,7 @@ executors:
     resource_class: 2xlarge
   ubuntu:
     docker:
-      - image: ubuntu:22.04
+      - image: ubuntu:default
 
 commands:
   install-deps:
@@ -328,10 +328,10 @@ workflows:
           suite: itest-retrieval
           target: "./itests/graphsync_retrieval_test.go"
 
-      #- test:
-          #name: test-itest-direct_deal
-          #suite: itest-direct_deal
-          #target: "./itests/ddo_test.go"
+      - test:
+          name: test-itest-direct_deal
+          suite: itest-direct_deal
+          target: "./itests/ddo_test.go"
 
       - test:
           name: test-all
