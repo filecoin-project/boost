@@ -22,11 +22,13 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
-	"github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	lotuspiece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
 )
 
@@ -78,6 +80,7 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 }
 
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
+	log.Infow("direct deals provider: starting")
 	ddp.ctx = ctx
 
 	deals, err := ddp.directDealsDB.ListActive(ctx)
@@ -93,6 +96,7 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 		ddp.startDealThread(entry.ID)
 	}
 
+	log.Infow("direct deals provider: started")
 	return nil
 }
 
@@ -350,28 +354,22 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		_ = clientId
 
 		// Add the piece to a sector
-		sdInfo := lapi.PieceDealInfo{
-			// "Old" builtin-market deal info
-			//PublishCid   *cid.Cid
-			//DealID       abi.DealID
-			//DealProposal *market.DealProposal
-
+		sdInfo := lotuspiece.PieceDealInfo{
 			// Common deal info, required for all pieces
-			DealSchedule: lapi.DealSchedule{
+			DealSchedule: lotuspiece.DealSchedule{
 				StartEpoch: entry.StartEpoch,
 				EndEpoch:   entry.EndEpoch,
 			},
 
 			// Direct Data Onboarding
 			// When PieceActivationManifest is set, builtin-market deal info must not be set
-			PieceActivationManifest: &miner.PieceActivationManifest{
+			PieceActivationManifest: &minertypes.PieceActivationManifest{
 				CID:  entry.PieceCID,
 				Size: entry.PieceSize,
-				VerifiedAllocationKey: &miner.VerifiedAllocationKey{
+				VerifiedAllocationKey: &miner13types.VerifiedAllocationKey{
 					Client: abi.ActorID(clientId),
-					ID:     verifreg.AllocationId(uint64(entry.AllocationID)),
+					ID:     verifreg13types.AllocationId(entry.AllocationID),
 				},
-				//Notify                []DataActivationNotification
 				Notify: nil,
 			},
 

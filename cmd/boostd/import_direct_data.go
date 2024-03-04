@@ -117,6 +117,10 @@ var importDirectDataCmd = &cli.Command{
 			return fmt.Errorf("getting claim details from chain: %w", err)
 		}
 
+		if alloc.Expiration < startEpoch {
+			return fmt.Errorf("allocation will expire on %d before start epoch %d", alloc.Expiration, startEpoch)
+		}
+
 		// Since StartEpoch is more than Head+StartEpochSealingBuffer, we can set end epoch as start+TermMin
 		endEpoch := startEpoch + alloc.TermMin
 

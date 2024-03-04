@@ -41,7 +41,7 @@ type DirectDeal struct {
 
 	// deal checkpoint in DB.
 	Checkpoint dealcheckpoints.Checkpoint
-	// CheckpointAt is the time at which the deal entered in the last state
+	// CheckpointAt is the time at which the deal entered the last state
 	CheckpointAt time.Time
 
 	StartEpoch abi.ChainEpoch

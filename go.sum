@@ -380,8 +380,8 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d h1:KX85N/juToCpFXeYtWKGZ1lGPTjRo1i3QBUhxgOtYck=
 github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d/go.mod h1:6+uTL2U1NwtLg0Dnz+6ksFGhRY1y9CygWFKKC1h/HV0=
-github.com/filecoin-project/lotus v1.25.3-0.20240228124156-fc6229abf7f4 h1:ccee29n37fR0ymXBL3rSPSY+56AuLXBuIeMFcZmVy0g=
-github.com/filecoin-project/lotus v1.25.3-0.20240228124156-fc6229abf7f4/go.mod h1:m2HZtRLwJKm2WVBFzYitQqq4Jqb2wcxzR1qWHNVUHuY=
+github.com/filecoin-project/lotus v1.25.3-0.20240301100536-62989ff743e4 h1:mFiLunb5si3gU7nbqse/MzSxR7xsPYMXQMEDvsCbYRY=
+github.com/filecoin-project/lotus v1.25.3-0.20240301100536-62989ff743e4/go.mod h1:m2HZtRLwJKm2WVBFzYitQqq4Jqb2wcxzR1qWHNVUHuY=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
