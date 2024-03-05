@@ -12,12 +12,14 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
@@ -204,6 +206,7 @@ func (p *pdcleaner) CleanOnce() error {
 		if err != nil {
 			return fmt.Errorf("getting claims for the miner %s: %w", p.miner, err)
 		}
+
 		// Loading miner actor locally is preferred to avoid getting unnecessary data from full.StateMinerActiveSectors()
 		mActor, err := p.full.StateGetActor(p.ctx, p.miner, tskey)
 		if err != nil {
@@ -218,13 +221,31 @@ func (p *pdcleaner) CleanOnce() error {
 		if err != nil {
 			return fmt.Errorf("getting active sector sets for miner %s: %w", p.miner, err)
 		}
+		unProvenSectors, err := miner.AllPartSectors(mas, miner.Partition.UnprovenSectors)
+		if err != nil {
+			return fmt.Errorf("getting unproven sector sets for miner %s: %w", p.miner, err)
+		}
+		finalSectors, err := bitfield.MergeBitFields(activeSectors, unProvenSectors)
+		if err != nil {
+			return fmt.Errorf("merging bitfields to generate all deal sectors on miner %s: %w", p.miner, err)
+		}
+
+		// Load verifreg actor locally
+		verifregActor, err := p.full.StateGetActor(p.ctx, verifreg.Address, tskey)
+		if err != nil {
+			return fmt.Errorf("getting verified registry actor state: %w", err)
+		}
+		verifregState, err := verifreg.Load(store, verifregActor)
+		if err != nil {
+			return fmt.Errorf("loading verified registry actor state: %w", err)
+		}
 
 		for _, d := range completeDirectDeals {
-			// AllocationID and ClaimID should match
 			cID := verifregtypes.ClaimId(d.AllocationID)
 			c, ok := claims[cID]
+			// If claim found
 			if ok {
-				present, err := activeSectors.IsSet(uint64(c.Sector))
+				present, err := finalSectors.IsSet(uint64(c.Sector))
 				if err != nil {
 					return fmt.Errorf("checking if bitfield is set: %w", err)
 				}
@@ -232,19 +253,45 @@ func (p *pdcleaner) CleanOnce() error {
 				// it must be either Active(Proving, Faulty, Recovering) or terminated. If bitfield is not set
 				// then sector must have been terminated. This method will also account for future change in sector numbers
 				// of a claim. Even if the sector is changed then it must be Active as this change will require a
-				// ProveCommit message
+				// ProveCommit message.
 				if !present {
 					err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
 					if err != nil {
 						// Don't return if cleaning up a deal results in error. Try them all.
-						log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+						log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
 					}
 				}
+				continue
 			}
-			// TODO: Account for a final sealing state other than proving (Depends on v1.26.0)
-			// 1. We can either check allocation list for all client (Lotus v1.26.0) and cleanup LID if found
-			// 2. If not found in allocation list then either claim expired or allocation. We should clean up in this case
-			// 3. Account for Curio as it will have redundant sealing until proven
+
+			// If no claim found
+			clientAllocs, err := verifregState.GetAllocations(d.Client)
+			if err != nil {
+				return fmt.Errorf("getting allocations for client %s: %w", d.Client, err)
+			}
+			alloc, ok := clientAllocs[d.AllocationID]
+			if !ok {
+				// The allocation does not exist anymore.
+				// Either it was claimed and then claim was cleaned up after TermMax
+				// or allocation expired before it could be claimed and was cleaned up
+				// Deal should be cleaned up in either case
+				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+				if err != nil {
+					// Don't return if cleaning up a deal results in error. Try them all.
+					log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+				}
+				continue
+			}
+
+			// If claim is found then we should check if it is expired. If expired, clean up the deal.
+			if alloc.Expiration < head.Height() {
+				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+				if err != nil {
+					// Don't return if cleaning up a deal results in error. Try them all.
+					log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+				}
+				continue
+			}
 		}
 	}
 
