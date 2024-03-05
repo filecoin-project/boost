@@ -245,6 +245,18 @@ func (p *pdcleaner) CleanOnce() error {
 			c, ok := claims[cID]
 			// If claim found
 			if ok {
+				// Claim Sector number and Deal Sector number should match(regardless of how DDO works)
+				// If they don't match and older sector is removed, then we can't use the metadata
+				// This check can be removed once Curio has resealing enabled, and it can provide
+				// new replacement sector details to Boost before deal reached "Complete" state.
+				if c.Sector != d.SectorID {
+					err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+					if err != nil {
+						// Don't return if cleaning up a deal results in error. Try them all.
+						log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+					}
+					continue
+				}
 				present, err := finalSectors.IsSet(uint64(c.Sector))
 				if err != nil {
 					return fmt.Errorf("checking if bitfield is set: %w", err)
