@@ -31,12 +31,9 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 )
-
-var log = logging.Logger("boost-api")
 
 type BoostAPI struct {
 	fx.In
@@ -193,11 +190,6 @@ func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.
 func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, params types.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
 	return nil, fmt.Errorf("not implemented")
 	// return sm.DirectDealsProvider.Import(ctx, params)
-}
-
-func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	log.Infow("received json-rpc deal proposal", "id", params.DealUUID)
-	return sm.StorageProvider.ExecuteDeal(ctx, &params, "json-rpc-deal")
 }
 
 func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
