@@ -40,9 +40,8 @@ func main() {
 			offlineDealCmd,
 			providerCmd,
 			walletCmd,
-			//TODO: enable when DDO ends up in a network upgrade
-			//directDealAllocate,
-			//directDealGetAllocations,
+			directDealAllocate,
+			directDealGetAllocations,
 		},
 	}
 	app.Setup()

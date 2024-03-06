@@ -64,11 +64,11 @@ type Wrapper struct {
 	stop           context.CancelFunc
 }
 
-func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
+func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
 	ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
 	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
-	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
+	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
 		ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
 		ssm *sectorstatemgr.SectorStateMgr,
@@ -85,6 +85,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		w := &Wrapper{
 			h:              h,
 			dealsDB:        dealsDB,
+			directDealsDB:  directDealsDB,
 			legacyProv:     legacyProv,
 			prov:           prov,
 			meshCreator:    meshCreator,

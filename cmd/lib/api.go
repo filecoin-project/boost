@@ -151,7 +151,7 @@ func (a *MultiMinerAccessor) GetMinerAddresses() []address.Address {
 func (a *MultiMinerAccessor) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
 	pr, ok := a.readers[minerAddr]
 	if !ok {
-		return nil, fmt.Errorf("get reader: no endpoint registered for miner %s", minerAddr)
+		return nil, fmt.Errorf("get reader: no endpoint registered for miner %s, len(readers)=%d", minerAddr, len(a.readers))
 	}
 	return pr.GetReader(ctx, minerAddr, id, offset, length)
 }
@@ -159,7 +159,7 @@ func (a *MultiMinerAccessor) GetReader(ctx context.Context, minerAddr address.Ad
 func (a *MultiMinerAccessor) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
 	sa, ok := a.sas[minerAddr]
 	if !ok {
-		return nil, fmt.Errorf("read sector: no endpoint registered for miner %s", minerAddr)
+		return nil, fmt.Errorf("read sector: no endpoint registered for miner %s, len(readers)=%d", minerAddr, len(a.readers))
 	}
 	return sa.UnsealSectorAt(ctx, sectorID, pieceOffset, length)
 }
@@ -167,7 +167,7 @@ func (a *MultiMinerAccessor) UnsealSectorAt(ctx context.Context, minerAddr addre
 func (a *MultiMinerAccessor) IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
 	sa, ok := a.sas[minerAddr]
 	if !ok {
-		return false, fmt.Errorf("is unsealed: no endpoint registered for miner %s", minerAddr)
+		return false, fmt.Errorf("is unsealed: no endpoint registered for miner %s, len(readers)=%d", minerAddr, len(a.readers))
 	}
 	return sa.IsUnsealed(ctx, sectorID, offset, length)
 }

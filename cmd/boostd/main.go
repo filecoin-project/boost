@@ -42,7 +42,7 @@ func main() {
 			dummydealCmd,
 			indexProvCmd,
 			importDataCmd,
-			//importDirectDataCmd,
+			importDirectDataCmd,
 			logCmd,
 			netCmd,
 			pieceDirCmd,

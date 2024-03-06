@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -188,8 +187,7 @@ func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.
 }
 
 func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, params types.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
-	return nil, fmt.Errorf("not implemented")
-	// return sm.DirectDealsProvider.Import(ctx, params)
+	return sm.DirectDealsProvider.Import(ctx, params)
 }
 
 func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {

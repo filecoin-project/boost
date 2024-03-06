@@ -319,8 +319,8 @@ func NewSectorStateDB(sqldb *sql.DB) *db.SectorStateDB {
 	return db.NewSectorStateDB(sqldb)
 }
 
-func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, directProv *storagemarket.DirectDealsProvider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, directProv *storagemarket.DirectDealsProvider, a v1api.FullNode, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
@@ -331,6 +331,10 @@ func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host
 				err := prov.Start()
 				if err != nil {
 					return fmt.Errorf("starting storage provider: %w", err)
+				}
+				err = directProv.Start(ctx)
+				if err != nil {
+					return fmt.Errorf("starting direct deals provider: %w", err)
 				}
 				lp2pnet.Start(ctx)
 				log.Info("boost storage provider started successfully")

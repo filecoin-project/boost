@@ -32,20 +32,23 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	types2 "github.com/filecoin-project/boost/transport/types"
+	transporttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
+	verifregtypes13 "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	minertypes "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	miner9types "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
@@ -99,6 +102,7 @@ type TestFrameworkConfig struct {
 	Ensemble                  *kit.Ensemble
 	MaxStagingBytes           int64
 	ProvisionalWalletBalances int64
+	StartEpochSealingBuffer   uint64
 }
 
 type TestFramework struct {
@@ -142,10 +146,18 @@ func SetProvisionalWalletBalances(balance int64) FrameworkOpts {
 	}
 }
 
+func WithStartEpochSealingBuffer(e uint64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.StartEpochSealingBuffer = e
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
+	//bal, err := chaintypes.ParseFIL("1000fil")
+	//require.NoError(t, err)
 	fmc := &TestFrameworkConfig{
 		// default provisional balance
-		ProvisionalWalletBalances: 1e18,
+		ProvisionalWalletBalances: 9e18,
 	}
 	for _, opt := range opts {
 		opt(fmc)
@@ -182,8 +194,10 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.MaxSealingSectors = 1
 					sc.MaxSealingSectorsForDeals = 3
 					sc.AlwaysKeepUnsealedCopy = true
-					sc.WaitDealsDelay = time.Hour
-					sc.AggregateCommits = false
+					sc.WaitDealsDelay = time.Second
+					//sc.AggregateCommits = false
+					sc.CommitBatchWait = 2 * time.Second
+					sc.StartEpochSealingBuffer = 30
 
 					return sc, nil
 				}, nil
@@ -214,7 +228,7 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 	ensemble.FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...)
 	if defaultEnsemble {
 		ensemble.Start()
-		blockTime := 100 * time.Millisecond
+		blockTime := 20 * time.Millisecond
 		ensemble.BeginMining(blockTime)
 	}
 
@@ -253,7 +267,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		Log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
 	}()
@@ -268,7 +282,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
 	}()
@@ -277,7 +291,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
 		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
 	}()
@@ -357,7 +371,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	cfg.Wallets.DealCollateral = dealCollatAddr.String()
 	cfg.Dealpublish.MaxDealsPerPublishMsg = 1
 	cfg.Dealpublish.PublishMsgPeriod = config.Duration(0)
-	val, err := ltypes.ParseFIL("0.1 FIL")
+	val, err := chaintypes.ParseFIL("0.1 FIL")
 	if err != nil {
 		return err
 	}
@@ -376,6 +390,10 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingBytes
 	} else {
 		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+	}
+
+	if f.config.StartEpochSealingBuffer > 0 {
+		cfg.Dealmaking.StartEpochSealingBuffer = f.config.StartEpochSealingBuffer
 	}
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
@@ -464,22 +482,22 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	// Set boost libp2p address on chain
 	Log.Debugw("setting peer id on chain", "peer id", boostAddrs.ID)
-	params, err := actors.SerializeParams(&minertypes.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
+	params, err := actors.SerializeParams(&miner9types.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
 	if err != nil {
 		return err
 	}
 
-	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ltypes.EmptyTSK)
+	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, chaintypes.EmptyTSK)
 	if err != nil {
 		return err
 	}
 
-	msg := &ltypes.Message{
+	msg := &chaintypes.Message{
 		To:     minerAddr,
 		From:   minerInfo.Owner,
 		Method: builtin.MethodsMiner.ChangePeerID,
 		Params: params,
-		Value:  ltypes.NewInt(0),
+		Value:  chaintypes.NewInt(0),
 	}
 
 	signed, err := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
@@ -644,7 +662,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	Log.Debugf("Provider balance requirement for deal: %d attoFil", proposal.ProviderBalanceRequirement())
 
 	// Save the path to the CAR file as a transfer parameter
-	transferParams := &types2.HttpRequest{URL: url}
+	transferParams := &transporttypes.HttpRequest{URL: url}
 	transferParamsJSON, err := json.Marshal(transferParams)
 	if err != nil {
 		return nil, err
@@ -698,7 +716,7 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 	}, nil
 }
 
-func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
+func SendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
 	senderAddr, err := sender.WalletDefaultAddress(ctx)
 	if err != nil {
 		return err
@@ -725,7 +743,7 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 		return err
 	}
 
-	cwp := &minertypes.ChangeWorkerAddressParams{
+	cwp := &miner9types.ChangeWorkerAddressParams{
 		NewWorker:       mi.Worker,
 		NewControlAddrs: []address.Address{psdAddr},
 	}
@@ -1019,4 +1037,115 @@ func RetrievalQuery(ctx context.Context, t *testing.T, client *clinode.Node, pee
 	require.NoError(t, err)
 
 	return &resp, nil
+}
+
+type DatacapParams struct {
+	RootKey     *key.Key
+	VerifierKey *key.Key
+	Opts        []kit.EnsembleOpt
+}
+
+func BuildDatacapParams() (*DatacapParams, error) {
+	rootKey, err := key.GenerateKey(chaintypes.KTSecp256k1)
+	if err != nil {
+		return nil, err
+	}
+
+	verifierKey, err := key.GenerateKey(chaintypes.KTSecp256k1)
+	if err != nil {
+		return nil, err
+	}
+
+	bal, err := chaintypes.ParseFIL("100fil")
+	if err != nil {
+		return nil, err
+	}
+
+	eOpts := []kit.EnsembleOpt{
+		kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())),
+		// assign some balance to the verifier so they can send an AddClient message.
+		kit.Account(verifierKey, abi.NewTokenAmount(bal.Int64())),
+	}
+
+	return &DatacapParams{
+		RootKey:     rootKey,
+		VerifierKey: verifierKey,
+		Opts:        eOpts,
+	}, nil
+}
+
+func (f *TestFramework) AddClientDataCap(t *testing.T, ctx context.Context, rootKey *key.Key, verifierKey *key.Key) error {
+	// get VRH
+	vrh, err := f.FullNode.StateVerifiedRegistryRootKey(ctx, chaintypes.TipSetKey{})
+	fmt.Println(vrh.String())
+	require.NoError(t, err)
+
+	// import the root key to Lotus to send message
+	rootAddr, err := f.FullNode.WalletImport(ctx, &rootKey.KeyInfo)
+	require.NoError(t, err)
+
+	// import the verifiers' keys to Lotus to send message
+	verifier1Addr, err := f.FullNode.WalletImport(ctx, &verifierKey.KeyInfo)
+	require.NoError(t, err)
+
+	// make the verifier1Addr a datacap verifiers
+
+	mkVerifier(ctx, t, f.FullNode.FullNode.(*lapi.FullNodeStruct), rootAddr, verifier1Addr)
+
+	// assign datacap to a client
+	initialDatacap := big.NewInt(10000000)
+
+	params, err := actors.SerializeParams(&verifregtypes13.AddVerifiedClientParams{Address: f.ClientAddr, Allowance: initialDatacap})
+	require.NoError(t, err)
+
+	msg := &chaintypes.Message{
+		From:   verifier1Addr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifiedClient,
+		Params: params,
+		Value:  big.Zero(),
+	}
+
+	sm, err := f.FullNode.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err)
+
+	res, err := f.FullNode.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, res.Receipt.ExitCode)
+
+	// check datacap balance
+	dcap, err := f.FullNode.StateVerifiedClientStatus(ctx, f.ClientAddr, chaintypes.EmptyTSK)
+	if err != nil {
+		return err
+	}
+	if !dcap.Equals(initialDatacap) {
+		return fmt.Errorf("verified client datacap is %s but expected %d", dcap, initialDatacap)
+	}
+
+	return nil
+}
+
+func mkVerifier(ctx context.Context, t *testing.T, api *lapi.FullNodeStruct, rootAddr address.Address, addr address.Address) {
+	allowance := big.NewInt(100000000000)
+	params, aerr := actors.SerializeParams(&verifreg9types.AddVerifierParams{Address: addr, Allowance: allowance})
+	require.NoError(t, aerr)
+
+	msg := &chaintypes.Message{
+		From:   rootAddr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifier,
+		Params: params,
+		Value:  big.Zero(),
+	}
+
+	sm, err := api.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err, "AddVerifier failed")
+
+	res, err := api.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, res.Receipt.ExitCode)
+
+	verifierAllowance, err := api.StateVerifierStatus(ctx, addr, chaintypes.EmptyTSK)
+	require.NoError(t, err)
+	require.Equal(t, allowance, *verifierAllowance)
 }
