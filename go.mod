@@ -8,8 +8,6 @@ replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
 // replace github.com/filecoin-project/boost-graphsync => ../boost-graphsync
 
-// replace github.com/filecoin-project/boost-gfm => ../boost-gfm
-
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
 	github.com/BurntSushi/toml v1.3.2
@@ -32,7 +30,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.13.0-rc.1
+	github.com/filecoin-project/go-state-types v0.13.0-rc.2
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -321,7 +319,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
-	github.com/filecoin-project/lotus v1.25.3-0.20240301100536-62989ff743e4
+	github.com/filecoin-project/lotus v1.26.0-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0

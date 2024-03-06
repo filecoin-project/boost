@@ -1141,9 +1141,8 @@ see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#
 			Name: "DisableRealTimeFilterAPI",
 			Type: "bool",
 
-			Comment: `EnableEthRPC enables APIs that
-DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
-The API is enabled when EnableEthRPC is true, but can be disabled selectively with this flag.`,
+			Comment: `DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
+The API is enabled when EnableEthRPC or Events.EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
 		},
 		{
 			Name: "DisableHistoricFilterAPI",
@@ -1151,7 +1150,7 @@ The API is enabled when EnableEthRPC is true, but can be disabled selectively wi
 
 			Comment: `DisableHistoricFilterAPI will disable the HistoricFilterAPI that can create and query filters for actor events
 that occurred in the past. HistoricFilterAPI maintains a queryable index of events.
-The API is enabled when EnableEthRPC is true, but can be disabled selectively with this flag.`,
+The API is enabled when EnableEthRPC or Events.EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
 		},
 		{
 			Name: "FilterTTL",
@@ -1187,6 +1186,17 @@ the entire chain)`,
 support the historic filter APIs. If the database does not exist it will be created. The directory containing
 the database must already exist and be writeable. If a relative path is provided here, sqlite treats it as
 relative to the CWD (current working directory).`,
+		},
+	},
+	"lotus_config.EventsConfig": []DocField{
+		{
+			Name: "EnableActorEventsAPI",
+			Type: "bool",
+
+			Comment: `EnableActorEventsAPI enables the Actor events API that enables clients to consume events
+emitted by (smart contracts + built-in Actors).
+This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be
+disabled by setting their respective Disable* options in Fevm.Events.`,
 		},
 	},
 	"lotus_config.FaultReporterConfig": []DocField{
@@ -1282,6 +1292,12 @@ Set to 0 to keep all mappings`,
 		{
 			Name: "Fevm",
 			Type: "FevmConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Events",
+			Type: "EventsConfig",
 
 			Comment: ``,
 		},
