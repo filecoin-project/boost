@@ -156,6 +156,12 @@ func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address
 	return ps.store.PiecesCount(ctx, maddr)
 }
 
+func (ps *PieceDirectory) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	defer func(start time.Time) { log.Debugw("piece directory ; PiecesList span", "took", time.Since(start)) }(time.Now())
+
+	return ps.store.ListPieces(ctx)
+}
+
 func (ps *PieceDirectory) ScanProgress(ctx context.Context, maddr address.Address) (*bdtypes.ScanProgress, error) {
 	defer func(start time.Time) { log.Debugw("piece directory ; ScanProgress span", "took", time.Since(start)) }(time.Now())
 

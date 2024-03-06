@@ -67,6 +67,8 @@ type BoostStruct struct {
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+
+		PdRemoveDealForPiece func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
 	}
 }
 
@@ -390,6 +392,17 @@ func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) er
 }
 
 func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) PdRemoveDealForPiece(p0 context.Context, p1 cid.Cid, p2 string) error {
+	if s.Internal.PdRemoveDealForPiece == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.PdRemoveDealForPiece(p0, p1, p2)
+}
+
+func (s *BoostStub) PdRemoveDealForPiece(p0 context.Context, p1 cid.Cid, p2 string) error {
 	return ErrNotSupported
 }
 

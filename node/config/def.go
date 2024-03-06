@@ -87,6 +87,7 @@ func DefaultBoost() *Boost {
 			ServiceApiInfo:        "",
 			ServiceRPCTimeout:     Duration(15 * time.Minute),
 			EnablePieceDoctor:     true,
+			LidCleanupInterval:    Duration(6 * time.Hour),
 		},
 
 		ContractDeals: ContractDealsConfig{
