@@ -23,6 +23,7 @@ ENV LOTUS_FEVM_ENABLEETHRPC=true
 
 VOLUME /var/tmp/filecoin-proof-parameters
 VOLUME /var/lib/genesis
+VOLUME /var/lib/builtin-actors
 
 WORKDIR /app
 RUN mkdir -p /app

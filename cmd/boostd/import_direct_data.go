@@ -9,7 +9,9 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
@@ -48,19 +50,15 @@ var importDirectDataCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "start-epoch",
-			Usage: "start epoch by when the deal should be proved by provider on-chain",
-			Value: 35000, // default is 35000, handy for tests with 2k/devnet build
-		},
-		&cli.IntFlag{
-			Name:  "duration",
-			Usage: "duration of the deal in epochs",
-			Value: 518400, // default is 2880 * 180 == 180 days
+			Usage: "start epoch by when the deal should be proved by provider on-chain (default: 2 days from now)",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() < 2 {
 			return fmt.Errorf("must specify piececid and file path")
 		}
+
+		ctx := cctx.Context
 
 		piececidStr := cctx.Args().Get(0)
 		path := cctx.Args().Get(1)
@@ -91,6 +89,17 @@ var importDirectDataCmd = &cli.Command{
 		}
 		defer closer()
 
+		lapi, lcloser, err := lcli.GetFullNodeAPIV1(cctx)
+		if err != nil {
+			return err
+		}
+		defer lcloser()
+
+		head, err := lapi.ChainHead(ctx)
+		if err != nil {
+			return fmt.Errorf("getting chain head: %w", err)
+		}
+
 		clientAddr, err := address.NewFromString(cctx.String("client-addr"))
 		if err != nil {
 			return fmt.Errorf("failed to parse clientaddr param: %w", err)
@@ -99,7 +108,21 @@ var importDirectDataCmd = &cli.Command{
 		allocationId := cctx.Uint64("allocation-id")
 
 		startEpoch := abi.ChainEpoch(cctx.Int("start-epoch"))
-		endEpoch := startEpoch + abi.ChainEpoch(cctx.Int("duration"))
+		// Set Default if not specified by the user
+		if startEpoch == 0 {
+			startEpoch = head.Height() + (builtin.EpochsInDay * 2)
+		}
+		alloc, err := lapi.StateGetAllocation(ctx, clientAddr, verifreg.AllocationId(allocationId), head.Key())
+		if err != nil {
+			return fmt.Errorf("getting claim details from chain: %w", err)
+		}
+
+		if alloc.Expiration < startEpoch {
+			return fmt.Errorf("allocation will expire on %d before start epoch %d", alloc.Expiration, startEpoch)
+		}
+
+		// Since StartEpoch is more than Head+StartEpochSealingBuffer, we can set end epoch as start+TermMin
+		endEpoch := startEpoch + alloc.TermMin
 
 		ddParams := types.DirectDealParams{
 			DealUUID:           uuid.New(),

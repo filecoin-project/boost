@@ -6,11 +6,11 @@ orbs:
 executors:
   golang:
     docker:
-      - image: cimg/go:1.20.7
+      - image: cimg/go:1.21.7
     resource_class: 2xlarge
   ubuntu:
     docker:
-      - image: ubuntu:22.04
+      - image: ubuntu:default
 
 commands:
   install-deps:
@@ -87,7 +87,7 @@ jobs:
   lid-docker-compose:
     description: 'Run LID integration tests'
     machine:
-      image: ubuntu-2204:2023.07.2
+      image: default
       resource_class: xlarge
     steps:
       - checkout
@@ -132,7 +132,7 @@ jobs:
       # local index directory tests so it may be worth refactoring so that it's
       # only included for local index directory
       - setup_remote_docker:
-          version: 20.10.23
+          version: default
           docker_layer_caching: true
       - run:
           name: go test
@@ -154,7 +154,7 @@ jobs:
           linux: false
           darwin: true
       - golang/install:
-          version: "1.20.7"
+          version: "1.21.7"
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
@@ -253,7 +253,7 @@ jobs:
         default: golang
       golangci-lint-version:
         type: string
-        default: 1.52.2
+        default: 1.56.2
       concurrency:
         type: string
         default: '2'
@@ -328,10 +328,10 @@ workflows:
           suite: itest-retrieval
           target: "./itests/graphsync_retrieval_test.go"
 
-      #- test:
-          #name: test-itest-direct_deal
-          #suite: itest-direct_deal
-          #target: "./itests/ddo_test.go"
+      - test:
+          name: test-itest-direct_deal
+          suite: itest-direct_deal
+          target: "./itests/ddo_test.go"
 
       - test:
           name: test-all

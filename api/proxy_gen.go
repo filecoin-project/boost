@@ -62,8 +62,6 @@ type BoostStruct struct {
 
 		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) `perm:"admin"`
 
-		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
-
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
@@ -362,17 +360,6 @@ func (s *BoostStruct) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Ci
 
 func (s *BoostStub) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {
 	return *new(legacytypes.MinerDeal), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	if s.Internal.BoostMakeDeal == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.BoostMakeDeal(p0, p1)
-}
-
-func (s *BoostStub) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	return nil, ErrNotSupported
 }
 
 func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {

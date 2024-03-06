@@ -22,9 +22,14 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	lotuspiece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
 )
 
@@ -41,6 +46,8 @@ type DirectDealsProvider struct {
 	config DDPConfig
 	ctx    context.Context // context to be stopped when stopping boostd
 
+	// Address of the provider on chain.
+	Address       address.Address
 	fullnodeApi   v1api.FullNode
 	pieceAdder    types.PieceAdder
 	commpCalc     smtypes.CommpCalculator
@@ -56,9 +63,10 @@ type DirectDealsProvider struct {
 	ip *indexprovider.Wrapper
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		config:        cfg,
+		Address:       minerAddr,
 		fullnodeApi:   fullnodeApi,
 		pieceAdder:    pieceAdder,
 		commpCalc:     commpCalc,
@@ -76,6 +84,7 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 }
 
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
+	log.Infow("direct deals provider: starting")
 	ddp.ctx = ctx
 
 	deals, err := ddp.directDealsDB.ListActive(ctx)
@@ -91,6 +100,7 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 		ddp.startDealThread(entry.ID)
 	}
 
+	log.Infow("direct deals provider: started")
 	return nil
 }
 
@@ -168,8 +178,25 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 		return nil, err
 	}
 
+	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	idaddr, err := address.NewIDAddress(uint64(allocation.Provider))
+	if err != nil {
+		return nil, fmt.Errorf("new id address for allocation %s: %w", allocation.Provider, err)
+	}
+
+	maddr, err := ddp.fullnodeApi.StateLookupID(ctx, idaddr, ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("looking up %s: %w", idaddr, err)
+	}
+
 	if res.Accepted {
-		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", params.FilePath)
+		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "maddr", maddr, "filepath", params.FilePath)
+
+		entry.Provider = maddr
 
 		err := ddp.directDealsDB.Insert(ctx, entry)
 		if err != nil {
@@ -331,31 +358,24 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		_ = clientId
 
 		// Add the piece to a sector
-		sdInfo := lapi.PieceDealInfo{
-			// "Old" builtin-market deal info
-			//PublishCid   *cid.Cid
-			//DealID       abi.DealID
-			//DealProposal *market.DealProposal
-
+		sdInfo := lotuspiece.PieceDealInfo{
 			// Common deal info, required for all pieces
-			DealSchedule: lapi.DealSchedule{
+			DealSchedule: lotuspiece.DealSchedule{
 				StartEpoch: entry.StartEpoch,
 				EndEpoch:   entry.EndEpoch,
 			},
 
 			// Direct Data Onboarding
 			// When PieceActivationManifest is set, builtin-market deal info must not be set
-			//TODO: enable PieceActivationManifest when DDO ends up in a network upgrade
-			//PieceActivationManifest: &miner.PieceActivationManifest{
-			//CID:  entry.PieceCID,
-			//Size: entry.PieceSize,
-			//VerifiedAllocationKey: &miner.VerifiedAllocationKey{
-			//Client: abi.ActorID(clientId),
-			//ID:     verifreg.AllocationId(uint64(entry.AllocationID)), // TODO: fix verifreg v9 or v12
-			//},
-			////Notify                []DataActivationNotification
-			//Notify: nil,
-			//},
+			PieceActivationManifest: &minertypes.PieceActivationManifest{
+				CID:  entry.PieceCID,
+				Size: entry.PieceSize,
+				VerifiedAllocationKey: &miner13types.VerifiedAllocationKey{
+					Client: abi.ActorID(clientId),
+					ID:     verifreg13types.AllocationId(entry.AllocationID),
+				},
+				Notify: nil,
+			},
 
 			// Best-effort deal asks
 			KeepUnsealed: entry.KeepUnsealedCopy,
@@ -416,7 +436,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 	if entry.Checkpoint < dealcheckpoints.Complete {
 		// The deal has been added to a piece, so just watch the deal sealing state
-		if derr := ddp.watchSealingUpdates(dealUuid, entry.SectorID); derr != nil {
+		if derr := ddp.watchSealingUpdates(entry); derr != nil {
 			return derr
 		}
 		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Complete); err != nil {
@@ -429,32 +449,46 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 // watchSealingUpdates periodically checks the sealing status of the deal,
 // and returns once the deal is active (or boost is shutdown)
-func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *dealMakingError {
 	var lastSealingState lapi.SectorState
 	checkSealingFinalized := func() bool {
 		// Get the sector status
-		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
+		si, err := ddp.sps.SectorsStatus(ddp.ctx, entry.SectorID, false)
 		if err != nil {
-			log.Warnw("getting sector sealing state", "sector", sectorNum, "err", err.Error())
+			log.Warnw("getting sector sealing state", "sector", entry.SectorID, "err", err.Error())
 			return false
 		}
 
 		if si.State != lastSealingState {
 			// Sector status has changed
 			lastSealingState = si.State
-			ddp.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
+			ddp.dealLogger.Infow(entry.ID, "current sealing state", "state", si.State)
 		}
 
 		return IsFinalSealingState(si.State)
 	}
 
 	// Check immediately if the sector has reached a final sealing state
-	if complete := checkSealingFinalized(); complete {
+	complete := checkSealingFinalized()
+	if complete {
+		isClaimed, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+		if claimErr != nil {
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: claimErr,
+			}
+		}
+		if !isClaimed {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: errors.New("sector mismatch for claim"),
+			}
+		}
 		return nil
 	}
 
 	// Check status every couple of minutes
-	ddp.dealLogger.Infow(dealUuid, "watching deal sealing state changes")
+	ddp.dealLogger.Infow(entry.ID, "watching deal sealing state changes")
 	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -465,8 +499,22 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNu
 				error: ddp.ctx.Err(),
 			}
 		case <-ticker.C:
-			if complete := checkSealingFinalized(); complete {
-				ddp.dealLogger.Infow(dealUuid, "deal sealing reached termination state")
+			complete := checkSealingFinalized()
+			if complete {
+				isClaimed, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+				if claimErr != nil {
+					return &dealMakingError{
+						retry: types.DealRetryAuto,
+						error: claimErr,
+					}
+				}
+				ddp.dealLogger.Infow(entry.ID, "deal sealing reached termination state")
+				if !isClaimed {
+					return &dealMakingError{
+						retry: types.DealRetryFatal,
+						error: errors.New("sector mismatch for claim"),
+					}
+				}
 				return nil
 			}
 		}
@@ -619,4 +667,15 @@ func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smt
 	}
 
 	return nil
+}
+
+func (ddp *DirectDealsProvider) confirmClaim(ctx context.Context, allocId verifreg9types.AllocationId, sectorNum abi.SectorNumber) (bool, error) {
+	claim, err := ddp.fullnodeApi.StateGetClaim(ctx, ddp.Address, verifreg9types.ClaimId(allocId), ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("getting claim details for allocationID %d: %s", allocId, err)
+	}
+	if claim.Sector != sectorNum {
+		return false, nil
+	}
+	return true, nil
 }
