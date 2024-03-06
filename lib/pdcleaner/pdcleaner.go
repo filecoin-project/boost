@@ -277,13 +277,12 @@ func (p *pdcleaner) CleanOnce() error {
 			}
 
 			// If no claim found
-			clientAllocs, err := verifregState.GetAllocations(d.Client)
+			alloc, ok, err := verifregState.GetAllocation(d.Client, d.AllocationID)
 			if err != nil {
-				return fmt.Errorf("getting allocations for client %s: %w", d.Client, err)
+				return fmt.Errorf("getting allocation %d for client %s: %w", d.AllocationID, d.Client, err)
 			}
-			alloc, ok := clientAllocs[d.AllocationID]
-			if !ok {
-				// The allocation does not exist anymore.
+			if !ok || alloc.Expiration < head.Height() {
+				// If allocation is expired, clean up the deal. If the allocation does not exist anymore.
 				// Either it was claimed and then claim was cleaned up after TermMax
 				// or allocation expired before it could be claimed and was cleaned up
 				// Deal should be cleaned up in either case
@@ -295,7 +294,6 @@ func (p *pdcleaner) CleanOnce() error {
 				continue
 			}
 
-			// If claim is found then we should check if it is expired. If expired, clean up the deal.
 			if alloc.Expiration < head.Height() {
 				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
 				if err != nil {
