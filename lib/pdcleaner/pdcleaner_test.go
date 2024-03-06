@@ -17,7 +17,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
@@ -155,7 +154,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 			deal.ClientDealProposal.Proposal.EndEpoch = 6
 			cDealMap[strconv.FormatInt(int64(deal.ChainDealID), 10)] = &api.MarketDeal{
 				Proposal: deal.ClientDealProposal.Proposal,
-				State: market.DealState{
+				State: api.MarketDealState{
 					SlashEpoch: 3, // Slash this deal
 				},
 			}
@@ -165,7 +164,7 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 		}
 		cDealMap[strconv.FormatInt(int64(deal.ChainDealID), 10)] = &api.MarketDeal{
 			Proposal: deal.ClientDealProposal.Proposal,
-			State: market.DealState{
+			State: api.MarketDealState{
 				SlashEpoch: -1,
 			},
 		}
