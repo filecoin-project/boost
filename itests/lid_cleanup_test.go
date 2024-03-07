@@ -77,7 +77,8 @@ func TestLIDCleanup(t *testing.T) {
 	eg := errgroup.Group{}
 	eg.SetLimit(4)
 	for i := 0; i < 6; i++ {
-		for _, addr := range addresses {
+		for _, a := range addresses {
+			addr := a
 			eg.Go(func() error {
 				return framework.SendFunds(ctx, f.FullNode, addr, abi.NewTokenAmount(int64(9e18)))
 			})
@@ -206,10 +207,7 @@ func TestLIDCleanup(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
-		if len(stateList) == 5 {
-			return true
-		}
-		return false
+		return len(stateList) == 5
 	}, time.Minute, 2*time.Second, "sectors are still not proving after a minute")
 
 	// Verify that LID has entries for all deals
@@ -244,10 +242,8 @@ func TestLIDCleanup(t *testing.T) {
 		unproven, err := miner.AllPartSectors(mas, miner.Partition.UnprovenSectors)
 		require.NoError(t, err)
 		count, err := unproven.Count()
-		if count == 0 {
-			return true
-		}
-		return false
+		require.NoError(t, err)
+		return count == 0
 	}, blockTime*(2880), 3*time.Second, "timeout waiting for wdPost")
 
 	// Terminate DDO sector and a deal sector
@@ -276,10 +272,7 @@ func TestLIDCleanup(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
-		if len(stateList) == 2 {
-			return true
-		}
-		return false
+		return len(stateList) == 2
 	}, time.Second*15, 1*time.Second, "timeout waiting for sectors to reach TerminateFinality")
 
 	// Clean up LID

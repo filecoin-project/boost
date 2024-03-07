@@ -163,16 +163,17 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 	boosteg := errgroup.Group{}
 	boosteg.SetLimit(20)
 	for _, d := range boostDeals {
+		deal := d
 		boosteg.Go(func() error {
-			present, err := activeSectors.IsSet(uint64(d.SectorID))
+			present, err := activeSectors.IsSet(uint64(deal.SectorID))
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
 			if !present {
-				err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
+				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.DealUuid.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
-					return fmt.Errorf("cleaning up boost deal %s for piece %s: %s", d.DealUuid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+					return fmt.Errorf("cleaning up boost deal %s for piece %s: %s", deal.DealUuid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
 			}
 			return nil
@@ -187,16 +188,17 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 	legacyeg := errgroup.Group{}
 	legacyeg.SetLimit(20)
 	for _, d := range legacyDeals {
+		deal := d
 		legacyeg.Go(func() error {
-			present, err := activeSectors.IsSet(uint64(d.SectorNumber))
+			present, err := activeSectors.IsSet(uint64(deal.SectorNumber))
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
 			if !present {
-				err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
+				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.ProposalCid.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
-					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ProposalCid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", deal.ProposalCid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
 			}
 			return nil
@@ -212,16 +214,17 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 	ddoeg := errgroup.Group{}
 	ddoeg.SetLimit(20)
 	for _, d := range completeDirectDeals {
+		deal := d
 		ddoeg.Go(func() error {
-			present, err := activeSectors.IsSet(uint64(d.SectorID))
+			present, err := activeSectors.IsSet(uint64(deal.SectorID))
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
 			if !present {
-				err = p.pd.RemoveDealForPiece(ctx, d.PieceCID, d.ID.String())
+				err = p.pd.RemoveDealForPiece(ctx, deal.PieceCID, deal.ID.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
-					return fmt.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+					return fmt.Errorf("cleaning up direct deal %s for piece %s: %s", deal.ID.String(), deal.PieceCID, err.Error())
 				}
 			}
 			return nil
@@ -240,7 +243,8 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 
 	lideg := errgroup.Group{}
 	lideg.SetLimit(50)
-	for _, piece := range plist {
+	for _, pi := range plist {
+		piece := pi
 		lideg.Go(func() error {
 			pdeals, err := p.pd.GetPieceDeals(ctx, piece)
 			if err != nil {
