@@ -3,15 +3,18 @@ package itests
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -21,12 +24,13 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDirectDeal(t *testing.T) {
+func TestLIDCleanup(t *testing.T) {
 	ctx := context.Background()
-	fileSize := 7048576
+	log := framework.Log
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
@@ -50,9 +54,10 @@ func TestDirectDeal(t *testing.T) {
 	opts = append(opts, framework.WithEnsemble(esemble))
 	opts = append(opts, framework.SetProvisionalWalletBalances(int64(9e18)))
 	opts = append(opts, framework.WithStartEpochSealingBuffer(30))
+	opts = append(opts, framework.WithMaxStagingDealsBytes(100000000))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	esemble.Start()
-	blockTime := 100 * time.Millisecond
+	blockTime := 50 * time.Millisecond
 	esemble.BeginMining(blockTime)
 
 	err = f.Start()
@@ -64,7 +69,7 @@ func TestDirectDeal(t *testing.T) {
 	require.NoError(t, err)
 	addresses := []address.Address{info.Owner, info.Worker}
 	addresses = append(addresses, info.ControlAddresses...)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 6; i++ {
 		for _, addr := range addresses {
 			err = framework.SendFunds(ctx, f.FullNode, addr, abi.NewTokenAmount(int64(9e18)))
 			require.NoError(t, err)
@@ -81,6 +86,51 @@ func TestDirectDeal(t *testing.T) {
 
 	// Create a CAR file
 	tempdir := t.TempDir()
+	log.Debugw("using tempdir", "dir", tempdir)
+
+	fileSize := 7048576
+	randomFilepath1, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
+	require.NoError(t, err)
+
+	randomFilepath2, err := testutil.CreateRandomFile(tempdir, 6, fileSize)
+	require.NoError(t, err)
+
+	// NOTE: these calls to CreateDenseCARv2 have the identity CID builder enabled so will
+	// produce a root identity CID for this case. So we're testing deal-making and retrieval
+	// where a DAG has an identity CID root
+	rootCid1, carFilepath1, err := testutil.CreateDenseCARv2(tempdir, randomFilepath1)
+	require.NoError(t, err)
+
+	rootCid2, carFilepath2, err := testutil.CreateDenseCARv2(tempdir, randomFilepath2)
+	require.NoError(t, err)
+
+	// Start a web server to serve the car files
+	log.Debug("starting webserver")
+	server, err := testutil.HttpTestFileServer(t, tempdir)
+	require.NoError(t, err)
+	defer server.Close()
+
+	// Create a new dummy deal
+	log.Debug("creating dummy deal")
+	dealUuid1 := uuid.New()
+
+	// Make a deal
+	res1, err := f.MakeDummyDeal(dealUuid1, carFilepath1, rootCid1, server.URL+"/"+filepath.Base(carFilepath1), false)
+	require.NoError(t, err)
+	require.True(t, res1.Result.Accepted)
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res1))
+
+	time.Sleep(2 * time.Second)
+
+	dealUuid2 := uuid.New()
+	res2, err := f.MakeDummyDeal(dealUuid2, carFilepath2, rootCid2, server.URL+"/"+filepath.Base(carFilepath2), false)
+	require.NoError(t, err)
+	require.True(t, res2.Result.Accepted)
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res2))
+
+	time.Sleep(2 * time.Second)
+
+	// Create a CAR file for DDO deal
 	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
 	require.NoError(t, err)
 	_, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
@@ -112,8 +162,6 @@ func TestDirectDeal(t *testing.T) {
 		allocationId = uint64(id)
 	}
 
-	alloc := allocations[verifreg.AllocationId(allocationId)]
-
 	head, err := f.FullNode.ChainHead(ctx)
 	require.NoError(t, err)
 
@@ -144,45 +192,114 @@ func TestDirectDeal(t *testing.T) {
 	// Wait for sector to start sealing
 	time.Sleep(2 * time.Second)
 
-	for {
-		secNums, err := f.LotusMiner.SectorsList(ctx)
-		require.NoError(t, err)
-		if len(secNums) > 2 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
 	states := []lapi.SectorState{lapi.SectorState(sealing.Proving)}
 
-	// Exit if sector 2 is now proving
+	// Exit if all sectors are now proving
 	for {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
-		if len(stateList) > 2 {
+		if len(stateList) > 4 {
 			break
 		}
 		time.Sleep(2 * time.Second)
 	}
 
-	// Confirm we have 0 allocations left
-	allocations, err = f.FullNode.StateGetAllocations(ctx, f.ClientAddr, types.EmptyTSK)
-	require.NoError(t, err)
-	require.Len(t, allocations, 0)
-
-	// Match claim with different vars
-	claims, err := f.FullNode.StateGetClaims(ctx, f.MinerAddr, types.EmptyTSK)
+	// Verify that LID has entries for all deals
+	prop1, err := cborutil.AsIpld(&res1.DealParams.ClientDealProposal)
 	require.NoError(t, err)
 
-	require.Len(t, claims, 3)
-	claim, ok := claims[verifreg.ClaimId(allocationId)]
-	require.True(t, ok)
-
-	st, err := f.FullNode.StateSectorGetInfo(ctx, f.MinerAddr, abi.SectorNumber(2), types.EmptyTSK)
+	prop2, err := cborutil.AsIpld(&res2.DealParams.ClientDealProposal)
 	require.NoError(t, err)
 
-	require.Equal(t, alloc.Data, claim.Data)
-	require.Equal(t, alloc.Size, claim.Size)
-	require.Equal(t, claim.TermStart, st.Activation)
-	require.Equal(t, claim.TermMin, alloc.TermMin)
+	mhs, err := f.Boost.BoostIndexerListMultihashes(ctx, prop1.Cid().Bytes())
+	require.NoError(t, err)
+	require.Greater(t, len(mhs), 0)
+
+	mhs, err = f.Boost.BoostIndexerListMultihashes(ctx, prop2.Cid().Bytes())
+	require.NoError(t, err)
+	require.Greater(t, len(mhs), 0)
+
+	ddo, err := dealUuid.MarshalBinary()
+	require.NoError(t, err)
+
+	mhs, err = f.Boost.BoostIndexerListMultihashes(ctx, ddo)
+	require.NoError(t, err)
+	require.Greater(t, len(mhs), 0)
+
+	st, err := f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(4), true)
+	require.NoError(t, err)
+
+	// Wait for wdPost
+	for {
+		head, err := f.FullNode.ChainHead(ctx)
+		require.NoError(t, err)
+		if head.Height() > st.Activation+abi.ChainEpoch(2880) {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+
+	// Terminate DDO sector and a deal sector
+	err = f.LotusMiner.SectorTerminate(ctx, abi.SectorNumber(2))
+	require.NoError(t, err)
+	err = f.LotusMiner.SectorTerminate(ctx, abi.SectorNumber(4))
+	require.NoError(t, err)
+	time.Sleep(2 * time.Second)
+	_, err = f.LotusMiner.SectorTerminateFlush(ctx)
+	require.NoError(t, err)
+
+	// Keep trying to terminate in case of deadline issues
+	for {
+		tpending, err := f.LotusMiner.SectorTerminatePending(ctx)
+		require.NoError(t, err)
+		if len(tpending) == 0 {
+			break
+		}
+		_, err = f.LotusMiner.SectorTerminateFlush(ctx)
+		require.NoError(t, err)
+	}
+
+	// Wait for terminate message to be processed
+	for {
+		states := []lapi.SectorState{lapi.SectorState(sealing.TerminateFinality)}
+		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
+		require.NoError(t, err)
+		if len(stateList) == 2 {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+
+	// Clean up LID
+	err = f.Boost.PdCleanup(ctx)
+	require.NoError(t, err)
+
+	// Listing multihashes for DDO deal should fail
+	_, err = f.Boost.BoostIndexerListMultihashes(ctx, ddo)
+	require.ErrorContains(t, err, " key not found")
+
+	st, err = f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(3), true)
+	require.NoError(t, err)
+	require.Len(t, st.Pieces, 1)
+	var removedProp cid.Cid
+	var remainingProp cid.Cid
+
+	for _, p := range st.Pieces {
+		if res1.DealParams.ClientDealProposal.Proposal.PieceCID.Equals(p.Piece.PieceCID) {
+			removedProp = prop2.Cid()
+			remainingProp = prop1.Cid()
+		} else {
+			removedProp = prop1.Cid()
+			remainingProp = prop2.Cid()
+		}
+	}
+
+	// Listing multihashes for removed Boost deal should fail
+	_, err = f.Boost.BoostIndexerListMultihashes(ctx, removedProp.Bytes())
+	require.ErrorContains(t, err, " key not found")
+
+	// Listing multihashes for remaining deal should succeed
+	mhs, err = f.Boost.BoostIndexerListMultihashes(ctx, remainingProp.Bytes())
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(mhs), 1)
 }

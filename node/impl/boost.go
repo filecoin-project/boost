@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/filecoin-project/boost/lib/legacy"
+	"github.com/filecoin-project/boost/lib/pdcleaner"
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -65,7 +66,8 @@ type BoostAPI struct {
 	Sps sealingpipeline.API
 
 	// Piece Directory
-	Pd *piecedirectory.PieceDirectory
+	Pd  *piecedirectory.PieceDirectory
+	Pdc pdcleaner.PieceDirectoryCleanup
 
 	// GraphSQL server
 	GraphqlServer *gql.Server
@@ -136,8 +138,8 @@ func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 }
 
 // BoostIndexerListMultihashes calls the index provider multihash lister for a given proposal cid
-func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error) {
-	it, err := sm.IndexProvider.MultihashLister(ctx, "", proposalCid.Bytes())
+func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, contextID []byte) ([]multihash.Multihash, error) {
+	it, err := sm.IndexProvider.MultihashLister(ctx, "", contextID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,4 +222,8 @@ func (sm *BoostAPI) PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, 
 	defer span.End()
 
 	return sm.Pd.RemoveDealForPiece(ctx, piececid, dealID)
+}
+
+func (sm *BoostAPI) PdCleanup(ctx context.Context) error {
+	return sm.Pdc.CleanOnce(ctx)
 }

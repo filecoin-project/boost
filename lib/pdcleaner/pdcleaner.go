@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -28,8 +27,8 @@ var log = logging.Logger("pdcleaner")
 
 type PieceDirectoryCleanup interface {
 	Start(ctx context.Context)
-	CleanOnce() error
-	getActiveUnprovenSectors(tskey chaintypes.TipSetKey) (bitfield.BitField, error)
+	CleanOnce(ctx context.Context) error
+	getActiveUnprovenSectors(ctx context.Context, tskey chaintypes.TipSetKey) (bitfield.BitField, error)
 }
 
 type pdcleaner struct {
@@ -43,7 +42,6 @@ type pdcleaner struct {
 	startOnce       sync.Once
 	lk              sync.Mutex
 	cleanupInterval time.Duration
-	testSetup       map[bool][]abi.SectorNumber
 }
 
 func NewPieceDirectoryCleaner(cfg *config.Boost) func(lc fx.Lifecycle, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, legacyDeals legacy.LegacyDealManager, pd *piecedirectory.PieceDirectory, full v1api.FullNode) PieceDirectoryCleanup {
@@ -107,7 +105,7 @@ func (p *pdcleaner) clean() {
 		select {
 		case <-ticker.C:
 			log.Infof("Starting LID clean up")
-			err := p.CleanOnce()
+			err := p.CleanOnce(p.ctx)
 			if err != nil {
 				log.Errorf("Failed to cleanup LID: %s", err)
 				continue
@@ -122,21 +120,21 @@ func (p *pdcleaner) clean() {
 // CleanOnce generates a list of all Expired-Boost, Legacy and Direct deals. It then attempts to clean up these deals.
 // It also generated a list of all pieces in LID and tries to find any pieceMetadata with no deals in Boost, Direct or Legacy DB.
 // If such a deal is found, it is cleaned up as well
-func (p *pdcleaner) CleanOnce() error {
+func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 	p.lk.Lock()
 	defer p.lk.Unlock()
 
-	head, err := p.full.ChainHead(p.ctx)
+	head, err := p.full.ChainHead(ctx)
 	if err != nil {
 		return fmt.Errorf("getting chain head: %w", err)
 	}
 	tskey := head.Key()
 
-	boostCompleteDeals, err := p.dealsDB.ListCompleted(p.ctx)
+	boostCompleteDeals, err := p.dealsDB.ListCompleted(ctx)
 	if err != nil {
 		return fmt.Errorf("getting complete boost deals: %w", err)
 	}
-	boostActiveDeals, err := p.dealsDB.ListActive(p.ctx)
+	boostActiveDeals, err := p.dealsDB.ListActive(ctx)
 	if err != nil {
 		return fmt.Errorf("getting active boost deals: %w", err)
 	}
@@ -150,24 +148,24 @@ func (p *pdcleaner) CleanOnce() error {
 	if err != nil {
 		return fmt.Errorf("getting legacy deals: %w", err)
 	}
-	completeDirectDeals, err := p.directDealsDB.ListCompleted(p.ctx)
+	completeDirectDeals, err := p.directDealsDB.ListCompleted(ctx)
 	if err != nil {
 		return fmt.Errorf("getting complete direct deals: %w", err)
 	}
 
-	finalSectors, err := p.getActiveUnprovenSectors(tskey)
+	activeSectors, err := p.getActiveUnprovenSectors(ctx, tskey)
 	if err != nil {
 		return err
 	}
 
 	// Clean up Boost deals where sector does not exist anymore
 	for _, d := range boostDeals {
-		present, err := finalSectors.IsSet(uint64(d.SectorID))
+		present, err := activeSectors.IsSet(uint64(d.SectorID))
 		if err != nil {
 			return fmt.Errorf("checking if bitfield is set: %w", err)
 		}
 		if !present {
-			err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
+			err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
 			if err != nil {
 				// Don't return if cleaning up a deal results in error. Try them all.
 				log.Errorf("cleaning up boost deal %s for piece %s: %s", d.DealUuid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
@@ -177,12 +175,12 @@ func (p *pdcleaner) CleanOnce() error {
 
 	// Clean up legacy deals where sector does not exist anymore
 	for _, d := range legacyDeals {
-		present, err := finalSectors.IsSet(uint64(d.SectorNumber))
+		present, err := activeSectors.IsSet(uint64(d.SectorNumber))
 		if err != nil {
 			return fmt.Errorf("checking if bitfield is set: %w", err)
 		}
 		if !present {
-			err = p.pd.RemoveDealForPiece(p.ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
+			err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
 			if err != nil {
 				// Don't return if cleaning up a deal results in error. Try them all.
 				log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ProposalCid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
@@ -194,12 +192,12 @@ func (p *pdcleaner) CleanOnce() error {
 	// TODO: Refactor for Curio sealing redundancy
 	if len(completeDirectDeals) > 0 {
 		for _, d := range completeDirectDeals {
-			present, err := finalSectors.IsSet(uint64(d.SectorID))
+			present, err := activeSectors.IsSet(uint64(d.SectorID))
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
 			if !present {
-				err = p.pd.RemoveDealForPiece(p.ctx, d.PieceCID, d.ID.String())
+				err = p.pd.RemoveDealForPiece(ctx, d.PieceCID, d.ID.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
 					log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
@@ -210,13 +208,13 @@ func (p *pdcleaner) CleanOnce() error {
 	}
 
 	// Clean up dangling LID deals with no Boost, Direct or Legacy deals attached to them
-	plist, err := p.pd.ListPieces(p.ctx)
+	plist, err := p.pd.ListPieces(ctx)
 	if err != nil {
 		return fmt.Errorf("getting piece list from LID: %w", err)
 	}
 
 	for _, piece := range plist {
-		pdeals, err := p.pd.GetPieceDeals(p.ctx, piece)
+		pdeals, err := p.pd.GetPieceDeals(ctx, piece)
 		if err != nil {
 			return fmt.Errorf("getting piece deals from LID: %w", err)
 		}
@@ -224,7 +222,7 @@ func (p *pdcleaner) CleanOnce() error {
 			// Remove only if the miner ID matches to avoid removing for other miners in case of shared LID
 			if deal.MinerAddr == p.miner {
 
-				bd, err := p.dealsDB.ByPieceCID(p.ctx, piece)
+				bd, err := p.dealsDB.ByPieceCID(ctx, piece)
 				if err != nil {
 					return err
 				}
@@ -232,7 +230,7 @@ func (p *pdcleaner) CleanOnce() error {
 					continue
 				}
 
-				ld, err := p.legacyDeals.ByPieceCid(p.ctx, piece)
+				ld, err := p.legacyDeals.ByPieceCid(ctx, piece)
 				if err != nil {
 					return err
 				}
@@ -240,7 +238,7 @@ func (p *pdcleaner) CleanOnce() error {
 					continue
 				}
 
-				dd, err := p.directDealsDB.ByPieceCID(p.ctx, piece)
+				dd, err := p.directDealsDB.ByPieceCID(ctx, piece)
 				if err != nil {
 					return err
 				}
@@ -248,7 +246,7 @@ func (p *pdcleaner) CleanOnce() error {
 					continue
 				}
 
-				err = p.pd.RemoveDealForPiece(p.ctx, piece, deal.DealUuid)
+				err = p.pd.RemoveDealForPiece(ctx, piece, deal.DealUuid)
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
 					log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
@@ -260,43 +258,28 @@ func (p *pdcleaner) CleanOnce() error {
 	return nil
 }
 
-func (p *pdcleaner) getActiveUnprovenSectors(tskey chaintypes.TipSetKey) (bitfield.BitField, error) {
-	// Test output for func
-	if len(p.testSetup) > 0 {
-		testData, ok := p.testSetup[true]
-		if !ok {
-			return bitfield.BitField{}, fmt.Errorf("test data not true")
-		}
-		out := bitfield.New()
-		for i, s := range testData {
-			if i > 3 {
-				out.Set(uint64(s))
-			}
-		}
-		return out, nil
-	}
-
-	mActor, err := p.full.StateGetActor(p.ctx, p.miner, tskey)
+func (p *pdcleaner) getActiveUnprovenSectors(ctx context.Context, tskey chaintypes.TipSetKey) (bitfield.BitField, error) {
+	mActor, err := p.full.StateGetActor(ctx, p.miner, tskey)
 	if err != nil {
 		return bitfield.BitField{}, fmt.Errorf("getting actor for the miner %s: %w", p.miner, err)
 	}
 
-	store := adt.WrapStore(p.ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(p.full)))
+	store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(p.full)))
 	mas, err := miner.Load(store, mActor)
 	if err != nil {
 		return bitfield.BitField{}, fmt.Errorf("loading miner actor state %s: %w", p.miner, err)
 	}
-	activeSectors, err := miner.AllPartSectors(mas, miner.Partition.ActiveSectors)
+	liveSectors, err := miner.AllPartSectors(mas, miner.Partition.LiveSectors)
 	if err != nil {
-		return bitfield.BitField{}, fmt.Errorf("getting active sector sets for miner %s: %w", p.miner, err)
+		return bitfield.BitField{}, fmt.Errorf("getting live sector sets for miner %s: %w", p.miner, err)
 	}
 	unProvenSectors, err := miner.AllPartSectors(mas, miner.Partition.UnprovenSectors)
 	if err != nil {
 		return bitfield.BitField{}, fmt.Errorf("getting unproven sector sets for miner %s: %w", p.miner, err)
 	}
-	finalSectors, err := bitfield.MergeBitFields(activeSectors, unProvenSectors)
+	activeSectors, err := bitfield.MergeBitFields(liveSectors, unProvenSectors)
 	if err != nil {
 		return bitfield.BitField{}, fmt.Errorf("merging bitfields to generate all sealed sectors on miner %s: %w", p.miner, err)
 	}
-	return finalSectors, nil
+	return activeSectors, nil
 }

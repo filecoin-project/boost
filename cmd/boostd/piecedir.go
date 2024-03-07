@@ -19,6 +19,7 @@ var pieceDirCmd = &cli.Command{
 		pdIndexGenerate,
 		recoverCmd,
 		removeDealCmd,
+		lidCleanupCmd,
 	},
 }
 
@@ -107,5 +108,26 @@ var removeDealCmd = &cli.Command{
 		fmt.Printf("Deal %s removed for piece %s\n", dealUuid, piececid)
 		return nil
 
+	},
+}
+
+var lidCleanupCmd = &cli.Command{
+	Name:  "cleanup",
+	Usage: "Triggers a cleanup for LID. Command will wait for existing cleanup jobs to finish if there are any",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		err = napi.PdCleanup(ctx)
+		if err != nil {
+			return fmt.Errorf("clean up failed: %w", err)
+		}
+		fmt.Println("LID clean up complete")
+		return nil
 	},
 }
