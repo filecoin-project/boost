@@ -21,6 +21,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
 )
 
 var log = logging.Logger("pdcleaner")
@@ -159,39 +160,59 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 	}
 
 	// Clean up Boost deals where sector does not exist anymore
+	boosteg := errgroup.Group{}
+	boosteg.SetLimit(20)
 	for _, d := range boostDeals {
-		present, err := activeSectors.IsSet(uint64(d.SectorID))
-		if err != nil {
-			return fmt.Errorf("checking if bitfield is set: %w", err)
-		}
-		if !present {
-			err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
+		boosteg.Go(func() error {
+			present, err := activeSectors.IsSet(uint64(d.SectorID))
 			if err != nil {
-				// Don't return if cleaning up a deal results in error. Try them all.
-				log.Errorf("cleaning up boost deal %s for piece %s: %s", d.DealUuid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
-		}
+			if !present {
+				err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.DealUuid.String())
+				if err != nil {
+					// Don't return if cleaning up a deal results in error. Try them all.
+					return fmt.Errorf("cleaning up boost deal %s for piece %s: %s", d.DealUuid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+				}
+			}
+			return nil
+		})
+	}
+	err = boosteg.Wait()
+	if err != nil {
+		return err
 	}
 
 	// Clean up legacy deals where sector does not exist anymore
+	legacyeg := errgroup.Group{}
+	legacyeg.SetLimit(20)
 	for _, d := range legacyDeals {
-		present, err := activeSectors.IsSet(uint64(d.SectorNumber))
-		if err != nil {
-			return fmt.Errorf("checking if bitfield is set: %w", err)
-		}
-		if !present {
-			err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
+		legacyeg.Go(func() error {
+			present, err := activeSectors.IsSet(uint64(d.SectorNumber))
 			if err != nil {
-				// Don't return if cleaning up a deal results in error. Try them all.
-				log.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ProposalCid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
-		}
+			if !present {
+				err = p.pd.RemoveDealForPiece(ctx, d.ClientDealProposal.Proposal.PieceCID, d.ProposalCid.String())
+				if err != nil {
+					// Don't return if cleaning up a deal results in error. Try them all.
+					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", d.ProposalCid.String(), d.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+				}
+			}
+			return nil
+		})
+	}
+	err = legacyeg.Wait()
+	if err != nil {
+		return err
 	}
 
 	// Clean up Direct deals where sector does not exist anymore
 	// TODO: Refactor for Curio sealing redundancy
-	if len(completeDirectDeals) > 0 {
-		for _, d := range completeDirectDeals {
+	ddoeg := errgroup.Group{}
+	ddoeg.SetLimit(20)
+	for _, d := range completeDirectDeals {
+		ddoeg.Go(func() error {
 			present, err := activeSectors.IsSet(uint64(d.SectorID))
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
@@ -200,11 +221,15 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 				err = p.pd.RemoveDealForPiece(ctx, d.PieceCID, d.ID.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
-					log.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
+					return fmt.Errorf("cleaning up direct deal %s for piece %s: %s", d.ID.String(), d.PieceCID, err.Error())
 				}
-				continue
 			}
-		}
+			return nil
+		})
+	}
+	err = ddoeg.Wait()
+	if err != nil {
+		return err
 	}
 
 	// Clean up dangling LID deals with no Boost, Direct or Legacy deals attached to them
@@ -213,49 +238,54 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 		return fmt.Errorf("getting piece list from LID: %w", err)
 	}
 
+	lideg := errgroup.Group{}
+	lideg.SetLimit(50)
 	for _, piece := range plist {
-		pdeals, err := p.pd.GetPieceDeals(ctx, piece)
-		if err != nil {
-			return fmt.Errorf("getting piece deals from LID: %w", err)
-		}
-		for _, deal := range pdeals {
-			// Remove only if the miner ID matches to avoid removing for other miners in case of shared LID
-			if deal.MinerAddr == p.miner {
+		lideg.Go(func() error {
+			pdeals, err := p.pd.GetPieceDeals(ctx, piece)
+			if err != nil {
+				return fmt.Errorf("getting piece deals from LID: %w", err)
+			}
+			for _, deal := range pdeals {
+				// Remove only if the miner ID matches to avoid removing for other miners in case of shared LID
+				if deal.MinerAddr == p.miner {
 
-				bd, err := p.dealsDB.ByPieceCID(ctx, piece)
-				if err != nil {
-					return err
-				}
-				if len(bd) > 0 {
-					continue
-				}
+					bd, err := p.dealsDB.ByPieceCID(ctx, piece)
+					if err != nil {
+						return err
+					}
+					if len(bd) > 0 {
+						continue
+					}
 
-				ld, err := p.legacyDeals.ByPieceCid(ctx, piece)
-				if err != nil {
-					return err
-				}
-				if len(ld) > 0 {
-					continue
-				}
+					ld, err := p.legacyDeals.ByPieceCid(ctx, piece)
+					if err != nil {
+						return err
+					}
+					if len(ld) > 0 {
+						continue
+					}
 
-				dd, err := p.directDealsDB.ByPieceCID(ctx, piece)
-				if err != nil {
-					return err
-				}
-				if len(dd) > 0 {
-					continue
-				}
+					dd, err := p.directDealsDB.ByPieceCID(ctx, piece)
+					if err != nil {
+						return err
+					}
+					if len(dd) > 0 {
+						continue
+					}
 
-				err = p.pd.RemoveDealForPiece(ctx, piece, deal.DealUuid)
-				if err != nil {
-					// Don't return if cleaning up a deal results in error. Try them all.
-					log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
+					err = p.pd.RemoveDealForPiece(ctx, piece, deal.DealUuid)
+					if err != nil {
+						// Don't return if cleaning up a deal results in error. Try them all.
+						log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
+					}
 				}
 			}
-		}
+			return nil
+		})
 	}
 
-	return nil
+	return lideg.Wait()
 }
 
 func (p *pdcleaner) getActiveUnprovenSectors(ctx context.Context, tskey chaintypes.TipSetKey) (bitfield.BitField, error) {

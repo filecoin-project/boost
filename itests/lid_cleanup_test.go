@@ -18,6 +18,9 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
@@ -25,7 +28,9 @@ import (
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestLIDCleanup(t *testing.T) {
@@ -69,13 +74,17 @@ func TestLIDCleanup(t *testing.T) {
 	require.NoError(t, err)
 	addresses := []address.Address{info.Owner, info.Worker}
 	addresses = append(addresses, info.ControlAddresses...)
+	eg := errgroup.Group{}
+	eg.SetLimit(4)
 	for i := 0; i < 6; i++ {
 		for _, addr := range addresses {
-			err = framework.SendFunds(ctx, f.FullNode, addr, abi.NewTokenAmount(int64(9e18)))
-			require.NoError(t, err)
-			t.Logf("control address: %s", addr)
+			eg.Go(func() error {
+				return framework.SendFunds(ctx, f.FullNode, addr, abi.NewTokenAmount(int64(9e18)))
+			})
 		}
 	}
+	err = eg.Wait()
+	require.NoError(t, err)
 
 	// Give the boost client's address enough datacap to make the deal
 	err = f.AddClientDataCap(t, ctx, rootKey, verifier1Key)
@@ -192,17 +201,16 @@ func TestLIDCleanup(t *testing.T) {
 	// Wait for sector to start sealing
 	time.Sleep(2 * time.Second)
 
+	// Wait for all 5 sectors to get to proving state
 	states := []lapi.SectorState{lapi.SectorState(sealing.Proving)}
-
-	// Exit if all sectors are now proving
-	for {
+	require.Eventuallyf(t, func() bool {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
-		if len(stateList) > 4 {
-			break
+		if len(stateList) == 5 {
+			return true
 		}
-		time.Sleep(2 * time.Second)
-	}
+		return false
+	}, time.Minute, 2*time.Second, "sectors are still not proving after a minute")
 
 	// Verify that LID has entries for all deals
 	prop1, err := cborutil.AsIpld(&res1.DealParams.ClientDealProposal)
@@ -226,19 +234,21 @@ func TestLIDCleanup(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(mhs), 0)
 
-	st, err := f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(4), true)
-	require.NoError(t, err)
-
 	// Wait for wdPost
-	for {
-		head, err := f.FullNode.ChainHead(ctx)
+	require.Eventuallyf(t, func() bool {
+		mActor, err := f.FullNode.StateGetActor(ctx, f.MinerAddr, types.EmptyTSK)
 		require.NoError(t, err)
-		if head.Height() > st.Activation+abi.ChainEpoch(2880) {
-			break
+		store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(f.FullNode)))
+		mas, err := miner.Load(store, mActor)
+		require.NoError(t, err)
+		unproven, err := miner.AllPartSectors(mas, miner.Partition.UnprovenSectors)
+		require.NoError(t, err)
+		count, err := unproven.Count()
+		if count == 0 {
+			return true
 		}
-		t.Log("Waiting for first wdPost after committing sectors")
-		time.Sleep(3 * time.Second)
-	}
+		return false
+	}, blockTime*(2880), 3*time.Second, "timeout waiting for wdPost")
 
 	// Terminate DDO sector and a deal sector
 	err = f.LotusMiner.SectorTerminate(ctx, abi.SectorNumber(2))
@@ -250,26 +260,27 @@ func TestLIDCleanup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Keep trying to terminate in case of deadline issues
-	for {
+	require.Eventually(t, func() bool {
 		tpending, err := f.LotusMiner.SectorTerminatePending(ctx)
 		require.NoError(t, err)
 		if len(tpending) == 0 {
-			break
+			return true
 		}
 		_, err = f.LotusMiner.SectorTerminateFlush(ctx)
 		require.NoError(t, err)
-	}
+		return false
+	}, blockTime*(60*2), 1*time.Second, "timeout waiting for sectors to terminate")
 
 	// Wait for terminate message to be processed
-	for {
-		states := []lapi.SectorState{lapi.SectorState(sealing.TerminateFinality)}
+	states = []lapi.SectorState{lapi.SectorState(sealing.TerminateFinality)}
+	require.Eventuallyf(t, func() bool {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
 		if len(stateList) == 2 {
-			break
+			return true
 		}
-		time.Sleep(2 * time.Second)
-	}
+		return false
+	}, time.Second*15, 1*time.Second, "timeout waiting for sectors to reach TerminateFinality")
 
 	// Clean up LID
 	err = f.Boost.PdCleanup(ctx)
@@ -279,20 +290,18 @@ func TestLIDCleanup(t *testing.T) {
 	_, err = f.Boost.BoostIndexerListMultihashes(ctx, ddo)
 	require.ErrorContains(t, err, " key not found")
 
-	st, err = f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(3), true)
+	st, err := f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(3), true)
 	require.NoError(t, err)
 	require.Len(t, st.Pieces, 1)
 	var removedProp cid.Cid
 	var remainingProp cid.Cid
 
-	for _, p := range st.Pieces {
-		if res1.DealParams.ClientDealProposal.Proposal.PieceCID.Equals(p.Piece.PieceCID) {
-			removedProp = prop2.Cid()
-			remainingProp = prop1.Cid()
-		} else {
-			removedProp = prop1.Cid()
-			remainingProp = prop2.Cid()
-		}
+	if res1.DealParams.ClientDealProposal.Proposal.PieceCID.Equals(st.Pieces[0].Piece.PieceCID) {
+		removedProp = prop2.Cid()
+		remainingProp = prop1.Cid()
+	} else {
+		removedProp = prop1.Cid()
+		remainingProp = prop2.Cid()
 	}
 
 	// Listing multihashes for removed Boost deal should fail
