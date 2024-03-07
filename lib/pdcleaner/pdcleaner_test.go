@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"testing"
 
 	bdb "github.com/filecoin-project/boost/db"
@@ -17,7 +16,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
@@ -129,6 +127,13 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	// Start a new PieceDirectoryCleaner
 	pdc := newPDC(dealsDB, directDB, legacyProv, pm, fn, 1)
 	pdc.ctx = ctx
+	var sectorNums []abi.SectorNumber
+	for _, d := range dealMap {
+		sectorNums = append(sectorNums, d.sector)
+	}
+	testData := make(map[bool][]abi.SectorNumber)
+	testData[true] = sectorNums
+	pdc.testSetup = testData
 
 	chainHead, err := test.MockTipset(provAddr, 1)
 	require.NoError(t, err)
@@ -137,37 +142,13 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	}
 
 	// Add deals to SQL DB
-	cDealMap := make(map[string]*api.MarketDeal)
-	for i, deal := range deals {
+	for _, deal := range deals {
 		data, ok := dealMap[deal.DealUuid]
 		require.True(t, ok)
 		deal.SectorID = data.sector
 		deal.ClientDealProposal.Proposal.PieceCID = data.piece
 		deal.ClientDealProposal.Proposal.EndEpoch = 3 // because chain head is always 5
 		deal.Checkpoint = dealcheckpoints.Complete
-		p, err := deal.SignedProposalCid()
-		require.NoError(t, err)
-		t.Logf("signed p %s", p.String())
-		// Test a slashed deal
-		if i == 0 {
-			deal.Checkpoint = dealcheckpoints.Accepted
-			deal.ClientDealProposal.Proposal.EndEpoch = 6
-			cDealMap[strconv.FormatInt(int64(deal.ChainDealID), 10)] = &api.MarketDeal{
-				Proposal: deal.ClientDealProposal.Proposal,
-				State: api.MarketDealState{
-					SlashEpoch: 3, // Slash this deal
-				},
-			}
-			err = dealsDB.Insert(ctx, &deal)
-			require.NoError(t, err)
-			continue
-		}
-		cDealMap[strconv.FormatInt(int64(deal.ChainDealID), 10)] = &api.MarketDeal{
-			Proposal: deal.ClientDealProposal.Proposal,
-			State: api.MarketDealState{
-				SlashEpoch: -1,
-			},
-		}
 		err = dealsDB.Insert(ctx, &deal)
 		require.NoError(t, err)
 	}
@@ -177,16 +158,28 @@ func TestPieceDirectoryCleaner(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pl, 5)
 
+	ac := chaintypes.ActorV5{
+		Address: nil,
+		Code:    cid.MustParse("bafk2bzacedo75pabe4i2l3hvhtsjmijrcytd2y76xwe573uku25fi7sugqld6"),
+		Head:    cid.MustParse("bafy2bzaceddnxeoeyarr4iogahxtgckd4y5jq4xpx66sk4ulb2a6a45wquklo"),
+		Nonce:   0,
+		Balance: abi.NewTokenAmount(int64(5347369358335063414)),
+	}
+
+	objstr := "j9gqWCcAAXGg5AIgnNa9WH0Bqjm/t4d/rNXuAoAgr3dO/oRkISmLDkKKRmtASgALDpa14/gUSyDYKlgnAAFxoOQCIInM1H8WA5BAqlYy0Cyecdq/ul0/Fs6OUAon1c2+HglDQEsAAQ2S407ePdPgDtgqWCcAAXGg5AIgGP5qzGGjo2sMNzxKOo6mS4Er8sqbUoBQkJx41AhVigzYKlgnAAFxoOQCIAGktx8yjDs1A+KosYKeC2psSl0Msu5THqIVFoqjp1gt2CpYJwABcaDkAiB7LaMaRW6fA4I79wGR0qYpYtKzHAihqzrLYlCbFKTuHNgqWCcAAXGg5AIgs2f3ZwRIxoC7iKmoMzoBAYk0Iii3GndePNxcx4LgOKMaADixtxLYKlgnAAFxoOQCIFLQ9lLyEu3HCE3IDAg+djoEpRN5eLuB2AI2PWnNjAIMQPU="
+	obj := []byte(objstr)
+
 	fn.EXPECT().ChainHead(gomock.Any()).DoAndReturn(chainHeadFn).AnyTimes()
-	fn.EXPECT().StateMarketDeals(gomock.Any(), gomock.Any()).Return(cDealMap, nil).AnyTimes()
+	fn.EXPECT().StateGetActor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&ac, nil).AnyTimes()
+	fn.EXPECT().ChainReadObj(gomock.Any(), gomock.Any()).Return(obj, nil).AnyTimes()
 	legacyProv.EXPECT().ListDeals().Return(nil, nil).AnyTimes()
 	legacyProv.EXPECT().ByPieceCid(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	err = pdc.CleanOnce()
 	require.NoError(t, err)
 
-	// Confirm we have 0 pieces in LID after clean up
+	// Confirm we have 1 piece in LID after clean up
 	pl, err = pm.ListPieces(ctx)
 	require.NoError(t, err)
-	require.Len(t, pl, 0)
+	require.Len(t, pl, 1)
 }
