@@ -57,7 +57,7 @@ func TestLIDCleanup(t *testing.T) {
 	opts = append(opts, framework.WithMaxStagingDealsBytes(100000000))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	esemble.Start()
-	blockTime := 50 * time.Millisecond
+	blockTime := 100 * time.Millisecond
 	esemble.BeginMining(blockTime)
 
 	err = f.Start()
@@ -236,6 +236,7 @@ func TestLIDCleanup(t *testing.T) {
 		if head.Height() > st.Activation+abi.ChainEpoch(2880) {
 			break
 		}
+		t.Log("Waiting for first wdPost after committing sectors")
 		time.Sleep(3 * time.Second)
 	}
 
