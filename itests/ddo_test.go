@@ -59,7 +59,7 @@ func TestDirectDeal(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Stop()
 
-	// Send funs to PSD wallet as it is being used for POST
+	// Send funds to PSD wallet as it is being used for POST
 	info, err := f.FullNode.StateMinerInfo(ctx, f.MinerAddr, types.EmptyTSK)
 	require.NoError(t, err)
 	addresses := []address.Address{info.Owner, info.Worker}

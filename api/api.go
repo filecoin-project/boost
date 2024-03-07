@@ -27,7 +27,7 @@ type Boost interface {
 
 	// MethodGroup: Boost
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                                     //perm:admin
-	BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error)                                        //perm:admin
+	BoostIndexerListMultihashes(ctx context.Context, contextID []byte) ([]multihash.Multihash, error)                                           //perm:admin
 	BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error)                                                                            //perm:admin
 	BoostIndexerAnnounceLatestHttp(ctx context.Context, urls []string) (cid.Cid, error)                                                         //perm:admin
 	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*ProviderDealRejectionInfo, error) //perm:admin
@@ -48,6 +48,7 @@ type Boost interface {
 	// MethodGroup: PieceDirectory
 	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error             //perm:admin
 	PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, dealID string) error //perm:admin
+	PdCleanup(ctx context.Context) error                                             //perm:admin
 
 	// MethodGroup: Misc
 	OnlineBackup(context.Context, string) error //perm:admin

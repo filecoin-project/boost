@@ -487,9 +487,9 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 		return nil
 	}
 
-	// Check status every couple of minutes
+	// Check status every 10 seconds
 	ddp.dealLogger.Infow(entry.ID, "watching deal sealing state changes")
-	ticker := time.NewTicker(2 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {

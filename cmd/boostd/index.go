@@ -8,6 +8,7 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
 )
 
@@ -45,16 +46,11 @@ var indexProvAnnounceAllCmd = &cli.Command{
 
 var indexProvListMultihashesCmd = &cli.Command{
 	Name:      "list-multihashes",
-	Usage:     "list-multihashes <proposal cid>",
-	UsageText: "List multihashes for a deal by proposal cid",
+	Usage:     "list-multihashes <proposal cid / deal UUID>",
+	UsageText: "List multihashes for a deal by proposal cid or deal UUID",
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
-			return fmt.Errorf("must supply proposal cid")
-		}
-
-		propCid, err := cid.Parse(cctx.Args().First())
-		if err != nil {
-			return fmt.Errorf("parsing proposal cid %s: %w", cctx.Args().First(), err)
+			return fmt.Errorf("must supply a proposal cid or deal UUID")
 		}
 
 		ctx := lcli.ReqContext(cctx)
@@ -66,13 +62,46 @@ var indexProvListMultihashesCmd = &cli.Command{
 		}
 		defer closer()
 
-		// get list of multihashes
-		mhs, err := napi.BoostIndexerListMultihashes(ctx, propCid)
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("must specify only one proposal CID / deal UUID")
+		}
+
+		id := cctx.Args().Get(0)
+
+		var proposalCid cid.Cid
+		var mhs []multihash.Multihash
+		dealUuid, err := uuid.Parse(id)
+		if err != nil {
+			propCid, err := cid.Decode(id)
+			if err != nil {
+				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
+			}
+			proposalCid = propCid
+		}
+
+		if !proposalCid.Defined() {
+			contextID, err := dealUuid.MarshalBinary()
+			if err != nil {
+				return fmt.Errorf("parsing UUID to bytes: %w", err)
+			}
+			mhs, err = napi.BoostIndexerListMultihashes(ctx, contextID)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Found %d multihashes for deal with ID %s:\n", len(mhs), id)
+			for _, mh := range mhs {
+				fmt.Println("  " + mh.String())
+			}
+
+			return nil
+		}
+
+		mhs, err = napi.BoostIndexerListMultihashes(ctx, proposalCid.Bytes())
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Found %d multihashes for deal with proposal cid %s:\n", len(mhs), propCid)
+		fmt.Printf("Found %d multihashes for deal with ID %s:\n", len(mhs), id)
 		for _, mh := range mhs {
 			fmt.Println("  " + mh.String())
 		}

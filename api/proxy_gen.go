@@ -58,7 +58,7 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceLegacyDeal func(p0 context.Context, p1 cid.Cid) (cid.Cid, error) `perm:"admin"`
 
-		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+		BoostIndexerListMultihashes func(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) `perm:"admin"`
 
 		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) `perm:"admin"`
 
@@ -67,6 +67,8 @@ type BoostStruct struct {
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+
+		PdCleanup func(p0 context.Context) error `perm:"admin"`
 
 		PdRemoveDealForPiece func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
 	}
@@ -340,14 +342,14 @@ func (s *BoostStub) BoostIndexerAnnounceLegacyDeal(p0 context.Context, p1 cid.Ci
 	return *new(cid.Cid), ErrNotSupported
 }
 
-func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) {
 	if s.Internal.BoostIndexerListMultihashes == nil {
 		return *new([]multihash.Multihash), ErrNotSupported
 	}
 	return s.Internal.BoostIndexerListMultihashes(p0, p1)
 }
 
-func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) {
 	return *new([]multihash.Multihash), ErrNotSupported
 }
 
@@ -392,6 +394,17 @@ func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) er
 }
 
 func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) PdCleanup(p0 context.Context) error {
+	if s.Internal.PdCleanup == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.PdCleanup(p0)
+}
+
+func (s *BoostStub) PdCleanup(p0 context.Context) error {
 	return ErrNotSupported
 }
 

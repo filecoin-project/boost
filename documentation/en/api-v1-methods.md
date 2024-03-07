@@ -55,6 +55,7 @@
   * [OnlineBackup](#onlinebackup)
 * [Pd](#pd)
   * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
+  * [PdCleanup](#pdcleanup)
   * [PdRemoveDealForPiece](#pdremovedealforpiece)
 ## 
 
@@ -554,9 +555,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  "Ynl0ZSBhcnJheQ=="
 ]
 ```
 
@@ -1242,6 +1241,15 @@ Inputs:
   }
 ]
 ```
+
+Response: `{}`
+
+### PdCleanup
+
+
+Perms: admin
+
+Inputs: `null`
 
 Response: `{}`
 
