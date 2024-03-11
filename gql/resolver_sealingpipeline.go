@@ -130,6 +130,7 @@ type waitDeal struct {
 	ID       graphql.ID
 	Size     gqltypes.Uint64
 	IsLegacy bool
+	IsDirect bool
 }
 
 type waitDealSector struct {

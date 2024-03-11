@@ -32,6 +32,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
+	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -645,11 +646,11 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 		return nil, fmt.Errorf("deal.PublishCid can't be nil")
 	}
 
-	sdInfo := lapi.PieceDealInfo{
+	sdInfo := piece.PieceDealInfo{
 		DealID:       deal.ChainDealID,
 		DealProposal: &deal.ClientDealProposal.Proposal,
 		PublishCid:   deal.PublishCID,
-		DealSchedule: lapi.DealSchedule{
+		DealSchedule: piece.DealSchedule{
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   deal.ClientDealProposal.Proposal.EndEpoch,
 		},

@@ -160,6 +160,7 @@ type DealBasic {
   PublishCid: String!
   Transfer: TransferParams!
   Message: String!
+  IsDirect: Boolean!
 }
 
 type DealList {

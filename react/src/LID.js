@@ -688,7 +688,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     {pieceStatus.Deals.map(deal => (
                         <tr key={deal.Deal.ID}>
                             <td>{moment(deal.Deal.CreatedAt).format(dateFormat)}</td>
-                            <td><ShortDealLink id={deal.Deal.ID} isLegacy={deal.Deal.IsLegacy} /></td>
+                            <td><ShortDealLink id={deal.Deal.ID} isLegacy={deal.Deal.IsLegacy} isDirect={deal.Deal.IsDirect} /></td>
                             <td>{deal.Deal.IsLegacy ? 'Yes' : 'No'}</td>
                             <td>{deal.Sector.ID+''}</td>
                             <td>{deal.Sector.Offset+''}</td>

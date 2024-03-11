@@ -136,8 +136,21 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 
 	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
 
-	// TODO: validate the deal proposal and check for deal acceptance (allocation id, term, start epoch, end epoch, etc.)
-	// TermMin ; TermMax
+	allActive, err := ddp.directDealsDB.ListActive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active deals: %w", err)
+	}
+
+	for _, deal := range allActive {
+		// We should only process 1 deal for each allocation at one time to avoid trying to claim
+		// same allocation for 2 sectors at once
+		if entry.Client == deal.Client && entry.AllocationID == deal.AllocationID {
+			return &api.ProviderDealRejectionInfo{
+				Accepted: false,
+				Reason:   fmt.Sprintf("another deal for client %s and allocation %d is already in process", entry.Client, entry.AllocationID),
+			}, nil
+		}
+	}
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,

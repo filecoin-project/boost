@@ -586,6 +586,7 @@ const PieceStatusQuery = gql`
                     IsLegacy
                     CreatedAt
                     DealDataRoot
+                    IsDirect
                 }
                 Sector {
                     ID
@@ -791,6 +792,7 @@ const DealPublishQuery = gql`
                 }
                 ClientAddress
                 PieceSize
+                IsDirect
             }
         }
     }

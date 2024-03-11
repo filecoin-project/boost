@@ -116,7 +116,7 @@ function DealsTable(props) {
                         <tr key={deal.ID}>
                             <td>{moment(deal.CreatedAt).fromNow()}</td>
                             <td className="deal-id">
-                                <ShortDealLink id={deal.ID} isLegacy={deal.IsLegacy} />
+                                <ShortDealLink id={deal.ID} isLegacy={deal.IsLegacy} isDirect={deal.IsDirect} />
                             </td>
                             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
                             <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
