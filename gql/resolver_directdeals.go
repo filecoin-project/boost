@@ -240,21 +240,22 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
-	       if si.State != lapi.SectorState(sealing.Proving) {
-		               return "Sealer: " + string(si.State)
-		       }
+	if si.State != lapi.SectorState(sealing.Proving) {
+		return "Sealer: " + string(si.State)
+	}
 
-		       claim, err := dr.fullNode.StateGetClaim(ctx, dr.Provider, verifreg9types.ClaimId(dr.AllocationID()), ltypes.EmptyTSK)
-	       if err != nil {
-		               log.Warnw("error getting status for claim", "claim", dr.AllocationID(), "error", err)
-		               return "Sealer: " + string(si.State)
-		       }
-	       if claim == nil {
-		               return "Sealer: " + string(si.State) + "(No claim found)"+       }
-	       if claim.Sector != dr.SectorID {
-		               return "Sealer: " + string(si.State) + "(Sector mismatch)"
-		       }
-	       return "Sealer: " + string(si.State) + "(Claim verified)"
+	claim, err := dr.fullNode.StateGetClaim(ctx, dr.Provider, verifreg9types.ClaimId(dr.AllocationID()), ltypes.EmptyTSK)
+	if err != nil {
+		log.Warnw("error getting status for claim", "claim", dr.AllocationID(), "error", err)
+		return "Sealer: " + string(si.State)
+	}
+	if claim == nil {
+		return "Sealer: " + string(si.State) + "(No claim found)"
+	}
+	if claim.Sector != dr.SectorID {
+		return "Sealer: " + string(si.State) + "(Sector mismatch)"
+	}
+	return "Sealer: " + string(si.State) + "(Claim verified)"
 }
 
 func (dr *directDealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
