@@ -144,26 +144,13 @@ func TestDirectDeal(t *testing.T) {
 	// Wait for sector to start sealing
 	time.Sleep(2 * time.Second)
 
-	for {
-		secNums, err := f.LotusMiner.SectorsList(ctx)
-		require.NoError(t, err)
-		if len(secNums) > 2 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
+	// Wait till sector 2 is Proving
 	states := []lapi.SectorState{lapi.SectorState(sealing.Proving)}
-
-	// Exit if sector 2 is now proving
-	for {
+	require.Eventuallyf(t, func() bool {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
-		if len(stateList) > 2 {
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
+		return len(stateList) == 3
+	}, 5*time.Minute, 2*time.Second, "sector 2 is still not proving after 5 minutes")
 
 	// Confirm we have 0 allocations left
 	allocations, err = f.FullNode.StateGetAllocations(ctx, f.ClientAddr, types.EmptyTSK)
