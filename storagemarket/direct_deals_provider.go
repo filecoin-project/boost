@@ -439,6 +439,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		if derr := ddp.watchSealingUpdates(entry); derr != nil {
 			return derr
 		}
+		ddp.dealLogger.Infow(entry.ID, "deal sealing reached termination state")
 		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Complete); err != nil {
 			return err
 		}
@@ -471,20 +472,22 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 	// Check immediately if the sector has reached a final sealing state
 	complete := checkSealingFinalized()
 	if complete {
-		isClaimed, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+		isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
 		if claimErr != nil {
 			return &dealMakingError{
 				retry: types.DealRetryAuto,
 				error: claimErr,
 			}
 		}
-		if !isClaimed {
-			return &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: errors.New("sector mismatch for claim"),
+		if found {
+			if !isClaimed {
+				return &dealMakingError{
+					retry: types.DealRetryFatal,
+					error: errors.New("sector mismatch for claim"),
+				}
 			}
+			return nil
 		}
-		return nil
 	}
 
 	// Check status every 10 seconds
@@ -501,21 +504,22 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 		case <-ticker.C:
 			complete := checkSealingFinalized()
 			if complete {
-				isClaimed, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+				isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
 				if claimErr != nil {
 					return &dealMakingError{
 						retry: types.DealRetryAuto,
 						error: claimErr,
 					}
 				}
-				ddp.dealLogger.Infow(entry.ID, "deal sealing reached termination state")
-				if !isClaimed {
-					return &dealMakingError{
-						retry: types.DealRetryFatal,
-						error: errors.New("sector mismatch for claim"),
+				if found {
+					if !isClaimed {
+						return &dealMakingError{
+							retry: types.DealRetryFatal,
+							error: errors.New("sector mismatch for claim"),
+						}
 					}
+					return nil
 				}
-				return nil
 			}
 		}
 	}
@@ -669,13 +673,16 @@ func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smt
 	return nil
 }
 
-func (ddp *DirectDealsProvider) confirmClaim(ctx context.Context, allocId verifreg9types.AllocationId, sectorNum abi.SectorNumber) (bool, error) {
+func (ddp *DirectDealsProvider) confirmClaim(ctx context.Context, allocId verifreg9types.AllocationId, sectorNum abi.SectorNumber) (bool, bool, error) {
 	claim, err := ddp.fullnodeApi.StateGetClaim(ctx, ddp.Address, verifreg9types.ClaimId(allocId), ltypes.EmptyTSK)
 	if err != nil {
-		return false, fmt.Errorf("getting claim details for allocationID %d: %s", allocId, err)
+		return false, false, fmt.Errorf("getting claim details for allocationID %d: %s", allocId, err)
+	}
+	if claim == nil {
+		return false, false, nil
 	}
 	if claim.Sector != sectorNum {
-		return false, nil
+		return false, true, nil
 	}
-	return true, nil
+	return true, true, nil
 }
