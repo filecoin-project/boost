@@ -14,7 +14,8 @@ import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
 import {DealActions, IsPaused, IsOfflineWaitingForData} from "./DealDetail";
-import {SearchBox} from "./Deals";
+import {SealingStatusInfo, SearchBox} from "./Deals";
+import {Info} from "./Info";
 
 const dealsBasePath = '/direct-deals'
 
@@ -140,7 +141,8 @@ function DirectDealsContent() {
                 <th>Deal ID</th>
                 <th>Allocation ID</th>
                 <th>Client</th>
-                <th>State</th>
+                <th>Sealing State<SealingStatusInfo/></th>
+                <th>Deal State<DDODealStatusInfo/></th>
             </tr>
 
             {deals.map(deal => (
@@ -188,6 +190,13 @@ function DealRow(props) {
             <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
+                <td className="sealing">
+                        <div className="message-content">
+                            <span className="message-text">
+                    {deal.SealingState}
+                            </span>
+                        </div>
+                </td>
             <td className="message">
                 <div className="message-content">
                     <span className="message-text">
@@ -245,3 +254,83 @@ export function DirectDealsCount(props) {
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
 }
+
+ function DDODealStatusInfo(props) {
+         return <span className="deal-status-info">
+         <Info>
+             The deal can be in one of the following states:
+             <p>
+                 <i>Transfer Queued</i><br/>
+                 <span>
+                     The storage deal proposal has been accepted, and Boost is
+                     about to start the data transfer.
+                 </span>
+             </p>
+             <p>
+                 <i>Awaiting Offline Data Import</i><br/>
+                 <span>
+                     The client has made an offline deal proposal, and Boost is
+                     waiting for the Storage Provider operator to import the deal
+                     data.
+                 </span>
+             </p>
+             <p>
+                 <i>Transferring</i><br/>
+                 <span>
+                     The data for the deal is transferring.
+                 </span>
+             </p>
+             <p>
+                 <i>Transfer Complete</i><br/>
+                 <span>
+                     The data transfer is complete and Boost is verifying the data matches commp.
+                 </span>
+             </p>
+             <p>
+                 <i>Ready to Publish</i><br/>
+                 <span>
+                     The deal is in the batch publish queue, ready to be published.
+                 </span>
+             </p>
+             <p>
+                 <i>Awaiting Publish Confirmation</i><br/>
+                 <span>
+                     Boost sent a publish deal message for the deal and is waiting for on-chain confirmation.
+                 </span>
+             </p>
+             <p>
+                 <i>Adding to Sector</i><br/>
+                 <span>
+                     Boost is handing the deal off to the lotus-miner sealing subsystem
+                     to be added to a sector.
+                 </span>
+             </p>
+             <p>
+                 <i>Indexing</i><br/>
+                 <span>
+                     Boost is indexing the deal in the Local Index Directory(LID)
+                     and will be announcing the deal to the network so that clients know where to retrieve it from.
+                 </span>
+             </p>
+             <p>
+                 <i>IndexedAndAnnounced</i><br/>
+                 <span>
+                     The deal has been indexed locally and announced to the network indexers.
+                 </span>
+             </p>
+             <p>
+                 <i>Complete</i><br/>
+                 <span>
+                     The deal process has finished execution.
+                 </span>
+             </p>
+             <p>
+                 <i>Cancelled</i><br/>
+                 <span>
+                     The deal was cancelled.
+                 </span>
+             </p>
+         </Info>
+     </span>
+}
+
