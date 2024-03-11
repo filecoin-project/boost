@@ -1,17 +1,27 @@
 package util
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v13/datacap"
-	"github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
+	cbor "github.com/ipfs/go-ipld-cbor"
+
 	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -95,13 +105,13 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 	}
 
 	// Create allocation requests
-	var allocationRequests []verifreg.AllocationRequest
+	var allocationRequests []verifreg9.AllocationRequest
 	for mid, minfo := range maddrs {
 		for _, p := range pieceInfos {
 			if uint64(minfo.SectorSize) < uint64(p.Size) {
 				return nil, fmt.Errorf("specified piece size %d is bigger than miner's sector size %s", uint64(p.Size), minfo.SectorSize.String())
 			}
-			allocationRequests = append(allocationRequests, verifreg.AllocationRequest{
+			allocationRequests = append(allocationRequests, verifreg9.AllocationRequest{
 				Provider:   mid,
 				Data:       p.PieceCID,
 				Size:       p.Size,
@@ -112,7 +122,7 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 		}
 	}
 
-	arequest := &verifreg.AllocationRequests{
+	arequest := &verifreg9.AllocationRequests{
 		Allocations: allocationRequests,
 	}
 
@@ -140,4 +150,256 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 	}
 
 	return msg, nil
+}
+
+// CreateExtendClaimMsg creates extend message[s] based on the following conditions
+// 1. Extend all claims for a miner ID
+// 2. Extend all claims for multiple miner IDs
+// 3. Extend specified claims for a miner ID
+// 4. Extend specific claims for specific miner ID
+// 5. Extend all claims for a miner ID with different client address (2 messages)
+// 6. Extend all claims for multiple miner IDs with different client address (2 messages)
+// 7. Extend specified claims for a miner ID with different client address (2 messages)
+// 8. Extend specific claims for specific miner ID with different client address (2 messages)
+func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg9.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool) ([]*types.Message, error) {
+	w, err := address.IDFromAddress(wallet)
+	if err != nil {
+		return nil, fmt.Errorf("converting wallet address to ID: %w", err)
+	}
+
+	wid := abi.ActorID(w)
+
+	head, err := api.ChainHead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var terms []verifreg9.ClaimTerm
+	var newClaims []verifreg9.ClaimExtensionRequest
+	rDataCap := big.NewInt(0)
+
+	// If --all is set
+	if all {
+		for _, id := range miners {
+			maddr, err := address.NewFromString(id)
+			if err != nil {
+				return nil, fmt.Errorf("parsing miner %s: %w", id, err)
+			}
+			mid, err := address.IDFromAddress(maddr)
+			if err != nil {
+				return nil, fmt.Errorf("converting miner address to miner ID: %w", err)
+			}
+			claims, err := api.StateGetClaims(ctx, maddr, types.EmptyTSK)
+			if err != nil {
+				return nil, fmt.Errorf("getting claims for miner %s: %w", maddr, err)
+			}
+			for claimID, claim := range claims {
+				if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
+					// If client is not same - needs to burn datacap
+					if claim.Client != wid {
+						newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
+							Claim:    claimID,
+							Provider: maddr,
+							TermMax:  tmax,
+						})
+						rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
+						continue
+					}
+					terms = append(terms, verifreg9.ClaimTerm{
+						ClaimId:  claimID,
+						TermMax:  tmax,
+						Provider: abi.ActorID(mid),
+					})
+				}
+			}
+		}
+	}
+
+	// Single miner and specific claims
+	if len(miners) == 1 && len(pcm) > 0 {
+		maddr, err := address.NewFromString(miners[0])
+		if err != nil {
+			return nil, fmt.Errorf("parsing miner %s: %w", miners[0], err)
+		}
+		mid, err := address.IDFromAddress(maddr)
+		if err != nil {
+			return nil, fmt.Errorf("converting miner address to miner ID: %w", err)
+		}
+		claims, err := api.StateGetClaims(ctx, maddr, types.EmptyTSK)
+		if err != nil {
+			return nil, fmt.Errorf("getting claims for miner %s: %w", maddr, err)
+		}
+
+		for claimID, claim := range claims {
+			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
+				// If client is not same - needs to burn datacap
+				if claim.Client != wid {
+					newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
+						Claim:    claimID,
+						Provider: maddr,
+						TermMax:  tmax,
+					})
+					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
+					continue
+				}
+				terms = append(terms, verifreg9.ClaimTerm{
+					ClaimId:  claimID,
+					TermMax:  tmax,
+					Provider: abi.ActorID(mid),
+				})
+			}
+		}
+	}
+
+	if len(miners) == 0 && len(pcm) > 0 {
+		store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(api)))
+		verifregActor, err := api.StateGetActor(ctx, verifreg.Address, types.EmptyTSK)
+		if err != nil {
+			return nil, fmt.Errorf("could not get the verified registry actor state: %w", err)
+		}
+
+		verifregState, err := verifreg.Load(store, verifregActor)
+		if err != nil {
+			return nil, fmt.Errorf("could not load the verified registry actor state: %w", err)
+		}
+		for c, prov := range pcm {
+			claim, ok, err := verifregState.GetClaim(prov.Addr, c)
+			if err != nil {
+				return nil, fmt.Errorf("could not load the claim %d: %w", c, err)
+			}
+			if !ok {
+				return nil, fmt.Errorf("claim %d not found in the actor state", c)
+			}
+			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
+				// If client is not same - needs to burn datacap
+				if claim.Client != wid {
+					newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
+						Claim:    c,
+						Provider: prov.Addr,
+						TermMax:  tmax,
+					})
+					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
+					continue
+				}
+				terms = append(terms, verifreg9.ClaimTerm{
+					ClaimId:  c,
+					TermMax:  tmax,
+					Provider: prov.ID,
+				})
+			}
+		}
+	}
+
+	params, err := actors.SerializeParams(&verifreg9.ExtendClaimTermsParams{
+		Terms: terms,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+	}
+
+	var msgs []*types.Message
+
+	oclaimMsg := &types.Message{
+		To:     verifreg.Address,
+		From:   wallet,
+		Method: verifreg.Methods.ExtendClaimTerms,
+		Params: params,
+	}
+
+	msgs = append(msgs, oclaimMsg)
+
+	if len(newClaims) > 0 {
+		// Get datacap balance
+		aDataCap, err := api.StateVerifiedClientStatus(ctx, wallet, types.EmptyTSK)
+		if err != nil {
+			return nil, err
+		}
+
+		if aDataCap == nil {
+			return nil, fmt.Errorf("wallet %s does not have any datacap", wallet)
+		}
+
+		// Check that we have enough data cap to make the allocation
+		if rDataCap.GreaterThan(big.NewInt(aDataCap.Int64())) {
+			return nil, fmt.Errorf("requested datacap %s is greater then the available datacap %s", rDataCap, aDataCap)
+		}
+
+		ncparams, err := actors.SerializeParams(&verifreg9.AllocationRequests{
+			Extensions: newClaims,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+		}
+
+		transferParams, err := actors.SerializeParams(&datacap.TransferParams{
+			To:           builtin.VerifiedRegistryActorAddr,
+			Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+			OperatorData: ncparams,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
+		}
+
+		nclaimMsg := &types.Message{
+			To:     builtin.DatacapActorAddr,
+			From:   wallet,
+			Method: datacap2.Methods.TransferExported,
+			Params: transferParams,
+			Value:  big.Zero(),
+		}
+
+		if assumeYes {
+			var yes bool
+			yes, err = confirm(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error reading user input: %w", err)
+			}
+			if !yes {
+				fmt.Printf("Dropping the extension for claims that require Datacap")
+				return msgs, nil
+			}
+		}
+
+		msgs = append(msgs, nclaimMsg)
+	}
+
+	return msgs, nil
+}
+
+type ProvInfo struct {
+	Addr address.Address
+	ID   abi.ActorID
+}
+
+func confirm(ctx context.Context) (bool, error) {
+	cs := readline.NewCancelableStdin(os.Stdin)
+	go func() {
+		<-ctx.Done()
+		cs.Close() // nolint:errcheck
+	}()
+	rl := bufio.NewReader(cs)
+	for {
+		fmt.Printf("Proceed? Yes [y] / No [n]:\n")
+
+		line, _, err := rl.ReadLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return false, fmt.Errorf("request canceled: %w", err)
+			}
+
+			return false, fmt.Errorf("reading input: %w", err)
+		}
+
+		switch string(line) {
+		case "yes", "y":
+			return true, nil
+		case "n":
+			return false, nil
+		default:
+			return false, nil
+		}
+	}
 }
