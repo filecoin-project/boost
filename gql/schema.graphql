@@ -107,6 +107,7 @@ type DirectDeal {
   Sector: Sector!
   Message: String!
   Logs: [DealLog]!
+  SealingState: String!
 }
 
 type DirectDealList {

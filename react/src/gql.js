@@ -170,6 +170,7 @@ const DirectDealsListQuery = gql`
                     Offset
                     Length
                 }
+                SealingState
             }
             totalCount
             more

@@ -2,13 +2,19 @@ package gql
 
 import (
 	"context"
+	"time"
+
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v1api"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/graph-gophers/graphql-go"
-	"time"
 )
 
 type directDealResolver struct {
@@ -17,6 +23,7 @@ type directDealResolver struct {
 	dealsDB     *db.DealsDB
 	logsDB      *db.LogsDB
 	spApi       sealingpipeline.API
+	fullNode    v1api.FullNode
 }
 
 type directDealListResolver struct {
@@ -86,6 +93,7 @@ func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDeal
 			dealsDB:     r.dealsDB,
 			logsDB:      r.logsDB,
 			spApi:       r.spApi,
+			fullNode:    r.fullNode,
 		})
 	}
 
@@ -213,7 +221,7 @@ func (dr *directDealResolver) message(ctx context.Context, checkpoint dealcheckp
 	case dealcheckpoints.AddedPiece:
 		return "Announcing"
 	case dealcheckpoints.IndexedAndAnnounced:
-		return dr.sealingState(ctx)
+		return "Indexed and Announced"
 	case dealcheckpoints.Complete:
 		switch dr.Err {
 		case "":
@@ -232,14 +240,22 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
-	return "Sealer: " + string(si.State)
-	// TODO: How to check that deal is in sector?
-	//for _, d := range si.Deals {
-	//	if d == dr.DirectDataEntry.ChainDealID {
-	//		return "Sealer: " + string(si.State)
-	//	}
-	//}
-	//return fmt.Sprintf("Sealer: failed - deal not found in sector %d", si.SectorID)
+	if si.State != lapi.SectorState(sealing.Proving) {
+		return "Sealer: " + string(si.State)
+	}
+
+	claim, err := dr.fullNode.StateGetClaim(ctx, dr.Provider, verifreg9types.ClaimId(dr.AllocationID()), ltypes.EmptyTSK)
+	if err != nil {
+		log.Warnw("error getting status for claim", "claim", dr.AllocationID(), "error", err)
+		return "Sealer: " + string(si.State)
+	}
+	if claim == nil {
+		return "Sealer: " + string(si.State) + "(No claim found)"
+	}
+	if claim.Sector != dr.SectorID {
+		return "Sealer: " + string(si.State) + "(Sector mismatch)"
+	}
+	return "Sealer: " + string(si.State) + "(Claim verified)"
 }
 
 func (dr *directDealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
@@ -253,4 +269,11 @@ func (dr *directDealResolver) Logs(ctx context.Context) ([]*logsResolver, error)
 		logResolvers = append(logResolvers, &logsResolver{l})
 	}
 	return logResolvers, nil
+}
+
+func (dr *directDealResolver) SealingState(ctx context.Context) string {
+	if dr.DirectDeal.Checkpoint < dealcheckpoints.AddedPiece {
+		return "To be sealed"
+	}
+	return dr.sealingState(ctx)
 }
