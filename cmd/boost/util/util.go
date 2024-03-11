@@ -94,10 +94,6 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 		return nil, err
 	}
 
-	if tmax < head.Height() || tmin < head.Height() {
-		return nil, fmt.Errorf("current chain head %d is greater than TermMin %d or TermMax %d", head.Height(), tmin, tmax)
-	}
-
 	// Create allocation requests
 	var allocationRequests []verifreg.AllocationRequest
 	for mid, minfo := range maddrs {
@@ -111,7 +107,7 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 				Size:       p.Size,
 				TermMin:    tmin,
 				TermMax:    tmax,
-				Expiration: exp,
+				Expiration: head.Height() + exp,
 			})
 		}
 	}
