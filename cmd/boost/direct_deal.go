@@ -351,7 +351,7 @@ var clientExtendDealCmd = &cli.Command{
 
 		// Multiple Miner with claimIDs
 		if len(miners) > 1 && cctx.Args().Len() > 0 {
-			return fmt.Errorf("either specify multiple miner IDs or multiple agruments")
+			return fmt.Errorf("either specify multiple miner IDs or multiple arguments")
 		}
 
 		// Multiple Miner with no claimID and no --all flag
