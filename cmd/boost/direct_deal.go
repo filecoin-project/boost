@@ -326,7 +326,7 @@ var clientExtendDealCmd = &cli.Command{
 		},
 		cmd.FlagRepo,
 	},
-	ArgsUsage: "<provider address>",
+	ArgsUsage: "<claim1> <claim2> ... or <miner1=claim1> <miner2=claims2> ...",
 	Action: func(cctx *cli.Context) error {
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
