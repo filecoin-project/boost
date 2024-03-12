@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
@@ -23,7 +22,7 @@ import (
 	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
+	"golang.org/x/sync/errgroup"
 )
 
 var directDealAllocate = &cli.Command{
@@ -461,36 +460,24 @@ var clientExtendDealCmd = &cli.Command{
 		}
 
 		// wait for msgs to get mined into a block
-		var wg sync.WaitGroup
-		wg.Add(len(mcids))
-		results := make(chan error, len(mcids))
+		eg := errgroup.Group{}
+		eg.SetLimit(10)
 		for _, msg := range mcids {
 			m := msg
-			go func() {
-				defer wg.Done()
+			eg.Go(func() error {
 				wait, err := gapi.StateWaitMsg(ctx, m, uint64(cctx.Int("confidence")), 2000, true)
 				if err != nil {
-					results <- xerrors.Errorf("Timeout waiting for message to land on chain %s", wait.Message)
-					return
+					return fmt.Errorf("timeout waiting for message to land on chain %s", wait.Message)
+
 				}
 
 				if wait.Receipt.ExitCode.IsError() {
-					results <- fmt.Errorf("failed to execute message %s: %w", wait.Message, wait.Receipt.ExitCode)
-					return
+					return fmt.Errorf("failed to execute message %s: %w", wait.Message, wait.Receipt.ExitCode)
 				}
-				results <- nil
-			}()
+				return nil
+			})
 		}
-
-		wg.Wait()
-		close(results)
-
-		for res := range results {
-			if res != nil {
-				fmt.Println("Failed to execute the message %w", res)
-			}
-		}
-		return nil
+		return eg.Wait()
 	},
 }
 
