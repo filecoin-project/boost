@@ -295,9 +295,8 @@ var clientExtendDealCmd = &cli.Command{
 	Usage: "extend claim expiration (TermMax)",
 	Flags: []cli.Flag{
 		&cli.Int64Flag{
-			Name: "term-max",
-			Usage: "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs).\n" +
-				"Default is 5 years.",
+			Name:    "term-max",
+			Usage:   "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs). Default is 5 years.",
 			Aliases: []string{"tmax"},
 			Value:   verifregst.MaximumVerifiedAllocationTerm,
 		},
@@ -415,7 +414,7 @@ var clientExtendDealCmd = &cli.Command{
 		if len(miners) == 1 && cctx.Args().Len() > 0 && !all {
 			for _, arg := range cctx.Args().Slice() {
 				detail := strings.Split(arg, "=")
-				if len(detail) == 1 {
+				if len(detail) > 1 {
 					return fmt.Errorf("incorrect argument format %s. Must provide only claim IDs with single miner ID", detail)
 				}
 
@@ -455,7 +454,7 @@ var clientExtendDealCmd = &cli.Command{
 				return err
 			}
 			if !sent {
-				fmt.Printf("message %s with method %s not send", msg.Cid(), msg.Method.String())
+				fmt.Printf("message %s with method %s not sent\n", msg.Cid(), msg.Method.String())
 				continue
 			}
 			mcids = append(mcids, mcid)
