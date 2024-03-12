@@ -290,24 +290,25 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 		}
 	}
 
-	params, err := actors.SerializeParams(&verifreg9.ExtendClaimTermsParams{
-		Terms: terms,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
-	}
-
 	var msgs []*types.Message
+	if len(terms) > 0 {
+		params, err := actors.SerializeParams(&verifreg9.ExtendClaimTermsParams{
+			Terms: terms,
+		})
 
-	oclaimMsg := &types.Message{
-		To:     verifreg.Address,
-		From:   wallet,
-		Method: verifreg.Methods.ExtendClaimTerms,
-		Params: params,
+		if err != nil {
+			return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+		}
+
+		oclaimMsg := &types.Message{
+			To:     verifreg.Address,
+			From:   wallet,
+			Method: verifreg.Methods.ExtendClaimTerms,
+			Params: params,
+		}
+
+		msgs = append(msgs, oclaimMsg)
 	}
-
-	msgs = append(msgs, oclaimMsg)
 
 	if len(newClaims) > 0 {
 		// Get datacap balance

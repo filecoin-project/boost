@@ -441,6 +441,12 @@ var clientExtendDealCmd = &cli.Command{
 			return err
 		}
 
+		// If not msgs are found then no claims can be extended
+		if msgs == nil {
+			fmt.Println("No eligible claims found")
+			return nil
+		}
+
 		var mcids []cid.Cid
 
 		for _, msg := range msgs {
