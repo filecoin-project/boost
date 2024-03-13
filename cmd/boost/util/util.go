@@ -1,16 +1,12 @@
 package util
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/chzyer/readline"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -24,6 +20,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
+	"github.com/manifoldco/promptui"
 )
 
 func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []string, wallet address.Address, tmin, tmax, exp abi.ChainEpoch) (*types.Message, error) {
@@ -352,14 +349,36 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 		}
 
 		if !assumeYes {
-			fmt.Printf("Some of the specified allocation have a different client address and will require %d Datacap to extend\n", rDataCap.Int)
-			var yes bool
-			yes, err = confirm(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("error reading user input: %w", err)
+			out := fmt.Sprintf("Some of the specified allocation have a different client address and will require %d Datacap to extend. Proceed? Yes [Y/y] / No [N/n], Ctrl+C (^C) to exit", rDataCap.Int)
+			validate := func(input string) error {
+				if strings.EqualFold(input, "y") || strings.EqualFold(input, "yes") {
+					return nil
+				}
+				if strings.EqualFold(input, "n") || strings.EqualFold(input, "no") {
+					return nil
+				}
+				return errors.New("incorrect input")
 			}
-			if !yes {
-				fmt.Printf("Dropping the extension for claims that require Datacap")
+
+			templates := &promptui.PromptTemplates{
+				Prompt:  "{{ . }} ",
+				Valid:   "{{ . | green }} ",
+				Invalid: "{{ . | red }} ",
+				Success: "{{ . | bold }} ",
+			}
+
+			prompt := promptui.Prompt{
+				Label:     out,
+				Templates: templates,
+				Validate:  validate,
+			}
+
+			input, err := prompt.Run()
+			if err != nil {
+				return nil, err
+			}
+			if strings.Contains(strings.ToLower(input), "n") {
+				fmt.Println("Dropping the extension for claims that require Datacap")
 				return msgs, nil
 			}
 		}
@@ -373,34 +392,4 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 type ProvInfo struct {
 	Addr address.Address
 	ID   abi.ActorID
-}
-
-func confirm(ctx context.Context) (bool, error) {
-	cs := readline.NewCancelableStdin(os.Stdin)
-	go func() {
-		<-ctx.Done()
-		cs.Close() // nolint:errcheck
-	}()
-	rl := bufio.NewReader(cs)
-	for {
-		fmt.Printf("Proceed? Yes [y] / No [n]:\n")
-
-		line, _, err := rl.ReadLine()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return false, fmt.Errorf("request canceled: %w", err)
-			}
-
-			return false, fmt.Errorf("reading input: %w", err)
-		}
-
-		switch string(line) {
-		case "yes", "y":
-			return true, nil
-		case "n":
-			return false, nil
-		default:
-			return false, nil
-		}
-	}
 }

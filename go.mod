@@ -330,6 +330,7 @@ require (
 	github.com/ipni/go-libipni v0.5.2
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/ipni/storetheindex v0.8.1
+	github.com/manifoldco/promptui v0.9.0
 	github.com/schollz/progressbar/v3 v3.14.1
 )
 
