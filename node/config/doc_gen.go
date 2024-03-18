@@ -1144,13 +1144,57 @@ see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#
 			Comment: ``,
 		},
 	},
-	"lotus_config.Events": []DocField{
+	"lotus_config.DeprecatedEvents": []DocField{
+		{
+			Name: "DisableRealTimeFilterAPI",
+			Type: "bool",
+
+			Comment: `DisableRealTimeFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableRealTimeFilterAPI instead.`,
+		},
+		{
+			Name: "DisableHistoricFilterAPI",
+			Type: "bool",
+
+			Comment: `DisableHistoricFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableHistoricFilterAPI instead.`,
+		},
+		{
+			Name: "FilterTTL",
+			Type: "Duration",
+
+			Comment: `FilterTTL is DEPRECATED and will be removed in a future release. Use Events.FilterTTL instead.`,
+		},
+		{
+			Name: "MaxFilters",
+			Type: "int",
+
+			Comment: `MaxFilters is DEPRECATED and will be removed in a future release. Use Events.MaxFilters instead.`,
+		},
+		{
+			Name: "MaxFilterResults",
+			Type: "int",
+
+			Comment: `MaxFilterResults is DEPRECATED and will be removed in a future release. Use Events.MaxFilterResults instead.`,
+		},
+		{
+			Name: "MaxFilterHeightRange",
+			Type: "uint64",
+
+			Comment: `MaxFilterHeightRange is DEPRECATED and will be removed in a future release. Use Events.MaxFilterHeightRange instead.`,
+		},
+		{
+			Name: "DatabasePath",
+			Type: "string",
+
+			Comment: `DatabasePath is DEPRECATED and will be removed in a future release. Use Events.DatabasePath instead.`,
+		},
+	},
+	"lotus_config.EventsConfig": []DocField{
 		{
 			Name: "DisableRealTimeFilterAPI",
 			Type: "bool",
 
 			Comment: `DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
-The API is enabled when EnableEthRPC or Events.EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
+The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
 		},
 		{
 			Name: "DisableHistoricFilterAPI",
@@ -1158,7 +1202,16 @@ The API is enabled when EnableEthRPC or Events.EnableActorEventsAPI is true, but
 
 			Comment: `DisableHistoricFilterAPI will disable the HistoricFilterAPI that can create and query filters for actor events
 that occurred in the past. HistoricFilterAPI maintains a queryable index of events.
-The API is enabled when EnableEthRPC or Events.EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
+The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
+		},
+		{
+			Name: "EnableActorEventsAPI",
+			Type: "bool",
+
+			Comment: `EnableActorEventsAPI enables the Actor events API that enables clients to consume events
+emitted by (smart contracts + built-in Actors).
+This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be
+disabled by setting their respective Disable* options.`,
 		},
 		{
 			Name: "FilterTTL",
@@ -1194,17 +1247,6 @@ the entire chain)`,
 support the historic filter APIs. If the database does not exist it will be created. The directory containing
 the database must already exist and be writeable. If a relative path is provided here, sqlite treats it as
 relative to the CWD (current working directory).`,
-		},
-	},
-	"lotus_config.EventsConfig": []DocField{
-		{
-			Name: "EnableActorEventsAPI",
-			Type: "bool",
-
-			Comment: `EnableActorEventsAPI enables the Actor events API that enables clients to consume events
-emitted by (smart contracts + built-in Actors).
-This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be
-disabled by setting their respective Disable* options in Fevm.Events.`,
 		},
 	},
 	"lotus_config.FaultReporterConfig": []DocField{
@@ -1261,7 +1303,7 @@ Set to 0 to keep all mappings`,
 		},
 		{
 			Name: "Events",
-			Type: "Events",
+			Type: "DeprecatedEvents",
 
 			Comment: ``,
 		},
