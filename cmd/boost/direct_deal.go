@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
@@ -55,20 +55,20 @@ var directDealAllocate = &cli.Command{
 			Usage: "The minimum duration which the provider must commit to storing the piece to avoid early-termination penalties (epochs).\n" +
 				"Default is 180 days.",
 			Aliases: []string{"tmin"},
-			Value:   verifregst.MinimumVerifiedAllocationTerm,
+			Value:   verifreg13types.MinimumVerifiedAllocationTerm,
 		},
 		&cli.Int64Flag{
 			Name: "term-max",
 			Usage: "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs).\n" +
 				"Default is 5 years.",
 			Aliases: []string{"tmax"},
-			Value:   verifregst.MaximumVerifiedAllocationTerm,
+			Value:   verifreg13types.MaximumVerifiedAllocationTerm,
 		},
 		&cli.Int64Flag{
 			Name: "expiration",
 			Usage: "The latest epoch by which a provider must commit data before the allocation expires (epochs).\n" +
 				"Default is 60 days.",
-			Value: verifregst.MaximumVerifiedAllocationExpiration,
+			Value: verifreg13types.MaximumVerifiedAllocationExpiration,
 		},
 	},
 	Before: before,
@@ -256,9 +256,9 @@ func printAllocation(allocations map[verifreg.AllocationId]verifreg.Allocation, 
 			TermMax    abi.ChainEpoch      `json:"term_max"`
 			Expiration abi.ChainEpoch      `json:"expiration"`
 		}
-		allocMap := make(map[verifregst.AllocationId]jalloc, len(allocations))
+		allocMap := make(map[verifreg13types.AllocationId]jalloc, len(allocations))
 		for id, allocation := range allocations {
-			allocMap[id] = jalloc{
+			allocMap[verifreg13types.AllocationId(id)] = jalloc{
 				Provider:   allocation.Provider,
 				Client:     allocation.Client,
 				Data:       allocation.Data,
@@ -297,7 +297,7 @@ var clientExtendDealCmd = &cli.Command{
 			Name:    "term-max",
 			Usage:   "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs). Default is 5 years.",
 			Aliases: []string{"tmax"},
-			Value:   verifregst.MaximumVerifiedAllocationTerm,
+			Value:   verifreg13types.MaximumVerifiedAllocationTerm,
 		},
 		&cli.StringFlag{
 			Name:  "wallet",
@@ -358,8 +358,8 @@ var clientExtendDealCmd = &cli.Command{
 		}
 
 		// Tmax can't be more than policy max
-		if tmax > verifregst.MaximumVerifiedAllocationTerm {
-			return fmt.Errorf("specified term-max %d is larger than %d maximum allowed by verified regirty actor policy", tmax, verifregst.MaximumVerifiedAllocationTerm)
+		if tmax > verifreg13types.MaximumVerifiedAllocationTerm {
+			return fmt.Errorf("specified term-max %d is larger than %d maximum allowed by verified regirty actor policy", tmax, verifreg13types.MaximumVerifiedAllocationTerm)
 		}
 
 		gapi, closer, err := lcli.GetGatewayAPI(cctx)
@@ -369,7 +369,7 @@ var clientExtendDealCmd = &cli.Command{
 		defer closer()
 
 		ctx := bcli.ReqContext(cctx)
-		claimMap := make(map[verifregst.ClaimId]util.ProvInfo)
+		claimMap := make(map[verifreg13types.ClaimId]util.ProvInfo)
 
 		// If no miners and arguments are present
 		if len(miners) == 0 && cctx.Args().Len() > 0 {
@@ -405,7 +405,7 @@ var clientExtendDealCmd = &cli.Command{
 					ID:   abi.ActorID(mid),
 				}
 
-				claimMap[verifregst.ClaimId(n)] = pi
+				claimMap[verifreg13types.ClaimId(n)] = pi
 			}
 		}
 
@@ -422,7 +422,7 @@ var clientExtendDealCmd = &cli.Command{
 					return fmt.Errorf("failed to parse the claim ID for %s for argument %s: %w", detail[0], detail, err)
 				}
 
-				claimMap[verifregst.ClaimId(n)] = util.ProvInfo{}
+				claimMap[verifreg13types.ClaimId(n)] = util.ProvInfo{}
 			}
 		}
 
@@ -530,9 +530,9 @@ var listClaimsCmd = &cli.Command{
 				TermStart abi.ChainEpoch      `json:"term_start"`
 				Sector    abi.SectorNumber    `json:"sector"`
 			}
-			claimMap := make(map[verifregst.ClaimId]jclaim, len(claims))
+			claimMap := make(map[verifreg13types.ClaimId]jclaim, len(claims))
 			for id, claim := range claims {
-				claimMap[id] = jclaim{
+				claimMap[verifreg13types.ClaimId(id)] = jclaim{
 					Provider:  claim.Provider,
 					Client:    claim.Client,
 					Data:      claim.Data,

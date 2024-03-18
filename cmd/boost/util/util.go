@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v13/datacap"
+	verifreg13 "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -154,7 +155,7 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 // 6. Extend all claims for multiple miner IDs with different client address (2 messages)
 // 7. Extend specified claims for a miner ID with different client address (2 messages)
 // 8. Extend specific claims for specific miner ID with different client address (2 messages)
-func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg9.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool) ([]*types.Message, error) {
+func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg13.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool) ([]*types.Message, error) {
 	ac, err := api.StateLookupID(ctx, wallet, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -171,8 +172,8 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 		return nil, err
 	}
 
-	var terms []verifreg9.ClaimTerm
-	var newClaims []verifreg9.ClaimExtensionRequest
+	var terms []verifreg13.ClaimTerm
+	var newClaims []verifreg13.ClaimExtensionRequest
 	rDataCap := big.NewInt(0)
 
 	// If --all is set
@@ -196,16 +197,16 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 					// If client is not same - needs to burn datacap
 					if claim.Client != wid {
-						newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
-							Claim:    claimID,
-							Provider: maddr,
+						newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
+							Claim:    verifreg13.ClaimId(claimID),
+							Provider: abi.ActorID(mid),
 							TermMax:  tmax,
 						})
 						rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 						continue
 					}
-					terms = append(terms, verifreg9.ClaimTerm{
-						ClaimId:  claimID,
+					terms = append(terms, verifreg13.ClaimTerm{
+						ClaimId:  verifreg13.ClaimId(claimID),
 						TermMax:  tmax,
 						Provider: abi.ActorID(mid),
 					})
@@ -231,22 +232,22 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 
 		for cID := range pcm {
 			claimID := cID
-			claim, ok := claims[claimID]
+			claim, ok := claims[verifreg9.ClaimId(claimID)]
 			if !ok {
 				return nil, fmt.Errorf("claim %d not found for provider %s", claimID, miners[0])
 			}
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				// If client is not same - needs to burn datacap
 				if claim.Client != wid {
-					newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
+					newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
 						Claim:    claimID,
-						Provider: maddr,
+						Provider: abi.ActorID(mid),
 						TermMax:  tmax,
 					})
 					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 					continue
 				}
-				terms = append(terms, verifreg9.ClaimTerm{
+				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  claimID,
 					TermMax:  tmax,
 					Provider: abi.ActorID(mid),
@@ -259,7 +260,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 		for cID, p := range pcm {
 			prov := p
 			c := cID
-			claim, err := api.StateGetClaim(ctx, prov.Addr, c, types.EmptyTSK)
+			claim, err := api.StateGetClaim(ctx, prov.Addr, verifreg9.ClaimId(c), types.EmptyTSK)
 			if err != nil {
 				return nil, fmt.Errorf("could not load the claim %d: %w", c, err)
 			}
@@ -269,15 +270,15 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				// If client is not same - needs to burn datacap
 				if claim.Client != wid {
-					newClaims = append(newClaims, verifreg9.ClaimExtensionRequest{
+					newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
 						Claim:    c,
-						Provider: prov.Addr,
+						Provider: prov.ID,
 						TermMax:  tmax,
 					})
 					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 					continue
 				}
-				terms = append(terms, verifreg9.ClaimTerm{
+				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  c,
 					TermMax:  tmax,
 					Provider: prov.ID,
@@ -288,7 +289,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 
 	var msgs []*types.Message
 	if len(terms) > 0 {
-		params, err := actors.SerializeParams(&verifreg9.ExtendClaimTermsParams{
+		params, err := actors.SerializeParams(&verifreg13.ExtendClaimTermsParams{
 			Terms: terms,
 		})
 
@@ -322,7 +323,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			return nil, fmt.Errorf("requested datacap %s is greater then the available datacap %s", rDataCap, aDataCap)
 		}
 
-		ncparams, err := actors.SerializeParams(&verifreg9.AllocationRequests{
+		ncparams, err := actors.SerializeParams(&verifreg13.AllocationRequests{
 			Extensions: newClaims,
 		})
 
@@ -364,7 +365,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				Prompt:  "{{ . }} ",
 				Valid:   "{{ . | green }} ",
 				Invalid: "{{ . | red }} ",
-				Success: "{{ . | bold }} ",
+				Success: "{{ . | cyan| bold }} ",
 			}
 
 			prompt := promptui.Prompt{
