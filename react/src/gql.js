@@ -659,6 +659,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SnapDealsWaitDealsSectors {
@@ -669,6 +670,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SectorStates {
