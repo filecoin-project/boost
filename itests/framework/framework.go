@@ -228,7 +228,7 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 	ensemble.FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...)
 	if defaultEnsemble {
 		ensemble.Start()
-		blockTime := 20 * time.Millisecond
+		blockTime := 100 * time.Millisecond
 		ensemble.BeginMining(blockTime)
 	}
 
