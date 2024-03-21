@@ -303,22 +303,27 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 	}
 
 	var msgs []*types.Message
-	if len(terms) > 0 {
-		params, err := actors.SerializeParams(&verifreg13.ExtendClaimTermsParams{
-			Terms: terms,
-		})
+	const batchSize = 1000
+	for i := 0; i < len(terms); i += batchSize {
+		batchEnd := i + batchSize
+		if batchEnd > len(terms) {
+			batchEnd = len(terms)
+		}
 
+		batch := terms[i:batchEnd]
+
+		params, err := actors.SerializeParams(&verifreg13.ExtendClaimTermsParams{
+			Terms: batch,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
 		}
-
 		oclaimMsg := &types.Message{
 			To:     verifreg.Address,
 			From:   wallet,
 			Method: verifreg.Methods.ExtendClaimTerms,
 			Params: params,
 		}
-
 		msgs = append(msgs, oclaimMsg)
 	}
 
@@ -338,32 +343,6 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			return nil, fmt.Errorf("requested datacap %s is greater then the available datacap %s", rDataCap, aDataCap)
 		}
 
-		ncparams, err := actors.SerializeParams(&verifreg13.AllocationRequests{
-			Extensions: newClaims,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
-		}
-
-		transferParams, err := actors.SerializeParams(&datacap.TransferParams{
-			To:           builtin.VerifiedRegistryActorAddr,
-			Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
-			OperatorData: ncparams,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
-		}
-
-		nclaimMsg := &types.Message{
-			To:     builtin.DatacapActorAddr,
-			From:   wallet,
-			Method: datacap2.Methods.TransferExported,
-			Params: transferParams,
-			Value:  big.Zero(),
-		}
-
 		if !assumeYes {
 			out := fmt.Sprintf("Some of the specified allocation have a different client address and will require %d Datacap to extend. Proceed? Yes [Y/y] / No [N/n], Ctrl+C (^C) to exit", rDataCap.Int)
 			validate := func(input string) error {
@@ -380,7 +359,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				Prompt:  "{{ . }} ",
 				Valid:   "{{ . | green }} ",
 				Invalid: "{{ . | red }} ",
-				Success: "{{ . | cyan| bold }} ",
+				Success: "{{ . | cyan | bold }} ",
 			}
 
 			prompt := promptui.Prompt{
@@ -399,7 +378,41 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			}
 		}
 
-		msgs = append(msgs, nclaimMsg)
+		// Batch in 1000 to avoid running out of gas
+		for i := 0; i < len(newClaims); i += batchSize {
+			batchEnd := i + batchSize
+			if batchEnd > len(newClaims) {
+				batchEnd = len(newClaims)
+			}
+
+			batch := newClaims[i:batchEnd]
+
+			ncparams, err := actors.SerializeParams(&verifreg13.AllocationRequests{
+				Extensions: batch,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+			}
+
+			transferParams, err := actors.SerializeParams(&datacap.TransferParams{
+				To:           builtin.VerifiedRegistryActorAddr,
+				Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+				OperatorData: ncparams,
+			})
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
+			}
+
+			nclaimMsg := &types.Message{
+				To:     builtin.DatacapActorAddr,
+				From:   wallet,
+				Method: datacap2.Methods.TransferExported,
+				Params: transferParams,
+				Value:  big.Zero(),
+			}
+			msgs = append(msgs, nclaimMsg)
+		}
 	}
 
 	return msgs, nil
