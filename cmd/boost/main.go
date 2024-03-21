@@ -42,6 +42,8 @@ func main() {
 			walletCmd,
 			directDealAllocate,
 			directDealGetAllocations,
+			listClaimsCmd,
+			clientExtendDealCmd,
 		},
 	}
 	app.Setup()

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -12,13 +13,16 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
+	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 var directDealAllocate = &cli.Command{
@@ -51,20 +55,20 @@ var directDealAllocate = &cli.Command{
 			Usage: "The minimum duration which the provider must commit to storing the piece to avoid early-termination penalties (epochs).\n" +
 				"Default is 180 days.",
 			Aliases: []string{"tmin"},
-			Value:   verifregst.MinimumVerifiedAllocationTerm,
+			Value:   verifreg13types.MinimumVerifiedAllocationTerm,
 		},
 		&cli.Int64Flag{
 			Name: "term-max",
 			Usage: "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs).\n" +
 				"Default is 5 years.",
 			Aliases: []string{"tmax"},
-			Value:   verifregst.MaximumVerifiedAllocationTerm,
+			Value:   verifreg13types.MaximumVerifiedAllocationTerm,
 		},
 		&cli.Int64Flag{
 			Name: "expiration",
 			Usage: "The latest epoch by which a provider must commit data before the allocation expires (epochs).\n" +
 				"Default is 60 days.",
-			Value: verifregst.MaximumVerifiedAllocationExpiration,
+			Value: verifreg13types.MaximumVerifiedAllocationExpiration,
 		},
 	},
 	Before: before,
@@ -226,18 +230,6 @@ func printAllocation(allocations map[verifreg.AllocationId]verifreg.Allocation, 
 	tMax := "TermMax"
 	expr := "Expiration"
 
-	// One-to-one mapping between tablewriter keys and JSON keys
-	tableKeysToJsonKeys := map[string]string{
-		allocationID: strings.ToLower(allocationID),
-		client:       strings.ToLower(client),
-		provider:     strings.ToLower(provider),
-		pieceCid:     strings.ToLower(pieceCid),
-		pieceSize:    strings.ToLower(pieceSize),
-		tMin:         strings.ToLower(tMin),
-		tMax:         strings.ToLower(tMax),
-		expr:         strings.ToLower(expr),
-	}
-
 	var allocs []map[string]interface{}
 
 	for key, val := range allocations {
@@ -255,17 +247,28 @@ func printAllocation(allocations map[verifreg.AllocationId]verifreg.Allocation, 
 	}
 
 	if json {
-		// get a new list of wallets with json keys instead of tablewriter keys
-		var jsonAllocs []map[string]interface{}
-		for _, alloc := range allocs {
-			jsonAlloc := make(map[string]interface{})
-			for k, v := range alloc {
-				jsonAlloc[tableKeysToJsonKeys[k]] = v
-			}
-			jsonAllocs = append(jsonAllocs, jsonAlloc)
+		type jalloc struct {
+			Client     abi.ActorID         `json:"client"`
+			Provider   abi.ActorID         `json:"provider"`
+			Data       cid.Cid             `json:"data"`
+			Size       abi.PaddedPieceSize `json:"size"`
+			TermMin    abi.ChainEpoch      `json:"term_min"`
+			TermMax    abi.ChainEpoch      `json:"term_max"`
+			Expiration abi.ChainEpoch      `json:"expiration"`
 		}
-		// then return this!
-		return cmd.PrintJson(jsonAllocs)
+		allocMap := make(map[verifreg13types.AllocationId]jalloc, len(allocations))
+		for id, allocation := range allocations {
+			allocMap[verifreg13types.AllocationId(id)] = jalloc{
+				Provider:   allocation.Provider,
+				Client:     allocation.Client,
+				Data:       allocation.Data,
+				Size:       allocation.Size,
+				TermMin:    allocation.TermMin,
+				TermMax:    allocation.TermMax,
+				Expiration: allocation.Expiration,
+			}
+		}
+		return cmd.PrintJson(map[string]any{"allocations": allocations})
 	} else {
 		// Init the tablewriter's columns
 		tw := tablewriter.New(
@@ -284,4 +287,301 @@ func printAllocation(allocations map[verifreg.AllocationId]verifreg.Allocation, 
 		// return the corresponding string
 		return tw.Flush(os.Stdout)
 	}
+}
+
+var clientExtendDealCmd = &cli.Command{
+	Name:  "extend-claim",
+	Usage: "extend claim expiration (TermMax)",
+	UsageText: `Extends claim expiration (TermMax).
+If the client is original client then claim can be extended to Maximum 5 years and no Datacap is required.
+If the client id different then claim can be extended up to Maximum 5 years from now and Datacap is required.
+`,
+	Flags: []cli.Flag{
+		&cli.Int64Flag{
+			Name:    "term-max",
+			Usage:   "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs). Default is 5 years.",
+			Aliases: []string{"tmax"},
+			Value:   verifreg13types.MaximumVerifiedAllocationTerm,
+		},
+		&cli.StringFlag{
+			Name:  "wallet",
+			Usage: "the wallet address that will used to send the message",
+		},
+		&cli.BoolFlag{
+			Name:  "all",
+			Usage: "automatically extend TermMax of all claims for specified miner[s] to --term-max (default: 5 years from claim start epoch)",
+		},
+		&cli.StringSliceFlag{
+			Name:    "miner",
+			Usage:   "storage provider address[es]",
+			Aliases: []string{"m", "provider", "p"},
+		},
+		&cli.BoolFlag{
+			Name:    "assume-yes",
+			Usage:   "automatic yes to prompts; assume 'yes' as answer to all prompts and run non-interactively",
+			Aliases: []string{"y", "yes"},
+		},
+		&cli.IntFlag{
+			Name:  "confidence",
+			Usage: "number of block confirmations to wait for",
+			Value: int(build.MessageConfidence),
+		},
+		&cli.IntFlag{
+			Name:  "batch-size",
+			Usage: "number of extend requests per batch. If set incorrectly, this will lead to out of gas error",
+			Value: 1000,
+		},
+		cmd.FlagRepo,
+	},
+	ArgsUsage: "<claim1> <claim2> ... or <miner1=claim1> <miner2=claims2> ...",
+	Action: func(cctx *cli.Context) error {
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		miners := cctx.StringSlice("miner")
+		all := cctx.Bool("all")
+		wallet := cctx.String("wallet")
+		tmax := cctx.Int64("term-max")
+
+		// No miner IDs and no arguments
+		if len(miners) == 0 && cctx.Args().Len() == 0 {
+			return fmt.Errorf("must specify at least one miner ID or argument[s]")
+		}
+
+		// Single Miner with no claimID and no --all flag
+		if len(miners) == 1 && cctx.Args().Len() == 0 && !all {
+			return fmt.Errorf("must specify either --all flag or claim IDs to extend in argument")
+		}
+
+		// Multiple Miner with claimIDs
+		if len(miners) > 1 && cctx.Args().Len() > 0 {
+			return fmt.Errorf("either specify multiple miner IDs or multiple arguments")
+		}
+
+		// Multiple Miner with no claimID and no --all flag
+		if len(miners) > 1 && cctx.Args().Len() == 0 && !all {
+			return fmt.Errorf("must specify --all flag with multiple miner IDs")
+		}
+
+		// Tmax can't be more than policy max
+		if tmax > verifreg13types.MaximumVerifiedAllocationTerm {
+			return fmt.Errorf("specified term-max %d is larger than %d maximum allowed by verified regirty actor policy", tmax, verifreg13types.MaximumVerifiedAllocationTerm)
+		}
+
+		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("can't setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		ctx := bcli.ReqContext(cctx)
+		claimMap := make(map[verifreg13types.ClaimId]util.ProvInfo)
+
+		// If no miners and arguments are present
+		if len(miners) == 0 && cctx.Args().Len() > 0 {
+			for _, arg := range cctx.Args().Slice() {
+				detail := strings.Split(arg, "=")
+				if len(detail) > 2 {
+					return fmt.Errorf("incorrect argument format: %s", detail)
+				}
+
+				n, err := strconv.ParseInt(detail[1], 10, 64)
+				if err != nil {
+					return fmt.Errorf("failed to parse the claim ID for %s for argument %s: %w", detail[0], detail, err)
+				}
+
+				maddr, err := address.NewFromString(detail[0])
+				if err != nil {
+					return err
+				}
+
+				// Verify that minerID exists
+				_, err = gapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+				if err != nil {
+					return err
+				}
+
+				mid, err := address.IDFromAddress(maddr)
+				if err != nil {
+					return err
+				}
+
+				pi := util.ProvInfo{
+					Addr: maddr,
+					ID:   abi.ActorID(mid),
+				}
+
+				claimMap[verifreg13types.ClaimId(n)] = pi
+			}
+		}
+
+		// If 1 miner ID and multiple arguments
+		if len(miners) == 1 && cctx.Args().Len() > 0 && !all {
+			for _, arg := range cctx.Args().Slice() {
+				detail := strings.Split(arg, "=")
+				if len(detail) > 1 {
+					return fmt.Errorf("incorrect argument format %s. Must provide only claim IDs with single miner ID", detail)
+				}
+
+				n, err := strconv.ParseInt(detail[0], 10, 64)
+				if err != nil {
+					return fmt.Errorf("failed to parse the claim ID for %s for argument %s: %w", detail[0], detail, err)
+				}
+
+				claimMap[verifreg13types.ClaimId(n)] = util.ProvInfo{}
+			}
+		}
+
+		// Get wallet address from input
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, wallet)
+		if err != nil {
+			return err
+		}
+
+		log.Debugw("selected wallet", "wallet", walletAddr)
+
+		msgs, err := util.CreateExtendClaimMsg(ctx, gapi, claimMap, miners, walletAddr, abi.ChainEpoch(tmax), all, cctx.Bool("assume-yes"), cctx.Int("batch-size"))
+		if err != nil {
+			return err
+		}
+
+		// If not msgs are found then no claims can be extended
+		if msgs == nil {
+			fmt.Println("No eligible claims found")
+			return nil
+		}
+
+		var mcids []cid.Cid
+
+		for _, msg := range msgs {
+			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
+			if err != nil {
+				return err
+			}
+			if !sent {
+				fmt.Printf("message %s with method %s not sent\n", msg.Cid(), msg.Method.String())
+				continue
+			}
+			mcids = append(mcids, mcid)
+		}
+
+		// wait for msgs to get mined into a block
+		eg := errgroup.Group{}
+		eg.SetLimit(10)
+		for _, msg := range mcids {
+			m := msg
+			eg.Go(func() error {
+				wait, err := gapi.StateWaitMsg(ctx, m, uint64(cctx.Int("confidence")), 2000, true)
+				if err != nil {
+					return fmt.Errorf("timeout waiting for message to land on chain %s", wait.Message)
+
+				}
+
+				if wait.Receipt.ExitCode.IsError() {
+					return fmt.Errorf("failed to execute message %s: %w", wait.Message, wait.Receipt.ExitCode)
+				}
+				return nil
+			})
+		}
+		return eg.Wait()
+	},
+}
+
+var listClaimsCmd = &cli.Command{
+	Name:      "list-claims",
+	Usage:     "List claims made by provider",
+	ArgsUsage: "providerAddress",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "expired",
+			Usage: "list only expired claims",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.NArg() != 1 {
+			return fmt.Errorf("must provide a miner ID")
+		}
+
+		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("can't setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		ctx := bcli.ReqContext(cctx)
+
+		providerAddr, err := address.NewFromString(cctx.Args().Get(0))
+		if err != nil {
+			return err
+		}
+
+		head, err := gapi.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+
+		claims, err := gapi.StateGetClaims(ctx, providerAddr, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+
+		if cctx.Bool("json") {
+			type jclaim struct {
+				Provider  abi.ActorID         `json:"provider"`
+				Client    abi.ActorID         `json:"client"`
+				Data      cid.Cid             `json:"data"`
+				Size      abi.PaddedPieceSize `json:"size"`
+				TermMin   abi.ChainEpoch      `json:"term_min"`
+				TermMax   abi.ChainEpoch      `json:"term_max"`
+				TermStart abi.ChainEpoch      `json:"term_start"`
+				Sector    abi.SectorNumber    `json:"sector"`
+			}
+			claimMap := make(map[verifreg13types.ClaimId]jclaim, len(claims))
+			for id, claim := range claims {
+				claimMap[verifreg13types.ClaimId(id)] = jclaim{
+					Provider:  claim.Provider,
+					Client:    claim.Client,
+					Data:      claim.Data,
+					Size:      claim.Size,
+					TermMin:   claim.TermMin,
+					TermMax:   claim.TermMax,
+					TermStart: claim.TermStart,
+					Sector:    claim.Sector,
+				}
+			}
+			return cmd.PrintJson(map[string]any{"claims": claimMap})
+		}
+
+		tw := tablewriter.New(
+			tablewriter.Col("ID"),
+			tablewriter.Col("Provider"),
+			tablewriter.Col("Client"),
+			tablewriter.Col("Data"),
+			tablewriter.Col("Size"),
+			tablewriter.Col("TermMin"),
+			tablewriter.Col("TermMax"),
+			tablewriter.Col("TermStart"),
+			tablewriter.Col("Sector"),
+		)
+
+		for claimId, claim := range claims {
+			if head.Height() > claim.TermMax+claim.TermStart || !cctx.IsSet("expired") {
+				tw.Write(map[string]interface{}{
+					"ID":        claimId,
+					"Provider":  claim.Provider,
+					"Client":    claim.Client,
+					"Data":      claim.Data,
+					"Size":      claim.Size,
+					"TermMin":   claim.TermMin,
+					"TermMax":   claim.TermMax,
+					"TermStart": claim.TermStart,
+					"Sector":    claim.Sector,
+				})
+			}
+		}
+		return tw.Flush(os.Stdout)
+	},
 }

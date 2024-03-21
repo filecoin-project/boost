@@ -494,6 +494,7 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 	ddp.dealLogger.Infow(entry.ID, "watching deal sealing state changes")
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+	claimTime := time.Now()
 	for {
 		select {
 		case <-ddp.ctx.Done():
@@ -519,6 +520,14 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 						}
 					}
 					return nil
+				}
+				// We should terminate looking for claim after 10 minutes and fail the deal
+				// This is to account for any state issues arising from sync issues
+				if time.Since(claimTime) > 10*time.Minute {
+					return &dealMakingError{
+						retry: types.DealRetryFatal,
+						error: errors.New("no claim found"),
+					}
 				}
 			}
 		}

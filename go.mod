@@ -14,7 +14,7 @@ require (
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/benbjohnson/clock v1.3.5
 	github.com/buger/goterm v1.0.3 // indirect
-	github.com/chzyer/readline v1.5.1
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
@@ -30,7 +30,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.13.0-rc.2
+	github.com/filecoin-project/go-state-types v0.13.0-rc.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -330,6 +330,7 @@ require (
 	github.com/ipni/go-libipni v0.5.2
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/ipni/storetheindex v0.8.1
+	github.com/manifoldco/promptui v0.9.0
 	github.com/schollz/progressbar/v3 v3.14.1
 )
 
