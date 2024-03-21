@@ -160,6 +160,7 @@ type DealBasic {
   PublishCid: String!
   Transfer: TransferParams!
   Message: String!
+  IsDirect: Boolean!
 }
 
 type DealList {
@@ -310,6 +311,7 @@ type WaitDeal {
   ID: ID!
   Size: Uint64!
   IsLegacy: Boolean!
+  IsDirect: Boolean!
 }
 
 type WaitDealsSector {

@@ -2,10 +2,14 @@ package gql
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -130,6 +134,7 @@ type waitDeal struct {
 	ID       graphql.ID
 	Size     gqltypes.Uint64
 	IsLegacy bool
+	IsDirect bool
 }
 
 type waitDealSector struct {
@@ -187,6 +192,50 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 
 			publishCid := p.DealInfo.PublishCid
 			if publishCid == nil {
+				// This is likely a direct deal
+				var directDeals []*smtypes.DirectDeal
+				if p.DealInfo.PieceActivationManifest.VerifiedAllocationKey != nil {
+					vkey := p.DealInfo.PieceActivationManifest.VerifiedAllocationKey
+					activeDeals, err := r.directDealsDB.ActiveByPieceAllocID(ctx, p.DealInfo.PieceCID(), verifreg.AllocationId(vkey.ID))
+					if err != nil {
+						return nil, err
+					}
+					// Match the client address
+					for _, deal := range activeDeals {
+						deal := deal
+						ac, err := r.fullNode.StateLookupID(ctx, deal.Client, types.EmptyTSK)
+						if err != nil {
+							return nil, err
+						}
+						w, err := address.IDFromAddress(ac)
+						if err != nil {
+							return nil, fmt.Errorf("converting client address to ID: %w", err)
+						}
+
+						wid := abi.ActorID(w)
+
+						if wid != vkey.Client {
+							log.Info("Client mismatch for deal", deal.ID)
+							continue
+						}
+						directDeals = append(directDeals, deal)
+					}
+					// We should have only 1 deal left here as import check prevents more than 1 active deal
+					// with for same client and allocationID
+					if len(directDeals) > 1 {
+						return nil, errors.New("more than 1 active deal with same client ID and allocation ID found")
+					}
+					if len(directDeals) == 1 {
+						d := directDeals[0]
+						deals = append(deals, &waitDeal{
+							ID:       graphql.ID(d.ID.String()),
+							Size:     gqltypes.Uint64(p.DealInfo.PieceActivationManifest.Size),
+							IsDirect: true,
+						})
+						used += uint64(p.DealInfo.PieceActivationManifest.Size)
+						continue
+					}
+				}
 				continue
 			}
 

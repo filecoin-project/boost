@@ -31,6 +31,7 @@ type basicDealResolver struct {
 	PublishCid         string
 	Transfer           dealTransfer
 	Message            string
+	IsDirect           bool
 }
 
 type dealPublishResolver struct {

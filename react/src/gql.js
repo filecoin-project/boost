@@ -586,6 +586,7 @@ const PieceStatusQuery = gql`
                     IsLegacy
                     CreatedAt
                     DealDataRoot
+                    IsDirect
                 }
                 Sector {
                     ID
@@ -658,6 +659,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SnapDealsWaitDealsSectors {
@@ -668,6 +670,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SectorStates {
@@ -791,6 +794,7 @@ const DealPublishQuery = gql`
                 }
                 ClientAddress
                 PieceSize
+                IsDirect
             }
         }
     }

@@ -292,6 +292,12 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		return nil, err
 	}
 
+	// Get DDO deals by piece CID
+	ddoDeals, err := r.directDealsDB.ByPieceCID(ctx, pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
 	// Convert local index directory deals to graphQL format
 	var pids []*pieceInfoDeal
 	for _, dl := range pieceInfo.Deals {
@@ -320,7 +326,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	// Convert boost deals to graphQL format
-	deals := make([]*pieceDealResolver, 0, len(boostDeals)+len(legacyDeals))
+	deals := make([]*pieceDealResolver, 0, len(boostDeals)+len(legacyDeals)+len(ddoDeals))
 	for _, dl := range boostDeals {
 		bd := propToBasicDeal(dl.ClientDealProposal.Proposal)
 		bd.IsLegacy = false
@@ -395,6 +401,54 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 			ss: &sealStatusReporter{
 				sector:  sector,
 				mma:     r.mma,
+				ssm:     r.ssm,
+				minerID: abi.ActorID(minerId),
+			},
+		})
+	}
+
+	for _, dl := range ddoDeals {
+		bd := basicDealResolver{
+			ClientAddress:      dl.Client.String(),
+			ProviderAddress:    dl.Provider.String(),
+			PieceCid:           dl.PieceCID.String(),
+			PieceSize:          gqltypes.Uint64(dl.PieceSize),
+			ProviderCollateral: gqltypes.Uint64(0),
+			StartEpoch:         gqltypes.Uint64(dl.StartEpoch),
+			EndEpoch:           gqltypes.Uint64(dl.EndEpoch),
+			IsDirect:           true,
+			IsLegacy:           false,
+			ID:                 graphql.ID(dl.ID.String()),
+		}
+		bd.CreatedAt = graphql.Time{Time: dl.CreatedAt}
+		bd.ClientPeerID = dl.Client.String()
+		bd.DealDataRoot = ""
+		bd.PublishCid = ""
+		bd.Transfer = dealTransfer{
+			Type: "",
+			Size: gqltypes.Uint64(dl.Length),
+		}
+		bd.Message = dl.Checkpoint.String()
+
+		provAddr, err := address.NewFromString(bd.ProviderAddress)
+		if err != nil {
+			return nil, fmt.Errorf("parsing actor address %s", bd.ProviderAddress)
+		}
+		minerId, err := address.IDFromAddress(provAddr)
+		if err != nil {
+			return nil, fmt.Errorf("getting actor id from address %s", bd.ProviderAddress)
+		}
+		sector := &sectorResolver{
+			ID:     gqltypes.Uint64(dl.SectorID),
+			Offset: gqltypes.Uint64(dl.Offset),
+			Length: gqltypes.Uint64(dl.Length),
+		}
+		deals = append(deals, &pieceDealResolver{
+			Deal:   &bd,
+			Sector: sector,
+			ss: &sealStatusReporter{
+				mma:     r.mma,
+				sector:  sector,
 				ssm:     r.ssm,
 				minerID: abi.ActorID(minerId),
 			},
