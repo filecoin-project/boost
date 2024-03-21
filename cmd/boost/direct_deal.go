@@ -326,6 +326,11 @@ If the client id different then claim can be extended up to Maximum 5 years from
 			Usage: "number of block confirmations to wait for",
 			Value: int(build.MessageConfidence),
 		},
+		&cli.IntFlag{
+			Name:  "batch-size",
+			Usage: "number of extend requests per batch. If set incorrectly, this will lead to out of gas error",
+			Value: 1000,
+		},
 		cmd.FlagRepo,
 	},
 	ArgsUsage: "<claim1> <claim2> ... or <miner1=claim1> <miner2=claims2> ...",
@@ -438,7 +443,7 @@ If the client id different then claim can be extended up to Maximum 5 years from
 
 		log.Debugw("selected wallet", "wallet", walletAddr)
 
-		msgs, err := util.CreateExtendClaimMsg(ctx, gapi, claimMap, miners, walletAddr, abi.ChainEpoch(tmax), all, cctx.Bool("assume-yes"))
+		msgs, err := util.CreateExtendClaimMsg(ctx, gapi, claimMap, miners, walletAddr, abi.ChainEpoch(tmax), all, cctx.Bool("assume-yes"), cctx.Int("batch-size"))
 		if err != nil {
 			return err
 		}

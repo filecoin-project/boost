@@ -155,7 +155,7 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 // 6. Extend all claims for multiple miner IDs with different client address (2 messages)
 // 7. Extend specified claims for a miner ID with different client address (2 messages)
 // 8. Extend specific claims for specific miner ID with different client address (2 messages)
-func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg13.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool) ([]*types.Message, error) {
+func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg13.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool, batchSize int) ([]*types.Message, error) {
 	ac, err := api.StateLookupID(ctx, wallet, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -303,7 +303,6 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 	}
 
 	var msgs []*types.Message
-	const batchSize = 1000
 	for i := 0; i < len(terms); i += batchSize {
 		batchEnd := i + batchSize
 		if batchEnd > len(terms) {
