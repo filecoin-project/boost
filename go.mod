@@ -308,7 +308,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.10
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
-	github.com/filecoin-project/lotus v1.26.0-boost
+	github.com/filecoin-project/lotus v1.26.0
 	github.com/ipfs/boxo v0.18.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0
@@ -326,7 +326,9 @@ require (
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
+	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7 // indirect
 	github.com/filecoin-project/go-fil-markets v1.28.3 // indirect
 	github.com/filecoin-project/kubo-api-client v0.27.0 // indirect
@@ -336,9 +338,13 @@ require (
 	github.com/google/pprof v0.0.0-20240207164012-fb44976bdcd5 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.5 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/hashicorp/raft v1.3.10 // indirect
+	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
@@ -352,6 +358,9 @@ require (
 	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/jackc/puddle/v2 v2.2.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
+	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
+	github.com/libp2p/go-libp2p-gorpc v0.6.0 // indirect
+	github.com/libp2p/go-libp2p-raft v0.4.0 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.15.0 // indirect
@@ -361,6 +370,7 @@ require (
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
 	github.com/samber/lo v1.39.0 // indirect
 	github.com/triplewz/poseidon v0.0.0-20220525065023-a7cdb0e183e7 // indirect
+	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/warpfork/go-testmark v0.12.1 // indirect
 	github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6 // indirect
 	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
