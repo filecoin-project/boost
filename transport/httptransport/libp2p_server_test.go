@@ -389,7 +389,7 @@ func min(a int, b int) int {
 
 func newLibp2pHttpRequest(h host.Host, token string) types.HttpRequest {
 	return types.HttpRequest{
-		URL: "libp2p://" + h.Addrs()[0].String() + "/p2p/" + h.ID().Pretty(),
+		URL: "libp2p://" + h.Addrs()[0].String() + "/p2p/" + h.ID().String(),
 		Headers: map[string]string{
 			"Authorization": BasicAuthHeader("", token),
 		},
