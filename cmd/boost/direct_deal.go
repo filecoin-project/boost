@@ -329,7 +329,7 @@ If the client id different then claim can be extended up to Maximum 5 years from
 		&cli.IntFlag{
 			Name:  "batch-size",
 			Usage: "number of extend requests per batch. If set incorrectly, this will lead to out of gas error",
-			Value: 1000,
+			Value: 500,
 		},
 		cmd.FlagRepo,
 	},
