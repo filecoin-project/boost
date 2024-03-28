@@ -209,7 +209,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 					// If new duration shorter than the original duration then do nothing
 					continue
 				}
-				// For original client, compare duration(TermMax) and claim should be already be expired
+				// For original client, compare duration(TermMax) and claim should not already be expired
 				if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 					terms = append(terms, verifreg13.ClaimTerm{
 						ClaimId:  verifreg13.ClaimId(claimID),
@@ -257,7 +257,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				// If new duration shorter than the original duration then do nothing
 				continue
 			}
-			// For original client, compare duration(TermMax) and claim should be already be expired
+			// For original client, compare duration(TermMax) and claim should not already be expired
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  claimID,
@@ -294,7 +294,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				// If new duration shorter than the original duration then do nothing
 				continue
 			}
-			// For original client, compare duration(TermMax) and claim should be already be expired
+			// For original client, compare duration(TermMax) and claim should not already be expired
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  claimID,
