@@ -392,6 +392,8 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	}
 
+	cfg.Dealmaking.StartEpochSealingBuffer = 50
+
 	if f.config.StartEpochSealingBuffer > 0 {
 		cfg.Dealmaking.StartEpochSealingBuffer = f.config.StartEpochSealingBuffer
 	}
@@ -633,7 +635,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	if err != nil {
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
-	startEpoch := head.Height() + abi.ChainEpoch(2000)
+	startEpoch := head.Height() + abi.ChainEpoch(600)
 	l, err := market.NewLabelFromString(rootCid.String())
 	if err != nil {
 		return nil, err

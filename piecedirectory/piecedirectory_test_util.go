@@ -234,8 +234,6 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// directory should re-build the index and then return the size.
 	pm := NewPieceDirectory(cl, pr, 1)
 	pm.Start(ctx)
-	err = pm.BuildIndexForPiece(ctx, pieceCid)
-	require.NoError(t, err)
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)

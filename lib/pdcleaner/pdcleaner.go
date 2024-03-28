@@ -169,7 +169,8 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
-			if !present {
+			// If not present and start epoch has already passed (to cover any unproven sector in actor state)
+			if !present && deal.ClientDealProposal.Proposal.StartEpoch < head.Height() {
 				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.DealUuid.String())
 				if err != nil {
 					// Don't return if cleaning up a deal results in error. Try them all.
