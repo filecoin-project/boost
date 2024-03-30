@@ -173,7 +173,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 	}
 
 	var terms []verifreg13.ClaimTerm
-	var newClaims []verifreg13.ClaimExtensionRequest
+	newClaims := make(map[verifreg13.ClaimExtensionRequest]big.Int)
 	rDataCap := big.NewInt(0)
 
 	// If --all is set
@@ -198,17 +198,18 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				if claim.Client != wid {
 					// The new duration should be greater than the original deal duration and claim should not already be expired
 					if head.Height()+tmax-claim.TermStart > claim.TermMax-claim.TermStart && claim.TermStart+claim.TermMax > head.Height() {
-						newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
+						req := verifreg13.ClaimExtensionRequest{
 							Claim:    verifreg13.ClaimId(claimID),
 							Provider: abi.ActorID(mid),
 							TermMax:  head.Height() + tmax - claim.TermStart,
-						})
+						}
+						newClaims[req] = big.NewInt(int64(claim.Size))
 						rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 					}
 					// If new duration shorter than the original duration then do nothing
 					continue
 				}
-				// For original client, compare duration(TermMax) and claim should be already be expired
+				// For original client, compare duration(TermMax) and claim should not already be expired
 				if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 					terms = append(terms, verifreg13.ClaimTerm{
 						ClaimId:  verifreg13.ClaimId(claimID),
@@ -245,17 +246,18 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			if claim.Client != wid {
 				// The new duration should be greater than the original deal duration and claim should not already be expired
 				if head.Height()+tmax-claim.TermStart > claim.TermMax-claim.TermStart && claim.TermStart+claim.TermMax > head.Height() {
-					newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
+					req := verifreg13.ClaimExtensionRequest{
 						Claim:    claimID,
 						Provider: abi.ActorID(mid),
 						TermMax:  head.Height() + tmax - claim.TermStart,
-					})
+					}
+					newClaims[req] = big.NewInt(int64(claim.Size))
 					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 				}
 				// If new duration shorter than the original duration then do nothing
 				continue
 			}
-			// For original client, compare duration(TermMax) and claim should be already be expired
+			// For original client, compare duration(TermMax) and claim should not already be expired
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  claimID,
@@ -281,17 +283,18 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			if claim.Client != wid {
 				// The new duration should be greater than the original deal duration and claim should not already be expired
 				if head.Height()+tmax-claim.TermStart > claim.TermMax-claim.TermStart && claim.TermStart+claim.TermMax > head.Height() {
-					newClaims = append(newClaims, verifreg13.ClaimExtensionRequest{
+					req := verifreg13.ClaimExtensionRequest{
 						Claim:    claimID,
 						Provider: prov.ID,
 						TermMax:  head.Height() + tmax - claim.TermStart,
-					})
+					}
+					newClaims[req] = big.NewInt(int64(claim.Size))
 					rDataCap.Add(big.NewInt(int64(claim.Size)).Int, rDataCap.Int)
 				}
 				// If new duration shorter than the original duration then do nothing
 				continue
 			}
-			// For original client, compare duration(TermMax) and claim should be already be expired
+			// For original client, compare duration(TermMax) and claim should not already be expired
 			if claim.TermMax < tmax && claim.TermStart+claim.TermMax > head.Height() {
 				terms = append(terms, verifreg13.ClaimTerm{
 					ClaimId:  claimID,
@@ -303,27 +306,30 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 	}
 
 	var msgs []*types.Message
-	for i := 0; i < len(terms); i += batchSize {
-		batchEnd := i + batchSize
-		if batchEnd > len(terms) {
-			batchEnd = len(terms)
-		}
 
-		batch := terms[i:batchEnd]
+	if len(terms) > 0 {
+		for i := 0; i < len(terms); i += batchSize {
+			batchEnd := i + batchSize
+			if batchEnd > len(terms) {
+				batchEnd = len(terms)
+			}
 
-		params, err := actors.SerializeParams(&verifreg13.ExtendClaimTermsParams{
-			Terms: batch,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+			batch := terms[i:batchEnd]
+
+			params, err := actors.SerializeParams(&verifreg13.ExtendClaimTermsParams{
+				Terms: batch,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to searialise the parameters: %w", err)
+			}
+			oclaimMsg := &types.Message{
+				To:     verifreg.Address,
+				From:   wallet,
+				Method: verifreg.Methods.ExtendClaimTerms,
+				Params: params,
+			}
+			msgs = append(msgs, oclaimMsg)
 		}
-		oclaimMsg := &types.Message{
-			To:     verifreg.Address,
-			From:   wallet,
-			Method: verifreg.Methods.ExtendClaimTerms,
-			Params: params,
-		}
-		msgs = append(msgs, oclaimMsg)
 	}
 
 	if len(newClaims) > 0 {
@@ -377,14 +383,27 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 			}
 		}
 
-		// Batch in 1000 to avoid running out of gas
-		for i := 0; i < len(newClaims); i += batchSize {
+		// Create a map of just keys, so we can easily batch based on the numeric keys
+		keys := make([]verifreg13.ClaimExtensionRequest, 0, len(newClaims))
+		for k := range newClaims {
+			keys = append(keys, k)
+		}
+
+		// Batch in 500 to avoid running out of gas
+		for i := 0; i < len(keys); i += batchSize {
 			batchEnd := i + batchSize
-			if batchEnd > len(newClaims) {
-				batchEnd = len(newClaims)
+			if batchEnd > len(keys) {
+				batchEnd = len(keys)
 			}
 
-			batch := newClaims[i:batchEnd]
+			batch := keys[i:batchEnd]
+
+			// Calculate Datacap for this batch
+			dcap := big.NewInt(0)
+			for _, k := range batch {
+				dc := newClaims[k]
+				dcap.Add(dcap.Int, dc.Int)
+			}
 
 			ncparams, err := actors.SerializeParams(&verifreg13.AllocationRequests{
 				Extensions: batch,
@@ -395,7 +414,7 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 
 			transferParams, err := actors.SerializeParams(&datacap.TransferParams{
 				To:           builtin.VerifiedRegistryActorAddr,
-				Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+				Amount:       big.Mul(dcap, builtin.TokenPrecision),
 				OperatorData: ncparams,
 			})
 
