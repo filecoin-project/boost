@@ -293,7 +293,7 @@ var clientExtendDealCmd = &cli.Command{
 	Name:  "extend-claim",
 	Usage: "extend claim expiration (TermMax)",
 	UsageText: `Extends claim expiration (TermMax).
-If the client is original client then claim can be extended to maximum 5 years and no Datacap is required.
+If the client is the original client, then the claim can be extended up to a maximum of 5 years, and no Datacap is required.
 If the client id different then claim can be extended up to maximum 5 years from now and Datacap is required.
 `,
 	Flags: []cli.Flag{
