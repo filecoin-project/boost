@@ -2,6 +2,7 @@ package pdcleaner
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,7 +174,9 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 			if !present && deal.ClientDealProposal.Proposal.StartEpoch < head.Height() {
 				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.DealUuid.String())
 				if err != nil {
-					// Don't return if cleaning up a deal results in error. Try them all.
+					if strings.Contains(err.Error(), "not found") {
+						return nil
+					}
 					return fmt.Errorf("cleaning up boost deal %s for piece %s: %s", deal.DealUuid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
 			}
@@ -198,7 +201,9 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 			if !present {
 				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.ProposalCid.String())
 				if err != nil {
-					// Don't return if cleaning up a deal results in error. Try them all.
+					if strings.Contains(err.Error(), "not found") {
+						return nil
+					}
 					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", deal.ProposalCid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
 			}
@@ -224,7 +229,9 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 			if !present {
 				err = p.pd.RemoveDealForPiece(ctx, deal.PieceCID, deal.ID.String())
 				if err != nil {
-					// Don't return if cleaning up a deal results in error. Try them all.
+					if strings.Contains(err.Error(), "not found") {
+						return nil
+					}
 					return fmt.Errorf("cleaning up direct deal %s for piece %s: %s", deal.ID.String(), deal.PieceCID, err.Error())
 				}
 			}
@@ -281,7 +288,9 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 
 					err = p.pd.RemoveDealForPiece(ctx, piece, deal.DealUuid)
 					if err != nil {
-						// Don't return if cleaning up a deal results in error. Try them all.
+						if strings.Contains(err.Error(), "not found") {
+							return nil
+						}
 						log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
 					}
 				}
