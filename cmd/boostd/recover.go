@@ -218,7 +218,12 @@ func action(cctx *cli.Context) error {
 		return err
 	}
 
-	sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, types.EmptyTSK)
+	head, err := fullnodeApi.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
+
+	sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, head.Key())
 	if err != nil {
 		return err
 	}
@@ -234,6 +239,11 @@ func action(cctx *cli.Context) error {
 
 		// ignore sector 0
 		if info.SectorNumber == abi.SectorNumber(0) {
+			continue
+		}
+
+		if info.Expiration < head.Height() {
+			logger.Infof("ignoring expired sector %d", info.SectorNumber)
 			continue
 		}
 
@@ -257,7 +267,7 @@ func action(cctx *cli.Context) error {
 			continue
 		}
 
-		ok, isUnsealed, err := processSector(ctx, info)
+		ok, isUnsealed, err := processSector(ctx, head.Key(), info)
 		if err != nil {
 			return err
 		}
@@ -671,7 +681,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	return nil
 }
 
-func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
+func processSector(ctx context.Context, key types.TipSetKey, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
 	logger.Debugw("processing sector", "sector", info.SectorNumber, "deals", info.DealIDs)
 
 	sectorid := info.SectorNumber
@@ -698,7 +708,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 
 	nextoffset := uint64(0)
 	for _, did := range info.DealIDs {
-		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, types.EmptyTSK)
+		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, key)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				logger.Warnw("deal present in sector, but not in market actor state, so probably expired", "sector", sectorid, "deal", did, "err", err)
