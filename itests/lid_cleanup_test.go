@@ -275,6 +275,28 @@ func TestLIDCleanup(t *testing.T) {
 		return len(stateList) == 2
 	}, time.Second*15, 1*time.Second, "timeout waiting for sectors to reach TerminateFinality")
 
+	var bigger abi.ChainEpoch
+
+	bigger = res2.DealParams.ClientDealProposal.Proposal.StartEpoch
+
+	if res1.DealParams.ClientDealProposal.Proposal.StartEpoch > res2.DealParams.ClientDealProposal.Proposal.StartEpoch {
+		bigger = res1.DealParams.ClientDealProposal.Proposal.StartEpoch
+	}
+
+	if bigger < ddParams.StartEpoch {
+		bigger = ddParams.StartEpoch
+	}
+
+	// Wait till all deal start epochs have passed
+	require.Eventuallyf(t, func() bool {
+		h, err := f.FullNode.ChainHead(ctx)
+		require.NoError(t, err)
+		if h.Height() > bigger {
+			return true
+		}
+		return false
+	}, time.Minute*5, time.Second, "timeout waiting for start epochs")
+
 	// Clean up LID
 	err = f.Boost.PdCleanup(ctx)
 	require.NoError(t, err)
