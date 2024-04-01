@@ -291,10 +291,7 @@ func TestLIDCleanup(t *testing.T) {
 	require.Eventuallyf(t, func() bool {
 		h, err := f.FullNode.ChainHead(ctx)
 		require.NoError(t, err)
-		if h.Height() > bigger {
-			return true
-		}
-		return false
+		return h.Height() > bigger
 	}, time.Minute*5, time.Second, "timeout waiting for start epochs")
 
 	// Clean up LID
