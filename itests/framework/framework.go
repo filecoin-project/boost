@@ -635,7 +635,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	if err != nil {
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
-	startEpoch := head.Height() + abi.ChainEpoch(600)
+	startEpoch := head.Height() + abi.ChainEpoch(1000)
 	l, err := market.NewLabelFromString(rootCid.String())
 	if err != nil {
 		return nil, err

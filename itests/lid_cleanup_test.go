@@ -175,7 +175,7 @@ func TestLIDCleanup(t *testing.T) {
 	head, err := f.FullNode.ChainHead(ctx)
 	require.NoError(t, err)
 
-	startEpoch := head.Height() + 200
+	startEpoch := head.Height() + 1000
 	endEpoch := head.Height() + +2880*400
 
 	dealUuid := uuid.New()
