@@ -227,3 +227,7 @@ func (sm *BoostAPI) PdRemoveDealForPiece(ctx context.Context, piececid cid.Cid, 
 func (sm *BoostAPI) PdCleanup(ctx context.Context) error {
 	return sm.Pdc.CleanOnce(ctx)
 }
+
+func (sm *BoostAPI) MarketGetAsk(ctx context.Context) (*legacytypes.SignedStorageAsk, error) {
+	return sm.StorageProvider.GetAsk(), nil
+}
