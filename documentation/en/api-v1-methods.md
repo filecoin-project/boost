@@ -27,6 +27,8 @@
 * [Log](#log)
   * [LogList](#loglist)
   * [LogSetLevel](#logsetlevel)
+* [Market](#market)
+  * [MarketGetAsk](#marketgetask)
 * [Net](#net)
   * [NetAddrsListen](#netaddrslisten)
   * [NetAgentVersion](#netagentversion)
@@ -703,6 +705,36 @@ Inputs:
 ```
 
 Response: `{}`
+
+## Market
+
+
+### MarketGetAsk
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "Ask": {
+    "Price": "0",
+    "VerifiedPrice": "0",
+    "MinPieceSize": 1032,
+    "MaxPieceSize": 1032,
+    "Miner": "f01234",
+    "Timestamp": 10101,
+    "Expiry": 10101,
+    "SeqNo": 42
+  },
+  "Signature": {
+    "Type": 2,
+    "Data": "Ynl0ZSBhcnJheQ=="
+  }
+}
+```
 
 ## Net
 

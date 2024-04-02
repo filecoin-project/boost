@@ -64,6 +64,8 @@ type BoostStruct struct {
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
+		MarketGetAsk func(p0 context.Context) (*legacytypes.SignedStorageAsk, error) `perm:"read"`
+
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
@@ -372,6 +374,17 @@ func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID,
 }
 
 func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) MarketGetAsk(p0 context.Context) (*legacytypes.SignedStorageAsk, error) {
+	if s.Internal.MarketGetAsk == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MarketGetAsk(p0)
+}
+
+func (s *BoostStub) MarketGetAsk(p0 context.Context) (*legacytypes.SignedStorageAsk, error) {
 	return nil, ErrNotSupported
 }
 
