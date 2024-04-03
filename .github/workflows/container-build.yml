@@ -16,7 +16,7 @@ jobs:
       contents: read
       packages: write
     env:
-      LOTUS_VERSION: 'v1.26.0-rc1'
+      LOTUS_VERSION: 'v1.26.1'
       LOTUS_SOURCE_IMAGE: 'ghcr.io/filecoin-shipyard/lotus-containers:lotus'
       NETWORK_NAME: 'devnet'
       FFI_BUILD_FROM_SOURCE: '0'
