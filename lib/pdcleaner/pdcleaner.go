@@ -185,6 +185,7 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 					}
 					return fmt.Errorf("cleaning up boost deal %s for piece %s: %s", deal.DealUuid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
+				log.Infof("removed deal for %s and deal ID %s", deal.ClientDealProposal.Proposal.PieceCID.String(), deal.DealUuid.String())
 			}
 			return nil
 		})
@@ -212,6 +213,7 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 					}
 					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", deal.ProposalCid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
 				}
+				log.Infof("removed legacy deal for %s and deal ID %s", deal.ClientDealProposal.Proposal.PieceCID.String(), deal.ProposalCid.String())
 			}
 			return nil
 		})
@@ -240,6 +242,7 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 					}
 					return fmt.Errorf("cleaning up direct deal %s for piece %s: %s", deal.ID.String(), deal.PieceCID, err.Error())
 				}
+				log.Infof("removed direct deal for %s and deal ID %s", deal.PieceCID.String(), deal.ID.String())
 			}
 			return nil
 		})
@@ -299,6 +302,7 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 						}
 						log.Errorf("cleaning up dangling deal %s for piece %s: %s", deal.DealUuid, piece, err.Error())
 					}
+					log.Infof("removed dangling deal for %s and deal ID %s", piece.String(), deal.DealUuid)
 				}
 			}
 			return nil
