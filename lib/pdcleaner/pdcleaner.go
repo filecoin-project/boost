@@ -102,7 +102,9 @@ func (p *pdcleaner) clean() {
 	// Run at start up
 	log.Infof("Starting LID clean up")
 	serr := p.CleanOnce(p.ctx)
-	log.Errorf("Failed to cleanup LID: %s", serr)
+	if serr != nil {
+		log.Errorf("Failed to cleanup LID: %s", serr)
+	}
 	log.Debugf("Finished cleaning up LID")
 
 	// Create a ticker with an hour tick
