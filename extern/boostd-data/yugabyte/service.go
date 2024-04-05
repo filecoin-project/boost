@@ -894,7 +894,7 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 		return fmt.Errorf("removing indexes for piece %s: getting recs: %w", pieceCid, err)
 	}
 
-	// Delete from multihash -> piece cids index
+	// Delete from multihash -> piece cids index and PieceBlockOffsetSize
 	var eg errgroup.Group
 	for i := 0; i < s.settings.PayloadPiecesParallelism; i++ {
 		eg.Go(func() error {
@@ -914,6 +914,11 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 					if err != nil {
 						return fmt.Errorf("deleting from PayloadToPieces: %w", err)
 					}
+					q = `DELETE FROM PieceBlockOffsetSize WHERE PayloadMultihash = ? AND PieceCid = ?`
+					err = s.session.Query(q, multihashBytes, pieceCid.Bytes()).Exec()
+					if err != nil {
+						return fmt.Errorf("deleting from PieceBlockOffsetSize: %w", err)
+					}
 				}
 			}
 
@@ -923,13 +928,6 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	err = eg.Wait()
 	if err != nil {
 		return err
-	}
-
-	// Delete from piece offsets index
-	qry := `DELETE FROM PieceBlockOffsetSize WHERE PieceCid = ?`
-	err = s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Exec()
-	if err != nil {
-		return fmt.Errorf("removing indexes for piece %s: deleting offset / size info: %w", pieceCid, err)
 	}
 
 	failureMetrics = false
