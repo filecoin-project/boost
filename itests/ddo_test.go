@@ -2,7 +2,6 @@ package itests
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -89,15 +88,25 @@ func TestDirectDeal(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Piece CID: %s, Piece Size: %d", commp.PieceCID.String(), commp.Size)
 
-	pieceInfos := []string{fmt.Sprintf("%s=%d", commp.PieceCID, commp.Size)}
-	minerIds := []string{"f01000"}
-	allocateMsg, err := util.CreateAllocationMsg(ctx, f.FullNode, pieceInfos, minerIds, f.ClientAddr,
-		verifregst.MinimumVerifiedAllocationTerm,
-		verifregst.MaximumVerifiedAllocationTerm,
-		verifregst.MaximumVerifiedAllocationExpiration)
+	mid, err := address.IDFromAddress(f.MinerAddr)
 	require.NoError(t, err)
 
-	sm, err := f.FullNode.MpoolPushMessage(ctx, allocateMsg, nil)
+	var pieceInfos []util.PieceInfos
+
+	pieceInfos = append(pieceInfos, util.PieceInfos{
+		Cid:       commp.PieceCID,
+		Size:      int64(commp.Size),
+		Miner:     abi.ActorID(mid),
+		MinerAddr: f.MinerAddr,
+		Tmin:      verifregst.MinimumVerifiedAllocationTerm,
+		Tmax:      verifregst.MaximumVerifiedAllocationTerm,
+		Exp:       verifregst.MaximumVerifiedAllocationExpiration,
+	})
+
+	allocateMsg, err := util.CreateAllocationMsg(ctx, f.FullNode, pieceInfos, f.ClientAddr, 10)
+	require.NoError(t, err)
+
+	sm, err := f.FullNode.MpoolPushMessage(ctx, allocateMsg[0], nil)
 	require.NoError(t, err)
 
 	_, err = f.FullNode.StateWaitMsg(ctx, sm.Cid(), 1, 1e10, true)
