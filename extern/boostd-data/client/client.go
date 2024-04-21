@@ -40,6 +40,7 @@ type Store struct {
 		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
 		FlaggedPiecesList         func(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 		FlaggedPiecesCount        func(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error)
+		UntrackPiece              func(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
 	}
 	closer   jsonrpc.ClientCloser
 	dialOpts []jsonrpc.Option
@@ -196,4 +197,8 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 
 func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	return s.client.FlaggedPiecesCount(ctx, filter)
+}
+
+func (s *Store) UntrackPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
+	return s.client.UntrackPiece(ctx, pieceCid, maddr)
 }
