@@ -30,7 +30,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.13.1
+	github.com/filecoin-project/go-state-types v0.13.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -86,7 +86,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
-	github.com/whyrusleeping/cbor-gen v0.1.0
+	github.com/whyrusleeping/cbor-gen v0.1.1
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.21.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
@@ -144,7 +144,7 @@ require (
 	github.com/filecoin-project/filecoin-ffi v1.25.0-dev.1 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
-	github.com/filecoin-project/go-amt-ipld/v4 v4.2.0 // indirect
+	github.com/filecoin-project/go-amt-ipld/v4 v4.3.0 // indirect
 	github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20220905160352-62059082a837 // indirect
 	github.com/filecoin-project/go-crypto v0.0.1 // indirect
 	github.com/filecoin-project/go-ds-versioning v0.1.2
@@ -308,7 +308,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.10
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
-	github.com/filecoin-project/lotus v1.26.2
+	github.com/filecoin-project/lotus v1.26.3
 	github.com/ipfs/boxo v0.18.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0
