@@ -27,8 +27,9 @@ import (
 )
 
 var directDealAllocate = &cli.Command{
-	Name:  "allocate",
-	Usage: "Create new allocation[s] for verified deals",
+	Name:        "allocate",
+	Usage:       "Create new allocation[s] for verified deals",
+	Description: "The command can accept a CSV formatted file in the format 'pieceCid,pieceSize,miner,tmin,tmax,expiration'",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:    "miner",
@@ -192,7 +193,7 @@ var directDealAllocate = &cli.Command{
 				}
 				for _, p := range cctx.StringSlice("piece-info") {
 					pieceDetail := strings.Split(p, "=")
-					if len(pieceDetail) > 2 {
+					if len(pieceDetail) != 2 {
 						return fmt.Errorf("incorrect pieceInfo format: %s", pieceDetail)
 					}
 
