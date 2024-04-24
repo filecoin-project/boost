@@ -38,6 +38,7 @@ func main() {
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd-data", "INFO")
 	_ = logging.SetLogLevel("boostd-data-yb", "INFO")
+	_ = logging.SetLogLevel("rpc", "ERROR")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd-data", "DEBUG")
