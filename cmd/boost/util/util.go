@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/filecoin-project/go-address"
@@ -15,7 +14,6 @@ import (
 	verifreg13 "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	datacap2 "github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
@@ -24,54 +22,34 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []string, wallet address.Address, tmin, tmax, exp abi.ChainEpoch) (*types.Message, error) {
-	// Get all minerIDs from input
-	maddrs := make(map[abi.ActorID]lapi.MinerInfo)
-	minerIds := miners
-	for _, id := range minerIds {
-		maddr, err := address.NewFromString(id)
-		if err != nil {
-			return nil, err
-		}
+func CreateAllocationMsg(ctx context.Context, api api.Gateway, infos []PieceInfos, wallet address.Address, batchSize int) ([]*types.Message, error) {
 
-		// Verify that minerID exists
-		m, err := api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
-		if err != nil {
-			return nil, err
-		}
-
-		mid, err := address.IDFromAddress(maddr)
-		if err != nil {
-			return nil, err
-		}
-
-		maddrs[abi.ActorID(mid)] = m
+	head, err := api.ChainHead(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	// Get all pieceCIDs from input
 	rDataCap := big.NewInt(0)
-	var pieceInfos []*abi.PieceInfo
-	pieces := pInfos
-	for _, p := range pieces {
-		pieceDetail := strings.Split(p, "=")
-		if len(pieceDetail) > 2 {
-			return nil, fmt.Errorf("incorrect pieceInfo format: %s", pieceDetail)
-		}
 
-		n, err := strconv.ParseInt(pieceDetail[1], 10, 64)
+	// Create allocation requests
+	var allocationRequests []verifreg9.AllocationRequest
+	for _, info := range infos {
+		minfo, err := api.StateMinerInfo(ctx, info.MinerAddr, types.EmptyTSK)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse the piece size for %s for pieceCid %s: %w", pieceDetail[0], pieceDetail[1], err)
+			return nil, err
 		}
-		pcid, err := cid.Parse(pieceDetail[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse the pieceCid for %s: %w", pieceDetail[0], err)
+		if uint64(minfo.SectorSize) < uint64(info.Size) {
+			return nil, fmt.Errorf("specified piece size %d is bigger than miner's sector size %s", info.Size, minfo.SectorSize.String())
 		}
-
-		pieceInfos = append(pieceInfos, &abi.PieceInfo{
-			Size:     abi.PaddedPieceSize(n),
-			PieceCID: pcid,
+		allocationRequests = append(allocationRequests, verifreg9.AllocationRequest{
+			Provider:   info.Miner,
+			Data:       info.Cid,
+			Size:       abi.PaddedPieceSize(info.Size),
+			TermMin:    info.Tmin,
+			TermMax:    info.Tmax,
+			Expiration: head.Height() + info.Exp,
 		})
-		rDataCap.Add(big.NewInt(n).Int, rDataCap.Int)
+		rDataCap.Add(big.NewInt(info.Size).Int, rDataCap.Int)
 	}
 
 	// Get datacap balance
@@ -89,61 +67,52 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, pInfos, miners []
 		return nil, fmt.Errorf("requested datacap %s is greater then the available datacap %s", rDataCap, aDataCap)
 	}
 
-	if tmax < tmin {
-		return nil, fmt.Errorf("maximum duration %d cannot be smaller than minimum duration %d", tmax, tmin)
-	}
-
-	head, err := api.ChainHead(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create allocation requests
-	var allocationRequests []verifreg9.AllocationRequest
-	for mid, minfo := range maddrs {
-		for _, p := range pieceInfos {
-			if uint64(minfo.SectorSize) < uint64(p.Size) {
-				return nil, fmt.Errorf("specified piece size %d is bigger than miner's sector size %s", uint64(p.Size), minfo.SectorSize.String())
-			}
-			allocationRequests = append(allocationRequests, verifreg9.AllocationRequest{
-				Provider:   mid,
-				Data:       p.PieceCID,
-				Size:       p.Size,
-				TermMin:    tmin,
-				TermMax:    tmax,
-				Expiration: head.Height() + exp,
-			})
+	// Batch allocationRequests to create message
+	var messages []*types.Message
+	for i := 0; i < len(allocationRequests); i += batchSize {
+		end := i + batchSize
+		if end > len(allocationRequests) {
+			end = len(allocationRequests)
 		}
+		batch := allocationRequests[i:end]
+		arequest := &verifreg9.AllocationRequests{
+			Allocations: batch,
+		}
+
+		receiverParams, err := actors.SerializeParams(arequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to seralize the parameters: %w", err)
+		}
+
+		transferParams, err := actors.SerializeParams(&datacap.TransferParams{
+			To:           builtin.VerifiedRegistryActorAddr,
+			Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+			OperatorData: receiverParams,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
+		}
+		msg := &types.Message{
+			To:     builtin.DatacapActorAddr,
+			From:   wallet,
+			Method: datacap2.Methods.TransferExported,
+			Params: transferParams,
+			Value:  big.Zero(),
+		}
+		messages = append(messages, msg)
 	}
+	return messages, nil
+}
 
-	arequest := &verifreg9.AllocationRequests{
-		Allocations: allocationRequests,
-	}
-
-	receiverParams, err := actors.SerializeParams(arequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seralize the parameters: %w", err)
-	}
-
-	transferParams, err := actors.SerializeParams(&datacap.TransferParams{
-		To:           builtin.VerifiedRegistryActorAddr,
-		Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
-		OperatorData: receiverParams,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
-	}
-
-	msg := &types.Message{
-		To:     builtin.DatacapActorAddr,
-		From:   wallet,
-		Method: datacap2.Methods.TransferExported,
-		Params: transferParams,
-		Value:  big.Zero(),
-	}
-
-	return msg, nil
+type PieceInfos struct {
+	Cid       cid.Cid
+	Size      int64
+	MinerAddr address.Address
+	Miner     abi.ActorID
+	Tmin      abi.ChainEpoch
+	Tmax      abi.ChainEpoch
+	Exp       abi.ChainEpoch
 }
 
 // CreateExtendClaimMsg creates extend message[s] based on the following conditions
