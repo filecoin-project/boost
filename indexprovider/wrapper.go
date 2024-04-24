@@ -10,8 +10,15 @@ import (
 
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/filecoin-project/go-bitfield"
 	"github.com/filecoin-project/go-statemachine/fsm"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	chainTypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	"go.uber.org/fx"
 
 	"github.com/ipfs/go-datastore"
@@ -48,6 +55,8 @@ var log = logging.Logger("index-provider-wrapper")
 type Wrapper struct {
 	enabled bool
 
+	full           v1api.FullNode
+	miner          address.Address
 	cfg            *config.Boost
 	dealsDB        *db.DealsDB
 	legacyProv     legacy.LegacyDealManager
@@ -64,15 +73,15 @@ type Wrapper struct {
 	stop           context.CancelFunc
 }
 
-func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
+func NewWrapper(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
 	ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
-	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService, full v1api.FullNode) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
 		ssDB *db.SectorStateDB, legacyProv legacy.LegacyDealManager, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
 		ssm *sectorstatemgr.SectorStateMgr,
-		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService, full v1api.FullNode) (*Wrapper, error) {
 
 		_, isDisabled := prov.(*DisabledIndexProvider)
 
@@ -95,6 +104,8 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			bitswapEnabled: bitswapEnabled,
 			httpEnabled:    httpEnabled,
 			ssm:            ssm,
+			full:           full,
+			miner:          provAddr,
 		}
 		return w, nil
 	}
@@ -445,6 +456,29 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		return errors.New("cannot announce all deals: index provider is disabled")
 	}
 
+	mActor, err := w.full.StateGetActor(ctx, w.miner, chainTypes.EmptyTSK)
+	if err != nil {
+		return fmt.Errorf("getting actor for the miner %s: %w", w.miner, err)
+	}
+
+	store := adt.WrapStore(ctx, cbor.NewCborStore(blockstore.NewAPIBlockstore(w.full)))
+	mas, err := miner.Load(store, mActor)
+	if err != nil {
+		return fmt.Errorf("loading miner actor state %s: %w", w.miner, err)
+	}
+	liveSectors, err := miner.AllPartSectors(mas, miner.Partition.LiveSectors)
+	if err != nil {
+		return fmt.Errorf("getting live sector sets for miner %s: %w", w.miner, err)
+	}
+	unProvenSectors, err := miner.AllPartSectors(mas, miner.Partition.UnprovenSectors)
+	if err != nil {
+		return fmt.Errorf("getting unproven sector sets for miner %s: %w", w.miner, err)
+	}
+	activeSectors, err := bitfield.MergeBitFields(liveSectors, unProvenSectors)
+	if err != nil {
+		return fmt.Errorf("merging bitfields to generate all sealed sectors on miner %s: %w", w.miner, err)
+	}
+
 	log.Info("announcing all legacy deals to Indexer")
 
 	legacyDeals, err := w.legacyProv.ListDeals()
@@ -473,6 +507,15 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		}
 		// only announce deals that have not expired
 		if _, ok := expiredStates[d.State]; ok {
+			continue
+		}
+
+		present, err := activeSectors.IsSet(uint64(d.SectorNumber))
+		if err != nil {
+			return fmt.Errorf("checking if bitfield is set: %w", err)
+		}
+
+		if !present {
 			continue
 		}
 
@@ -505,6 +548,15 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		// (note technically this is only one check point state IndexedAndAnnounced but is written so
 		// it will work if we ever introduce additional states between IndexedAndAnnounced & Complete)
 		if d.Checkpoint < dealcheckpoints.IndexedAndAnnounced || d.Checkpoint >= dealcheckpoints.Complete {
+			continue
+		}
+
+		present, err := activeSectors.IsSet(uint64(d.SectorID))
+		if err != nil {
+			return fmt.Errorf("checking if bitfield is set: %w", err)
+		}
+
+		if !present {
 			continue
 		}
 

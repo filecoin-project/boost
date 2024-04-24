@@ -472,7 +472,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr(cfg)),
-		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(walletMiner, cfg)),
 		Override(new(storedask.StoredAsk), storedask.NewStoredAsk(cfg)),
 
 		Override(new(legacy.LegacyDealManager), modules.NewLegacyDealsManager),

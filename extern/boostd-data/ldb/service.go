@@ -829,3 +829,26 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 
 	return err
 }
+
+func (s *Store) UntrackPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
+	log.Debugw("handle.untack-piece")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.untrack_pieces")
+	defer span.End()
+
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "ldb.untrack_pieces"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.untack-piece", "took", time.Since(now).String())
+	}(time.Now())
+
+	stats.Record(s.ctx, metrics.FailureUntrackPieceCount.M(1))
+
+	// LEVELDB does not have a separate PieceTracker table
+	// All pieces to be checked are picked from the main table
+	// so there is no need to delete anything
+	return nil
+
+}
