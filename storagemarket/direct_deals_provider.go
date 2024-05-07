@@ -28,6 +28,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/actors/policy"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	lotuspiece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
@@ -135,6 +136,15 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}
 
 	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
+
+	// If the TermMin is longer than initial sector duration, the deal will be dropped from the sector
+	if allocation.TermMin > miner13types.MaxSectorExpirationExtension-policy.SealRandomnessLookback {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   fmt.Sprintf("allocation term min %d is longer than the sector lifetime %d", allocation.TermMin, miner13types.MaxSectorExpirationExtension-policy.SealRandomnessLookback),
+		}, nil
+
+	}
 
 	allActive, err := ddp.directDealsDB.ListActive(ctx)
 	if err != nil {
