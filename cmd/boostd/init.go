@@ -262,20 +262,6 @@ func setCommonConfig(cctx *cli.Context, rcfg *config.Boost, bp *boostParams) {
 
 var minerAddrDSKey = datastore.NewKey("miner-address")
 
-func getMinerAddressFromDatastore(ds datastore.Batching) (address.Address, error) {
-	addr, err := ds.Get(context.Background(), minerAddrDSKey)
-	if err != nil {
-		return address.Address{}, fmt.Errorf("getting miner address from legacy datastore: %w", err)
-	}
-
-	minerAddr, err := address.NewFromBytes(addr)
-	if err != nil {
-		return address.Address{}, fmt.Errorf("parsing miner address from legacy datastore: %w", err)
-	}
-
-	return minerAddr, nil
-}
-
 func addMinerAddressToDatastore(ds datastore.Batching, minerActor address.Address) error {
 	return ds.Put(context.Background(), minerAddrDSKey, minerActor.Bytes())
 }
