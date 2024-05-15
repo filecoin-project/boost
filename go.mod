@@ -95,7 +95,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/fx v1.20.1
 	go.uber.org/multierr v1.11.0
-	golang.org/x/crypto v0.19.0
+	golang.org/x/crypto v0.20.0
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
 	golang.org/x/sync v0.6.0
 	golang.org/x/text v0.14.0
@@ -197,7 +197,6 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
 	github.com/ipfs/go-ds-measure v0.2.0 // indirect
 	github.com/ipfs/go-fs-lock v0.0.7 // indirect
-	github.com/ipfs/go-ipfs-cmds v0.10.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.3 // indirect
@@ -231,13 +230,13 @@ require (
 	github.com/libp2p/go-netroute v0.2.1 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.1 // indirect
-	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magefile/mage v1.9.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/miekg/dns v1.1.58 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
@@ -262,7 +261,7 @@ require (
 	github.com/prometheus/common v0.47.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/prometheus/statsd_exporter v0.22.7 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/cors v1.7.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
@@ -278,11 +277,10 @@ require (
 	github.com/whyrusleeping/cbor v0.0.0-20171005072247-63513f603b11
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
-	github.com/whyrusleeping/ledger-filecoin-go v0.9.1-0.20201010031517-c3dcc1bddce4 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	github.com/zondax/hid v0.9.1 // indirect
-	github.com/zondax/ledger-go v0.12.1 // indirect
+	github.com/zondax/hid v0.9.2 // indirect
+	github.com/zondax/ledger-go v0.14.3 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/zap v1.27.0
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
@@ -308,7 +306,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.10
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
-	github.com/filecoin-project/lotus v1.26.3
+	github.com/filecoin-project/lotus v1.27.0-rc2
 	github.com/ipfs/boxo v0.18.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0
@@ -325,26 +323,23 @@ require (
 
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
+	github.com/KarpelesLab/reflink v1.0.1 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/armon/go-metrics v0.3.9 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7 // indirect
 	github.com/filecoin-project/go-fil-markets v1.28.3 // indirect
-	github.com/filecoin-project/kubo-api-client v0.27.0 // indirect
 	github.com/gammazero/channelqueue v0.2.1 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/georgysavva/scany/v2 v2.0.0 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/pprof v0.0.0-20240207164012-fb44976bdcd5 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.5 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/hashicorp/raft v1.3.10 // indirect
-	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
+	github.com/invopop/jsonschema v0.12.0 // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
@@ -352,15 +347,12 @@ require (
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/pgtype v1.10.0 // indirect
 	github.com/jackc/pgx/v5 v5.4.1 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
-	github.com/jackc/puddle/v2 v2.2.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
-	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
-	github.com/libp2p/go-libp2p-gorpc v0.6.0 // indirect
-	github.com/libp2p/go-libp2p-raft v0.4.0 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.15.0 // indirect
@@ -369,11 +361,13 @@ require (
 	github.com/quic-go/quic-go v0.42.0 // indirect
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
 	github.com/samber/lo v1.39.0 // indirect
-	github.com/triplewz/poseidon v0.0.0-20220525065023-a7cdb0e183e7 // indirect
-	github.com/ugorji/go/codec v1.2.11 // indirect
+	github.com/triplewz/poseidon v0.0.0-20230828015038-79d8165c88ed // indirect
 	github.com/warpfork/go-testmark v0.12.1 // indirect
+	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6 // indirect
 	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
+	github.com/yugabyte/pgx/v5 v5.5.3-yb-2 // indirect
+	github.com/zondax/ledger-filecoin-go v0.11.1 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
@@ -383,3 +377,5 @@ require (
 )
 
 replace github.com/ugorji/go => github.com/ugorji/go v1.2.11
+
+replace github.com/KarpelesLab/reflink => github.com/magik6k/reflink v1.0.2-patch1
