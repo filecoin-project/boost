@@ -210,7 +210,6 @@ var LibP2P = Options(
 	Override(RelayKey, lotus_lp2p.NoRelay()),
 	Override(SecurityKey, lotus_lp2p.Security(true, false)),
 	Override(DefaultTransportsKey, lp2p.DefaultTransports),
-	Override(UserAgentKey, modules.UserAgent),
 
 	// Host
 	Override(new(lotus_lp2p.RawHost), lotus_lp2p.Host),
@@ -438,6 +437,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 	return Options(
 		ConfigCommon(&cfg.Common),
+		Override(UserAgentKey, modules.UserAgent(cfg)),
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
 

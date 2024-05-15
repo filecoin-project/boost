@@ -115,7 +115,7 @@ func NewMultiminerSectorAccessor(cfg *config.Boost) func(full v1api.FullNode) *l
 		}
 
 		// Create a reader that muxes between all the storage access endpoints
-		return lib.NewMultiMinerAccessor(storageApiInfos, full)
+		return lib.NewMultiMinerAccessor(storageApiInfos, full, time.Duration(cfg.Dealmaking.IsUnsealedCacheExpiry))
 	}
 }
 

@@ -106,12 +106,14 @@ type MultiMinerAccessor struct {
 	sas             map[address.Address]dagstore.SectorAccessor
 	closeOnce       sync.Once
 	closers         []jsonrpc.ClientCloser
+	cachingDuration time.Duration
 }
 
-func NewMultiMinerAccessor(storageApiInfos []string, fullnodeApi v1api.FullNode) *MultiMinerAccessor {
+func NewMultiMinerAccessor(storageApiInfos []string, fullnodeApi v1api.FullNode, cacheTTL time.Duration) *MultiMinerAccessor {
 	return &MultiMinerAccessor{
 		storageApiInfos: storageApiInfos,
 		fullnodeApi:     fullnodeApi,
+		cachingDuration: cacheTTL,
 	}
 }
 
@@ -226,7 +228,7 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	// Create the piece provider
 	pp := sealer.NewPieceProvider(storage, storageService, storageService)
 	const maxCacheSize = 4096
-	newSectorAccessor := sectoraccessor.NewCachingSectorAccessor(maxCacheSize, 5*time.Minute)
+	newSectorAccessor := sectoraccessor.NewCachingSectorAccessor(maxCacheSize, 10*time.Second)
 	sa := newSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
 	return &sectorAccessor{SectorAccessor: sa, maddr: maddr}, storageCloser, nil
 }

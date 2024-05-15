@@ -119,7 +119,7 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
+	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.cfg.Curio.Enabled), nil
 }
 
 type filterArgs struct {
@@ -172,7 +172,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
 		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
-		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
+		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.cfg.Curio.Enabled))
 	}
 
 	return &dealListResolver{
@@ -205,7 +205,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	}
 
 	net := make(chan *dealResolver, 1)
-	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi)
+	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.cfg.Curio.Enabled)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -217,7 +217,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, fmt.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool}
+	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool, curio: r.cfg.Curio.Enabled}
 	go func() {
 		sub.Pipe(ctx, net) // blocks until connection is closed
 		close(net)
@@ -256,7 +256,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, r.spApi)
+				rsv := newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, r.spApi, r.cfg.Curio.Enabled)
 				totalCount, err := r.dealsDB.Count(ctx, "", nil)
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
@@ -400,9 +400,12 @@ type dealResolver struct {
 	dealsDB     *db.DealsDB
 	logsDB      *db.LogsDB
 	spApi       sealingpipeline.API
+	curio       bool
 }
 
-func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealState, provider *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, spApi sealingpipeline.API) *dealResolver {
+func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealState,
+	provider *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB,
+	spApi sealingpipeline.API, curio bool) *dealResolver {
 	return &dealResolver{
 		mpool:             mpool,
 		ProviderDealState: *deal,
@@ -411,6 +414,7 @@ func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealS
 		dealsDB:           dealsDB,
 		logsDB:            logsDB,
 		spApi:             spApi,
+		curio:             curio,
 	}
 }
 
@@ -623,6 +627,9 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
+		if dr.curio {
+			return "Waiting for sector to seal"
+		}
 		return "Indexing"
 	case dealcheckpoints.IndexedAndAnnounced:
 		return "Indexed and Announced"
@@ -735,6 +742,7 @@ type subLastUpdate struct {
 	logsDB   *db.LogsDB
 	spApi    sealingpipeline.API
 	mpool    *mpoolmonitor.MpoolMonitor
+	curio    bool
 }
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
@@ -773,7 +781,7 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 	loop:
 		for {
 			di := lastUpdate.(types.ProviderDealState)
-			rsv := newDealResolver(s.mpool, &di, s.provider, s.dealsDB, s.logsDB, s.spApi)
+			rsv := newDealResolver(s.mpool, &di, s.provider, s.dealsDB, s.logsDB, s.spApi, s.curio)
 
 			select {
 			case <-ctx.Done():

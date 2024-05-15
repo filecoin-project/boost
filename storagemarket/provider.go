@@ -45,6 +45,7 @@ var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
+	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
 )
 
 var (
@@ -82,6 +83,7 @@ type Config struct {
 	// Cache timeout for Sealing Pipeline status
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
+	Curio                       bool
 }
 
 var log = logging.Logger("boost-provider")
