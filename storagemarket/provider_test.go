@@ -1527,6 +1527,14 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	minerStub := smtestutil.NewMinerStub(ctrl)
 	sps := minerStub.MockAPI
 
+	ver := lapi.APIVersion{
+		Version:    "lotus-miner",
+		APIVersion: lapi.MinerAPIVersion0,
+		BlockDelay: build.BlockDelaySecs,
+	}
+
+	sps.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
+
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
 	require.NoError(t, err)
@@ -1627,11 +1635,6 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), minerStub.MockPieceReader, 1)
 	pm.Start(pdctx)
 	t.Cleanup(cancel)
-	ver := lapi.APIVersion{
-		Version:    "lotus-miner",
-		APIVersion: lapi.MinerAPIVersion0,
-		BlockDelay: build.BlockDelaySecs,
-	}
 
 	ph.MockSealingPipelineAPI.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
 
@@ -1702,6 +1705,12 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
 	h.MockSealingPipelineAPI = h.MinerStub.MockAPI
+	ver := lapi.APIVersion{
+		Version:    "lotus-miner",
+		APIVersion: lapi.MinerAPIVersion0,
+		BlockDelay: build.BlockDelaySecs,
+	}
+	h.MockSealingPipelineAPI.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
