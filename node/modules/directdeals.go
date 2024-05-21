@@ -35,7 +35,6 @@ func NewDirectDealsProvider(provAddr address.Address, cfg *config.Boost) func(lc
 		ddpCfg := storagemarket.DDPConfig{
 			StartEpochSealingBuffer: abi.ChainEpoch(cfg.Dealmaking.StartEpochSealingBuffer),
 			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
-			Curio:                   cfg.Curio.Enabled,
 		}
 
 		prov := storagemarket.NewDirectDealsProvider(ddpCfg, provAddr, fullnodeApi, secb, commpc, commpt, sps, directDealsDB, dl, piecedirectory, ip)

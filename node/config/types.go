@@ -51,7 +51,6 @@ type Boost struct {
 	HttpDownload        HttpDownloadConfig
 	Retrievals          RetrievalConfig
 	IndexProvider       IndexProviderConfig
-	Curio               CurioConfig
 }
 
 type WalletsConfig struct {
@@ -395,10 +394,4 @@ type DealPublishConfig struct {
 	// as a multiplier of the minimum collateral bound
 	// The maximum fee to pay when sending the PublishStorageDeals message
 	MaxPublishDealsFee types.FIL
-}
-
-type CurioConfig struct {
-	//  When set to true, Boost will follow the deal processing specific to Curio
-	// cluster instead of lotus-miner
-	Enabled bool
 }

@@ -147,12 +147,6 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 
 			Comment: ``,
 		},
-		{
-			Name: "Curio",
-			Type: "CurioConfig",
-
-			Comment: ``,
-		},
 	},
 	"Common": []DocField{
 		{
@@ -198,15 +192,6 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Type: "string",
 
 			Comment: `From address for eth_ state call`,
-		},
-	},
-	"CurioConfig": []DocField{
-		{
-			Name: "Enabled",
-			Type: "bool",
-
-			Comment: `When set to true, Boost will follow the deal processing specific to Curio
-cluster instead of lotus-miner`,
 		},
 	},
 	"DealPublishConfig": []DocField{

@@ -437,7 +437,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 	return Options(
 		ConfigCommon(&cfg.Common),
-		Override(UserAgentKey, modules.UserAgent(cfg)),
+		Override(UserAgentKey, modules.UserAgent),
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
 

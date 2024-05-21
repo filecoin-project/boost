@@ -170,9 +170,6 @@ func DefaultBoost() *Boost {
 			MaxDealsPerPublishMsg: 8,
 			MaxPublishDealsFee:    types.MustParseFIL("0.05"),
 		},
-		Curio: CurioConfig{
-			Enabled: false,
-		},
 	}
 	return cfg
 }

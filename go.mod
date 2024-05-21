@@ -376,3 +376,5 @@ require (
 )
 
 replace github.com/ugorji/go => github.com/ugorji/go v1.2.11
+
+replace github.com/KarpelesLab/reflink => github.com/magik6k/reflink v1.0.2-patch1

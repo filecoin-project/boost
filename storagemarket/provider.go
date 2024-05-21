@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -156,6 +157,15 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
 	if err != nil {
 		return nil, err
+	}
+
+	v, err := sps.Version(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.Contains(v.String(), "curio") {
+		cfg.Curio = true
 	}
 
 	newDealPS, err := newDealPubsub()
