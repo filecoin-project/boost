@@ -242,6 +242,7 @@ func (dtnet *libp2pDataTransferNetwork) handleNewStream(s network.Stream) {
 	for {
 		var received datatransfer.Message
 		var err error
+		_ = s.SetReadDeadline(time.Now().Add(dtnet.sendMessageTimeout))
 		switch s.Protocol() {
 		case datatransfer.ProtocolDataTransfer1_2:
 			received, err = message.FromNet(s)
@@ -253,9 +254,10 @@ func (dtnet *libp2pDataTransferNetwork) handleNewStream(s network.Stream) {
 				go dtnet.receiver.ReceiveError(err)
 				log.Debugf("net handleNewStream from %s error: %s", p, err)
 			}
+			_ = s.SetReadDeadline(time.Time{})
 			return
 		}
-
+		_ = s.SetReadDeadline(time.Time{})
 		ctx := context.Background()
 		log.Debugf("net handleNewStream from %s", p)
 
