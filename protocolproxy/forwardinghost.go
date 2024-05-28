@@ -146,7 +146,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 	// recently) open the stream over the direct connection
 	if p != fh.proxy {
 		connectedness := fh.Host.Network().Connectedness(p)
-		if connectedness == network.Connected || connectedness == network.CanConnect {
+		if connectedness == network.Connected {
 			return fh.Host.NewStream(ctx, p, protocols...)
 		}
 	}

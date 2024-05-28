@@ -874,30 +874,6 @@ your node if metadata log is disabled`,
 	},
 	"lotus_config.Client": []DocField{
 		{
-			Name: "UseIpfs",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsOnlineMode",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsMAddr",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsUseForRetrieval",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
 			Name: "SimultaneousTransfersForStorage",
 			Type: "uint64",
 
@@ -950,6 +926,380 @@ of automatically performing on-chain operations.`,
 			Type: "Pubsub",
 
 			Comment: ``,
+		},
+	},
+	"lotus_config.CurioAddresses": []DocField{
+		{
+			Name: "PreCommitControl",
+			Type: "[]string",
+
+			Comment: `Addresses to send PreCommit messages from`,
+		},
+		{
+			Name: "CommitControl",
+			Type: "[]string",
+
+			Comment: `Addresses to send Commit messages from`,
+		},
+		{
+			Name: "TerminateControl",
+			Type: "[]string",
+
+			Comment: ``,
+		},
+		{
+			Name: "DisableOwnerFallback",
+			Type: "bool",
+
+			Comment: `DisableOwnerFallback disables usage of the owner address for messages
+sent automatically`,
+		},
+		{
+			Name: "DisableWorkerFallback",
+			Type: "bool",
+
+			Comment: `DisableWorkerFallback disables usage of the worker address for messages
+sent automatically, if control addresses are configured.
+A control address that doesn't have enough funds will still be chosen
+over the worker address if this flag is set.`,
+		},
+		{
+			Name: "MinerAddresses",
+			Type: "[]string",
+
+			Comment: `MinerAddresses are the addresses of the miner actors to use for sending messages`,
+		},
+	},
+	"lotus_config.CurioConfig": []DocField{
+		{
+			Name: "Subsystems",
+			Type: "CurioSubsystemsConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Fees",
+			Type: "CurioFees",
+
+			Comment: ``,
+		},
+		{
+			Name: "Addresses",
+			Type: "[]CurioAddresses",
+
+			Comment: `Addresses of wallets per MinerAddress (one of the fields).`,
+		},
+		{
+			Name: "Proving",
+			Type: "CurioProvingConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Ingest",
+			Type: "CurioIngestConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Journal",
+			Type: "JournalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Apis",
+			Type: "ApisConfig",
+
+			Comment: ``,
+		},
+	},
+	"lotus_config.CurioFees": []DocField{
+		{
+			Name: "DefaultMaxFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxPreCommitGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxCommitGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxPreCommitBatchGasFee",
+			Type: "BatchFeeConfig",
+
+			Comment: `maxBatchFee = maxBase + maxPerSector * nSectors`,
+		},
+		{
+			Name: "MaxCommitBatchGasFee",
+			Type: "BatchFeeConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxTerminateGasFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+		{
+			Name: "MaxWindowPoStGasFee",
+			Type: "types.FIL",
+
+			Comment: `WindowPoSt is a high-value operation, so the default fee should be high.`,
+		},
+		{
+			Name: "MaxPublishDealsFee",
+			Type: "types.FIL",
+
+			Comment: ``,
+		},
+	},
+	"lotus_config.CurioIngestConfig": []DocField{
+		{
+			Name: "MaxQueueSDR",
+			Type: "int",
+
+			Comment: `SDR queue is the first queue in the sealing pipeline, meaning that it should be used as the primary backpressure mechanism.`,
+		},
+		{
+			Name: "MaxQueueTrees",
+			Type: "int",
+
+			Comment: `Maximum number of sectors that can be queued waiting for SDRTrees to start processing.
+0 = unlimited
+Note: This mechanism will delay taking deal data from markets, providing backpressure to the market subsystem.
+In case of the trees tasks it is possible that this queue grows more than this limit, the backpressure is only
+applied to sectors entering the pipeline.`,
+		},
+		{
+			Name: "MaxQueuePoRep",
+			Type: "int",
+
+			Comment: `Maximum number of sectors that can be queued waiting for PoRep to start processing.
+0 = unlimited
+Note: This mechanism will delay taking deal data from markets, providing backpressure to the market subsystem.
+Like with the trees tasks, it is possible that this queue grows more than this limit, the backpressure is only
+applied to sectors entering the pipeline.`,
+		},
+	},
+	"lotus_config.CurioProvingConfig": []DocField{
+		{
+			Name: "ParallelCheckLimit",
+			Type: "int",
+
+			Comment: `After changing this option, confirm that the new value works in your setup by invoking
+'lotus-miner proving compute window-post 0'`,
+		},
+		{
+			Name: "SingleCheckTimeout",
+			Type: "Duration",
+
+			Comment: `WARNING: Setting this value too low risks in sectors being skipped even though they are accessible, just reading the
+test challenge took longer than this timeout
+WARNING: Setting this value too high risks missing PoSt deadline in case IO operations related to this sector are
+blocked (e.g. in case of disconnected NFS mount)`,
+		},
+		{
+			Name: "PartitionCheckTimeout",
+			Type: "Duration",
+
+			Comment: `WARNING: Setting this value too low risks in sectors being skipped even though they are accessible, just reading the
+test challenge took longer than this timeout
+WARNING: Setting this value too high risks missing PoSt deadline in case IO operations related to this partition are
+blocked or slow`,
+		},
+		{
+			Name: "DisableWDPoStPreChecks",
+			Type: "bool",
+
+			Comment: `After changing this option, confirm that the new value works in your setup by invoking
+'lotus-miner proving compute window-post 0'`,
+		},
+		{
+			Name: "//",
+			Type: "//",
+
+			Comment: `A single partition may contain up to 2349 32GiB sectors, or 2300 64GiB sectors.`,
+		},
+		{
+			Name: "MaxPartitionsPerPoStMessage",
+			Type: "int",
+
+			Comment: `Setting this value above the network limit has no effect`,
+		},
+		{
+			Name: "MaxPartitionsPerRecoveryMessage",
+			Type: "int",
+
+			Comment: `In some cases when submitting DeclareFaultsRecovered messages,
+there may be too many recoveries to fit in a BlockGasLimit.
+In those cases it may be necessary to set this value to something low (eg 1);
+Note that setting this value lower may result in less efficient gas use - more messages will be sent than needed,
+resulting in more total gas use (but each message will have lower gas limit)`,
+		},
+		{
+			Name: "SingleRecoveringPartitionPerPostMessage",
+			Type: "bool",
+
+			Comment: `Note that setting this value lower may result in less efficient gas use - more messages will be sent,
+to prove each deadline, resulting in more total gas use (but each message will have lower gas limit)`,
+		},
+	},
+	"lotus_config.CurioSubsystemsConfig": []DocField{
+		{
+			Name: "EnableWindowPost",
+			Type: "bool",
+
+			Comment: `It is possible to have instances handling both WindowPoSt and WinningPoSt, which can provide redundancy without
+the need for additional machines. In setups like this it is generally recommended to run
+partitionsPerDeadline+1 machines.`,
+		},
+		{
+			Name: "WindowPostMaxTasks",
+			Type: "int",
+
+			Comment: ``,
+		},
+		{
+			Name: "EnableWinningPost",
+			Type: "bool",
+
+			Comment: `EnableWinningPost enables winning post to be executed on this curio instance.
+Each machine in the cluster with WinningPoSt enabled will also participate in the winning post scheduler.
+It is possible to mix machines with WindowPoSt and WinningPoSt enabled, for details see the EnableWindowPost
+documentation.`,
+		},
+		{
+			Name: "WinningPostMaxTasks",
+			Type: "int",
+
+			Comment: ``,
+		},
+		{
+			Name: "EnableParkPiece",
+			Type: "bool",
+
+			Comment: `EnableParkPiece enables the "piece parking" task to run on this node. This task is responsible for fetching
+pieces from the network and storing them in the storage subsystem until sectors are sealed. This task is
+only applicable when integrating with boost, and should be enabled on nodes which will hold deal data
+from boost until sectors containing the related pieces have the TreeD/TreeR constructed.
+Note that future Curio implementations will have a separate task type for fetching pieces from the internet.`,
+		},
+		{
+			Name: "ParkPieceMaxTasks",
+			Type: "int",
+
+			Comment: ``,
+		},
+		{
+			Name: "EnableSealSDR",
+			Type: "bool",
+
+			Comment: `In lotus-miner this was run as part of PreCommit1.`,
+		},
+		{
+			Name: "SealSDRMaxTasks",
+			Type: "int",
+
+			Comment: `The maximum amount of SDR tasks that can run simultaneously. Note that the maximum number of tasks will
+also be bounded by resources available on the machine.`,
+		},
+		{
+			Name: "EnableSealSDRTrees",
+			Type: "bool",
+
+			Comment: `In lotus-miner this was run as part of PreCommit2 (TreeD was run in PreCommit1).
+Note that nodes with SDRTrees enabled will also answer to Finalize tasks,
+which just remove unneeded tree data after PoRep is computed.`,
+		},
+		{
+			Name: "SealSDRTreesMaxTasks",
+			Type: "int",
+
+			Comment: `The maximum amount of SealSDRTrees tasks that can run simultaneously. Note that the maximum number of tasks will
+also be bounded by resources available on the machine.`,
+		},
+		{
+			Name: "FinalizeMaxTasks",
+			Type: "int",
+
+			Comment: `FinalizeMaxTasks is the maximum amount of finalize tasks that can run simultaneously.
+The finalize task is enabled on all machines which also handle SDRTrees tasks. Finalize ALWAYS runs on whichever
+machine holds sector cache files, as it removes unneeded tree data after PoRep is computed.
+Finalize will run in parallel with the SubmitCommitMsg task.`,
+		},
+		{
+			Name: "EnableSendPrecommitMsg",
+			Type: "bool",
+
+			Comment: `EnableSendPrecommitMsg enables the sending of precommit messages to the chain
+from this curio instance.
+This runs after SDRTrees and uses the output CommD / CommR (roots of TreeD / TreeR) for the message`,
+		},
+		{
+			Name: "EnablePoRepProof",
+			Type: "bool",
+
+			Comment: `In lotus-miner this was Commit1 / Commit2`,
+		},
+		{
+			Name: "PoRepProofMaxTasks",
+			Type: "int",
+
+			Comment: `The maximum amount of PoRepProof tasks that can run simultaneously. Note that the maximum number of tasks will
+also be bounded by resources available on the machine.`,
+		},
+		{
+			Name: "EnableSendCommitMsg",
+			Type: "bool",
+
+			Comment: `EnableSendCommitMsg enables the sending of commit messages to the chain
+from this curio instance.`,
+		},
+		{
+			Name: "EnableMoveStorage",
+			Type: "bool",
+
+			Comment: `The MoveStorage task is the last task in the sealing pipeline. It moves the sealed sector data from the
+SDRTrees machine into long-term storage. This task runs after the Finalize task.`,
+		},
+		{
+			Name: "MoveStorageMaxTasks",
+			Type: "int",
+
+			Comment: `The maximum amount of MoveStorage tasks that can run simultaneously. Note that the maximum number of tasks will
+also be bounded by resources available on the machine. It is recommended that this value is set to a number which
+uses all available network (or disk) bandwidth on the machine without causing bottlenecks.`,
+		},
+		{
+			Name: "BoostAdapters",
+			Type: "[]string",
+
+			Comment: `NOTE: All deal data will flow through this service, so it should be placed on a machine running boost or on
+a machine which handles ParkPiece tasks.`,
+		},
+		{
+			Name: "EnableWebGui",
+			Type: "bool",
+
+			Comment: `EnableWebGui enables the web GUI on this curio instance. The UI has minimal local overhead, but it should
+only need to be run on a single machine in the cluster.`,
+		},
+		{
+			Name: "GuiAddress",
+			Type: "string",
+
+			Comment: `The address that should listen for Web GUI requests.`,
 		},
 	},
 	"lotus_config.DAGStoreConfig": []DocField{
@@ -1334,12 +1684,6 @@ Set to 0 to keep all mappings`,
 			Comment: ``,
 		},
 		{
-			Name: "Cluster",
-			Type: "UserRaftConfig",
-
-			Comment: ``,
-		},
-		{
 			Name: "Fevm",
 			Type: "FevmConfig",
 
@@ -1540,136 +1884,6 @@ closed by the connection manager.`,
 			Comment: `SubsystemLevels specify per-subsystem log levels`,
 		},
 	},
-	"lotus_config.LotusProviderAddresses": []DocField{
-		{
-			Name: "PreCommitControl",
-			Type: "[]string",
-
-			Comment: `Addresses to send PreCommit messages from`,
-		},
-		{
-			Name: "CommitControl",
-			Type: "[]string",
-
-			Comment: `Addresses to send Commit messages from`,
-		},
-		{
-			Name: "TerminateControl",
-			Type: "[]string",
-
-			Comment: ``,
-		},
-		{
-			Name: "DisableOwnerFallback",
-			Type: "bool",
-
-			Comment: `DisableOwnerFallback disables usage of the owner address for messages
-sent automatically`,
-		},
-		{
-			Name: "DisableWorkerFallback",
-			Type: "bool",
-
-			Comment: `DisableWorkerFallback disables usage of the worker address for messages
-sent automatically, if control addresses are configured.
-A control address that doesn't have enough funds will still be chosen
-over the worker address if this flag is set.`,
-		},
-		{
-			Name: "MinerAddresses",
-			Type: "[]string",
-
-			Comment: `MinerAddresses are the addresses of the miner actors to use for sending messages`,
-		},
-	},
-	"lotus_config.LotusProviderConfig": []DocField{
-		{
-			Name: "Subsystems",
-			Type: "ProviderSubsystemsConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "Fees",
-			Type: "LotusProviderFees",
-
-			Comment: ``,
-		},
-		{
-			Name: "Addresses",
-			Type: "LotusProviderAddresses",
-
-			Comment: ``,
-		},
-		{
-			Name: "Proving",
-			Type: "ProvingConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "Journal",
-			Type: "JournalConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "Apis",
-			Type: "ApisConfig",
-
-			Comment: ``,
-		},
-	},
-	"lotus_config.LotusProviderFees": []DocField{
-		{
-			Name: "DefaultMaxFee",
-			Type: "types.FIL",
-
-			Comment: ``,
-		},
-		{
-			Name: "MaxPreCommitGasFee",
-			Type: "types.FIL",
-
-			Comment: ``,
-		},
-		{
-			Name: "MaxCommitGasFee",
-			Type: "types.FIL",
-
-			Comment: ``,
-		},
-		{
-			Name: "MaxPreCommitBatchGasFee",
-			Type: "BatchFeeConfig",
-
-			Comment: `maxBatchFee = maxBase + maxPerSector * nSectors`,
-		},
-		{
-			Name: "MaxCommitBatchGasFee",
-			Type: "BatchFeeConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "MaxTerminateGasFee",
-			Type: "types.FIL",
-
-			Comment: ``,
-		},
-		{
-			Name: "MaxWindowPoStGasFee",
-			Type: "types.FIL",
-
-			Comment: `WindowPoSt is a high-value operation, so the default fee should be high.`,
-		},
-		{
-			Name: "MaxPublishDealsFee",
-			Type: "types.FIL",
-
-			Comment: ``,
-		},
-	},
 	"lotus_config.MinerAddressConfig": []DocField{
 		{
 			Name: "PreCommitControl",
@@ -1837,32 +2051,6 @@ blocks. This should only be set when there's an external process mining
 blocks on behalf of the miner.
 When disabled and no external block producers are configured, all potential
 block rewards will be missed!`,
-		},
-	},
-	"lotus_config.ProviderSubsystemsConfig": []DocField{
-		{
-			Name: "EnableWindowPost",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "WindowPostMaxTasks",
-			Type: "int",
-
-			Comment: ``,
-		},
-		{
-			Name: "EnableWinningPost",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "WinningPostMaxTasks",
-			Type: "int",
-
-			Comment: ``,
 		},
 	},
 	"lotus_config.ProvingConfig": []DocField{
@@ -2503,68 +2691,6 @@ HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 			Type: "HarmonyDB",
 
 			Comment: ``,
-		},
-	},
-	"lotus_config.UserRaftConfig": []DocField{
-		{
-			Name: "ClusterModeEnabled",
-			Type: "bool",
-
-			Comment: `EXPERIMENTAL. config to enabled node cluster with raft consensus`,
-		},
-		{
-			Name: "DataFolder",
-			Type: "string",
-
-			Comment: `A folder to store Raft's data.`,
-		},
-		{
-			Name: "InitPeersetMultiAddr",
-			Type: "[]string",
-
-			Comment: `InitPeersetMultiAddr provides the list of initial cluster peers for new Raft
-peers (with no prior state). It is ignored when Raft was already
-initialized or when starting in staging mode.`,
-		},
-		{
-			Name: "WaitForLeaderTimeout",
-			Type: "Duration",
-
-			Comment: `LeaderTimeout specifies how long to wait for a leader before
-failing an operation.`,
-		},
-		{
-			Name: "NetworkTimeout",
-			Type: "Duration",
-
-			Comment: `NetworkTimeout specifies how long before a Raft network
-operation is timed out`,
-		},
-		{
-			Name: "CommitRetries",
-			Type: "int",
-
-			Comment: `CommitRetries specifies how many times we retry a failed commit until
-we give up.`,
-		},
-		{
-			Name: "CommitRetryDelay",
-			Type: "Duration",
-
-			Comment: `How long to wait between retries`,
-		},
-		{
-			Name: "BackupsRotate",
-			Type: "int",
-
-			Comment: `BackupsRotate specifies the maximum number of Raft's DataFolder
-copies that we keep as backups (renaming) after cleanup.`,
-		},
-		{
-			Name: "Tracing",
-			Type: "bool",
-
-			Comment: `Tracing enables propagation of contexts across binary boundaries.`,
 		},
 	},
 	"lotus_config.Wallet": []DocField{
