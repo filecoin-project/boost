@@ -1418,6 +1418,8 @@ github.com/fatih/structs v0.0.0-20180123065059-ebf56d35bba7/go.mod h1:9NiDSp5zOc
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/felixge/httpsnoop v1.0.2/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
+github.com/filecoin-project/boost-graphsync v0.13.11 h1:quhAvlz+26D1xLH5v5XfWFfuxsZEcwbpbZxmF5ZNJzw=
+github.com/filecoin-project/boost-graphsync v0.13.11/go.mod h1:bc2M5ZLZJtXHl8kjnqtn4L1MsdEqpJErDaIeY0bJ9wk=
 github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231009154452-ca8daa2870f3/go.mod h1:vHUM62fb82DpsBSXptQjpvcysjoV2Guc1MVJiIYccfQ=
 github.com/filecoin-project/filecoin-ffi v0.30.4-0.20220519234331-bfd1f5f9fe38/go.mod h1:GM5pXRYvQM7wyH6V2WtPnJ2k1jt+qotRkWLxBSRCOuE=
 github.com/filecoin-project/go-dagaggregator-unixfs v0.3.0 h1:UXLtBUnPa61LkNa2GqhP+aJ53bOnHP/dzg6/wk2rnsA=
@@ -2705,7 +2707,6 @@ github.com/whyrusleeping/cbor-gen v0.0.0-20230126041949-52956bd4c9aa/go.mod h1:f
 github.com/whyrusleeping/cbor-gen v0.0.0-20230418232409-daab9ece03a0/go.mod h1:fgkXqYy7bV2cFeIEOkVTZS/WjXARfBqSH6Q2qHL33hQ=
 github.com/whyrusleeping/cbor-gen v0.0.0-20230818171029-f91ae536ca25/go.mod h1:fgkXqYy7bV2cFeIEOkVTZS/WjXARfBqSH6Q2qHL33hQ=
 github.com/whyrusleeping/cbor-gen v0.0.0-20240109153615-66e95c3e8a87/go.mod h1:fgkXqYy7bV2cFeIEOkVTZS/WjXARfBqSH6Q2qHL33hQ=
-github.com/whyrusleeping/cbor-gen v0.1.0/go.mod h1:pM99HXyEbSQHcosHc0iW7YFmwnscr+t9Te4ibko05so=
 github.com/whyrusleeping/go-ctrlnet v0.0.0-20180313164037-f564fbbdaa95 h1:c23eYhe7i8MG6dUSPzyIDDy5+cWOoZMovPamBKqrjYQ=
 github.com/whyrusleeping/go-logging v0.0.1 h1:fwpzlmT0kRC/Fmd0MdmGgJG/CXIZ6gFq46FQZjprUcc=
 github.com/whyrusleeping/go-notifier v0.0.0-20170827234753-097c5d47330f h1:M/lL30eFZTKnomXY6huvM6G0+gVquFNf6mxghaWlFUg=

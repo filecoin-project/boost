@@ -302,7 +302,7 @@ require (
 )
 
 require (
-	github.com/filecoin-project/boost-graphsync v0.13.10
+	github.com/filecoin-project/boost-graphsync v0.13.11
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/lotus v1.27.0
