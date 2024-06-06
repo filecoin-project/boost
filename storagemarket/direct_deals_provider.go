@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,6 +90,15 @@ func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeAp
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	log.Infow("direct deals provider: starting")
 	ddp.ctx = ctx
+
+	v, err := ddp.sps.Version(ctx)
+	if err != nil {
+		return err
+	}
+
+	if strings.Contains(v.String(), "curio") {
+		ddp.config.Curio = true
+	}
 
 	deals, err := ddp.directDealsDB.ListActive(ctx)
 	if err != nil {
