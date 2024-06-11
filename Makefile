@@ -217,11 +217,11 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.26.1
+lotus_version?=v1.27.0
 ffi_from_source?=0
 build_lotus?=0
 build_boost?=1
-boost_version?=v2.2.0-rc1
+boost_version?=v2.3.0-rc2
 ifeq ($(build_boost),1)
 #v1: build boost images currently checked out branch
 	boost_build_cmd=docker/boost

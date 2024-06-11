@@ -41,7 +41,7 @@ function RetrievalMinerAddrs() {
         return null
     }
 
-    const minerAddr = minerAddrQuery.data.minerAddress
+    const minerAddr = minerAddrQuery.data.minerAddress.MinerID
     const retrievalMinerAddrs = gsRetrievalMinerAddrsQuery.data.graphsyncRetrievalMinerAddresses
 
     if (retrievalMinerAddrs.length === 1 && retrievalMinerAddrs[0] === minerAddr) {
