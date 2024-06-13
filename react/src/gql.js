@@ -71,7 +71,10 @@ const EpochQuery = gql`
 
 const MinerAddressQuery = gql`
     query AppMinerAddressQuery {
-        minerAddress
+        minerAddress {
+            MinerID
+            IsCurio
+        }
     }
 `;
 

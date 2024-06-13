@@ -114,6 +114,21 @@ func (mr *MockAPIMockRecorder) SectorsSummary(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SectorsSummary", reflect.TypeOf((*MockAPI)(nil).SectorsSummary), arg0)
 }
 
+// Version mocks base method.
+func (m *MockAPI) Version(arg0 context.Context) (api.APIVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Version", arg0)
+	ret0, _ := ret[0].(api.APIVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Version indicates an expected call of Version.
+func (mr *MockAPIMockRecorder) Version(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockAPI)(nil).Version), arg0)
+}
+
 // WorkerJobs mocks base method.
 func (m *MockAPI) WorkerJobs(arg0 context.Context) (map[uuid.UUID][]storiface.WorkerJob, error) {
 	m.ctrl.T.Helper()

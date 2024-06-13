@@ -551,6 +551,12 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 			continue
 		}
 
+		// Skip if sector ID is 0. It would be better to skip accounting for this sector rather than
+		// announcing non-existent deal defaulting to sector 0
+		if d.SectorID == 0 {
+			continue
+		}
+
 		present, err := activeSectors.IsSet(uint64(d.SectorID))
 		if err != nil {
 			return fmt.Errorf("checking if bitfield is set: %w", err)

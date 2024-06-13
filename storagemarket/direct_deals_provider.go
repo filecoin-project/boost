@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	lotuspiece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
 )
@@ -41,6 +43,7 @@ type DDPConfig struct {
 	RemoteCommp bool
 	// Minimum start epoch buffer to give time for sealing of sector with deal
 	StartEpochSealingBuffer abi.ChainEpoch
+	Curio                   bool
 }
 
 type DirectDealsProvider struct {
@@ -87,6 +90,15 @@ func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeAp
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	log.Infow("direct deals provider: starting")
 	ddp.ctx = ctx
+
+	v, err := ddp.sps.Version(ctx)
+	if err != nil {
+		return err
+	}
+
+	if strings.Contains(v.String(), "curio") {
+		ddp.config.Curio = true
+	}
 
 	deals, err := ddp.directDealsDB.ListActive(ctx)
 	if err != nil {
@@ -659,6 +671,15 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 }
 
 func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal) *dealMakingError {
+	// If this is Curio sealer then we should wait till sector finishes sealing
+	if ddp.config.Curio {
+		// Wait for sector to finish sealing
+		err := ddp.trackCurioSealing(entry.SectorID)
+		if err != nil {
+			return err
+		}
+	}
+
 	// add deal to piece metadata store
 	ddp.dealLogger.Infow(entry.ID, "about to add direct deal for piece in LID")
 	if err := ddp.pd.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
@@ -717,4 +738,45 @@ func (ddp *DirectDealsProvider) confirmClaim(ctx context.Context, allocId verifr
 		return false, true, nil
 	}
 	return true, true, nil
+}
+
+func (ddp *DirectDealsProvider) trackCurioSealing(sectorNum abi.SectorNumber) *dealMakingError {
+	var lastSealingState lapi.SectorState
+	checkStatus := func() lapi.SectorInfo {
+		// Get the sector status
+		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
+		if err == nil && si.State != lastSealingState {
+			lastSealingState = si.State
+		}
+		return si
+	}
+
+	retErr := &dealMakingError{
+		retry: types.DealRetryFatal,
+		error: ErrSectorSealingFailed,
+	}
+
+	// Check status immediately
+	info := checkStatus()
+	if IsFinalSealingState(info.State) {
+		return nil
+	}
+
+	// Check status every 10 second. There is no advantage of checking it every second
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ddp.ctx.Done():
+			return nil
+		case <-ticker.C:
+			info = checkStatus()
+			if IsFinalSealingState(info.State) {
+				if sealing.SectorState(info.State) == sealing.FailedUnrecoverable {
+					return retErr
+				}
+				return nil
+			}
+		}
+	}
 }

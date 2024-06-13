@@ -27,15 +27,19 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask storedask.StoredAsk) *Server {
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask storedask.StoredAsk) (*Server, error) {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory,
 		indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg BlockGetter,
-		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask storedask.StoredAsk) *Server {
+		ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, sask storedask.StoredAsk) (*Server, error) {
 
 		resolverCtx, cancel := context.WithCancel(context.Background())
-		resolver := NewResolver(resolverCtx, cfg, r, h, dealsDB, directDealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, ddProv, legacyDeals, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma, sask)
+		resolver, err := NewResolver(resolverCtx, cfg, r, h, dealsDB, directDealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, ddProv, legacyDeals, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool, mma, sask)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
 		svr := NewServer(cfg, resolver, bg)
 
 		lc.Append(fx.Hook{
@@ -46,7 +50,7 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 			},
 		})
 
-		return svr
+		return svr, nil
 	}
 }
 

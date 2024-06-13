@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,7 @@ var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
+	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
 )
 
 var (
@@ -82,6 +84,7 @@ type Config struct {
 	// Cache timeout for Sealing Pipeline status
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
+	Curio                       bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -154,6 +157,15 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
 	if err != nil {
 		return nil, err
+	}
+
+	v, err := sps.Version(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.Contains(v.String(), "curio") {
+		cfg.Curio = true
 	}
 
 	newDealPS, err := newDealPubsub()

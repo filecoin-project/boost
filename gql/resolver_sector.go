@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+
 	"github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
@@ -27,9 +28,9 @@ func (r *sectorStatusResolver) DealIDs() []types.Uint64 {
 	return ids
 }
 
-func (dr *resolver) SectorStatus(ctx context.Context, args struct{ SectorNumber types.Uint64 }) (*sectorStatusResolver, error) {
+func (r *resolver) SectorStatus(ctx context.Context, args struct{ SectorNumber types.Uint64 }) (*sectorStatusResolver, error) {
 	sec := abi.SectorNumber(args.SectorNumber)
-	si, err := dr.spApi.SectorsStatus(ctx, sec, false)
+	si, err := r.spApi.SectorsStatus(ctx, sec, false)
 	if err != nil {
 		return nil, err
 	}

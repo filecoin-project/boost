@@ -296,7 +296,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			}
 
 			if j == len(lds) {
-				log.Errorw("couldnt match deal to boost or legacy market deal based on publish cid and proposal cid", "publishCid", publishCid, "dealProposalCid", dcid)
+				log.Errorw("couldn't match deal to boost or legacy market deal based on publish cid and proposal cid", "publishCid", publishCid, "dealProposalCid", dcid)
 				continue
 			}
 

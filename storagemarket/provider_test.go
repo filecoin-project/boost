@@ -43,6 +43,7 @@ import (
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
+	"github.com/filecoin-project/lotus/build"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -1526,6 +1527,14 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	minerStub := smtestutil.NewMinerStub(ctrl)
 	sps := minerStub.MockAPI
 
+	ver := lapi.APIVersion{
+		Version:    "lotus-miner",
+		APIVersion: lapi.MinerAPIVersion0,
+		BlockDelay: build.BlockDelaySecs,
+	}
+
+	sps.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
+
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
 	require.NoError(t, err)
@@ -1627,6 +1636,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	pm.Start(pdctx)
 	t.Cleanup(cancel)
 
+	ph.MockSealingPipelineAPI.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
+
 	prvCfg := Config{
 		MaxTransferDuration: time.Hour,
 		RemoteCommp:         !pc.localCommp,
@@ -1694,6 +1705,12 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
 	h.MockSealingPipelineAPI = h.MinerStub.MockAPI
+	ver := lapi.APIVersion{
+		Version:    "lotus-miner",
+		APIVersion: lapi.MinerAPIVersion0,
+		BlockDelay: build.BlockDelaySecs,
+	}
+	h.MockSealingPipelineAPI.EXPECT().Version(gomock.Any()).Return(ver, nil).AnyTimes()
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil

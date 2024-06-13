@@ -87,7 +87,7 @@ var initCmd = &cli.Command{
 			}
 
 			rcfg.ConfigVersion = config.CurrentVersion
-			cerr = setMinerApiConfig(cctx, rcfg, true)
+			cerr = setMinerApiConfig(cctx, rcfg)
 			if cerr != nil {
 				return
 			}
@@ -118,9 +118,14 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("writing config file %s: %w", string(newCfg), err)
 		}
 
+		miner, err := address.NewFromString(curCfg.Wallets.Miner)
+		if err != nil {
+			return fmt.Errorf("converting miner address: %w", err)
+		}
+
 		// Add the miner address to the metadata datastore
-		fmt.Printf("Adding miner address %s to datastore\n", bp.minerActor)
-		err = addMinerAddressToDatastore(ds, bp.minerActor)
+		fmt.Printf("Adding miner address %s to datastore\n", miner)
+		err = addMinerAddressToDatastore(ds, miner)
 		if err != nil {
 			return err
 		}
@@ -140,10 +145,9 @@ var initCmd = &cli.Command{
 }
 
 type boostParams struct {
-	repo       *lotus_repo.FsRepo
-	minerActor address.Address
-	walletPSD  address.Address
-	walletCP   address.Address
+	repo      *lotus_repo.FsRepo
+	walletPSD address.Address
+	walletCP  address.Address
 }
 
 func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.LockedRepo) (*boostParams, error) {
@@ -176,36 +180,6 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 		return nil, err
 	}
 	defer closer()
-
-	var minerActor address.Address
-	if marketsRepo == nil {
-		// If this is not a migration from an existing repo, just query the
-		// miner directly for the actor address
-		smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
-		if err != nil {
-			if strings.Contains(err.Error(), "could not get API info") {
-				err = fmt.Errorf("%w\nDo you need to set the environment variable MINER_API_INFO?", err)
-			}
-			return nil, err
-		}
-		defer smCloser()
-
-		minerActor, err = smApi.ActorAddress(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting miner actor address: %w", err)
-		}
-	} else {
-		// This is a migration from an existing repo, so get the miner address
-		// from the repo datastore
-		ds, err := marketsRepo.Datastore(context.Background(), metadataNamespace)
-		if err != nil {
-			return nil, fmt.Errorf("getting legacy repo datastore: %w", err)
-		}
-		minerActor, err = getMinerAddressFromDatastore(ds)
-		if err != nil {
-			return nil, fmt.Errorf("getting miner actor address: %w", err)
-		}
-	}
 
 	fmt.Println("Checking full node sync status")
 
@@ -248,55 +222,45 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	}
 
 	return &boostParams{
-		repo:       r,
-		minerActor: minerActor,
-		walletPSD:  walletPSD,
-		walletCP:   walletCP,
+		repo:      r,
+		walletPSD: walletPSD,
+		walletCP:  walletCP,
 	}, nil
 }
 
-func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) error {
+func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost) error {
 	ctx := cctx.Context
-	asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"), dialCheck)
+	asi, miner1, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
 	if err != nil {
 		return fmt.Errorf("checking sector index API: %w", err)
 	}
 	fmt.Printf("Sector index api info: %s\n", asi)
 	rcfg.SectorIndexApiInfo = asi
 
-	ai, err := checkApiInfo(ctx, cctx.String("api-sealer"), dialCheck)
+	ai, miner2, err := checkApiInfo(ctx, cctx.String("api-sealer"))
 	if err != nil {
 		return fmt.Errorf("checking sealer API: %w", err)
 	}
 
+	if miner1 != miner2 {
+		return errors.New("sector index and sealer APIs belong to different miners")
+	}
+
 	fmt.Printf("Sealer api info: %s\n", ai)
+	fmt.Printf("Miner address: %s", miner1)
 	rcfg.SealerApiInfo = ai
+	rcfg.Wallets.Miner = miner1
 
 	return nil
 }
 
 func setCommonConfig(cctx *cli.Context, rcfg *config.Boost, bp *boostParams) {
 	rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
-	rcfg.Wallets.Miner = bp.minerActor.String()
 	rcfg.Wallets.DealCollateral = bp.walletCP.String()
 	rcfg.Wallets.PublishStorageDeals = bp.walletPSD.String()
 }
 
 var minerAddrDSKey = datastore.NewKey("miner-address")
-
-func getMinerAddressFromDatastore(ds datastore.Batching) (address.Address, error) {
-	addr, err := ds.Get(context.Background(), minerAddrDSKey)
-	if err != nil {
-		return address.Address{}, fmt.Errorf("getting miner address from legacy datastore: %w", err)
-	}
-
-	minerAddr, err := address.NewFromBytes(addr)
-	if err != nil {
-		return address.Address{}, fmt.Errorf("parsing miner address from legacy datastore: %w", err)
-	}
-
-	return minerAddr, nil
-}
 
 func addMinerAddressToDatastore(ds datastore.Batching, minerActor address.Address) error {
 	return ds.Put(context.Background(), minerAddrDSKey, minerActor.Bytes())
@@ -328,33 +292,34 @@ func checkV1ApiSupport(ctx context.Context, cctx *cli.Context) error {
 	return nil
 }
 
-func checkApiInfo(ctx context.Context, ai string, dialCheck bool) (string, error) {
+func checkApiInfo(ctx context.Context, ai string) (string, string, error) {
 	ai = strings.TrimPrefix(strings.TrimSpace(ai), "MINER_API_INFO=")
 	info := cliutil.ParseApiInfo(ai)
 	addr, err := info.DialArgs("v0")
 	if err != nil {
-		return "", fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	if !dialCheck {
-		return ai, nil
+		return "", "", fmt.Errorf("could not get DialArgs: %w", err)
 	}
 
 	fmt.Printf("Checking miner api version of %s\n", addr)
 	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer closer()
 
 	v, err := api.Version(ctx)
 	if err != nil {
-		return "", fmt.Errorf("checking version: %w", err)
+		return "", "", fmt.Errorf("checking version: %w", err)
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.MinerAPIVersion0) {
-		return "", fmt.Errorf("remote service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
+		return "", "", fmt.Errorf("remote service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
 	}
 
-	return ai, nil
+	miner, err := api.ActorAddress(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("getting miner address: %w", err)
+	}
+
+	return ai, miner.String(), nil
 }

@@ -1,6 +1,6 @@
 module github.com/filecoin-project/boost
 
-go 1.21
+go 1.22
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
@@ -27,10 +27,10 @@ require (
 	github.com/filecoin-project/go-commp-utils v0.1.4
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0
-	github.com/filecoin-project/go-jsonrpc v0.3.1
+	github.com/filecoin-project/go-jsonrpc v0.3.2
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.13.3
+	github.com/filecoin-project/go-state-types v0.14.0-dev
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1

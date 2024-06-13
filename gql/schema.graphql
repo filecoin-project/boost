@@ -524,12 +524,17 @@ type PiecePayload {
   Multihash: String!
 }
 
+type MinerAddress {
+  MinerID: String!
+  IsCurio: Boolean!
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: EpochInfo!
 
   """Get miner address"""
-  minerAddress: String!
+  minerAddress: MinerAddress!
 
   """Get list of miners that graphsync can retrieve data from"""
   graphsyncRetrievalMinerAddresses: [String!]!
