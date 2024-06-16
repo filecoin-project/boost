@@ -56,6 +56,10 @@ var initCmd = &cli.Command{
 			Usage:    "max size for staging area in bytes",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:  "nosync",
+			Usage: "dont wait for the full node to sync with the chain",
+		},
 	}...),
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -181,10 +185,11 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	}
 	defer closer()
 
-	fmt.Println("Checking full node sync status")
-
-	if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
-		return nil, fmt.Errorf("sync wait: %w", err)
+	if !cctx.Bool("nosync") {
+		fmt.Println("Checking full node sync status")
+		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
+			return nil, fmt.Errorf("sync wait: %w", err)
+		}
 	}
 
 	repoPath := cctx.String(FlagBoostRepo)
