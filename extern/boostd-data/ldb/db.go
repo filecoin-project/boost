@@ -785,8 +785,10 @@ func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPieces
 		}
 	}
 
-	if len(records) > limit {
-		records = records[:limit]
+	if limit > 0 {
+		if len(records) > limit {
+			records = records[:limit]
+		}
 	}
 
 	return records, nil
