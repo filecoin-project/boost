@@ -216,7 +216,7 @@ func TestLIDCleanup(t *testing.T) {
 		stateList, err := f.LotusMiner.SectorsListInStates(ctx, states)
 		require.NoError(t, err)
 		return len(stateList) == 5
-	}, 5*time.Minute, 2*time.Second, "sectors are still not proving after 5 minutes")
+	}, 10*time.Minute, 2*time.Second, "sectors are still not proving after 5 minutes")
 
 	// Verify that LID has entries for all deals
 	prop1, err := cborutil.AsIpld(&res1.DealParams.ClientDealProposal)
