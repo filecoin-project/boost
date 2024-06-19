@@ -154,7 +154,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 
 	// default to a single stream for libp2p urls as libp2p server doesn't support range requests
 	nChunks := h.nChunks
-	if u.Scheme == "libp2p" {
+	if u.Scheme == "libp2p" || dealInfo.DealSize < (10<<20) {
 		nChunks = 1
 	}
 
