@@ -1,0 +1,25 @@
+name: 'Download Params'
+description: 'Restore and fetch Filecoin proof parameters'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run boostci
+      run: make boostci
+    - name: Restore parameters cache
+      uses: actions/cache@v2
+      with:
+        path: /var/tmp/filecoin-proof-parameters/
+        key: v25-8mb-lotus-params
+    - name: Fetch parameters
+      run: ./boostci fetch-params 8388608
+    - name: Save parameters cache
+      uses: actions/cache@v2
+      with:
+        path: /var/tmp/filecoin-proof-parameters/
+        key: v25-8mb-lotus-params
+    - name: Upload parameters
+      uses: actions/upload-artifact@v2
+      with:
+        name: filecoin-proof-parameters
+        path: /var/tmp/filecoin-proof-parameters/

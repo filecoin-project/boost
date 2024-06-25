@@ -1,0 +1,16 @@
+name: 'Install Dependencies'
+description: 'Install common dependencies'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openssh-client git ocl-icd-opencl-dev libhwloc-dev hwloc
+    - name: Fetch all tags
+      run: git fetch --all
+    - name: Sync submodules
+      run: git submodule sync
+    - name: Update submodules
+      run: git submodule update --init
