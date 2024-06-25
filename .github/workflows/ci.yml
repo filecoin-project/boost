@@ -26,7 +26,10 @@ jobs:
         uses: ./.github/actions/install-deps
 
       - name: Download Go Dependencies
-        run: go mod download
+        run: |
+          cd $GITHUB_WORKSPACE
+          go mod tidy
+          go mod download
         shell: bash
 
       - name: Cache Go Modules
