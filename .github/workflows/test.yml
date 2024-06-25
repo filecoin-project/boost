@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev
+          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev hwloc
       - name: Sync submodules
         run: git submodule sync
       - name: Update submodules
@@ -46,14 +46,6 @@ jobs:
     needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev
       - name: Run boostci
         run: make boostci
       - name: Restore parameters cache
@@ -102,7 +94,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-#    needs: [install-deps, prepare, download-params]
+    needs: [install-deps, prepare, download-params]
     strategy:
       matrix:
         test-suite:
@@ -111,7 +103,6 @@ jobs:
           - itest-graphsync_identity_cid
           - itest-retrieval
           - itest-direct_deal
-          - all
           - itest-data-segment-index
           - itest-ipni
           - itest-multiminer-graphsync
@@ -126,7 +117,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev
+          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev hwloc
       - name: Download parameters
         uses: actions/download-artifact@v2
         with:
@@ -177,7 +168,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
@@ -193,7 +184,7 @@ jobs:
 
   gofmt:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
@@ -210,7 +201,7 @@ jobs:
 
   cbor-check:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
@@ -230,7 +221,7 @@ jobs:
 
   docs-check:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
@@ -248,7 +239,7 @@ jobs:
 
   gen-check:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
@@ -278,7 +269,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev
+          sudo apt-get install -y ocl-icd-opencl-dev libhwloc-dev hwloc
       - name: Download parameters
         uses: actions/download-artifact@v2
         with:
@@ -302,7 +293,7 @@ jobs:
 
   mod-tidy-check:
     runs-on: ubuntu-latest
-    needs: install-deps
+    needs: [install-deps, prepare]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Go
