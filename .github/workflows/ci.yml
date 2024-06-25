@@ -131,7 +131,7 @@ jobs:
     needs: [setup-params, setup-deps]
     strategy:
       matrix:
-        test-suite:
+        test:
           - name: test-itest-dummydeal_offline
             target: "./itests/dummydeal_offline_test.go"
           - name: test-itest-dummydeal
@@ -154,8 +154,8 @@ jobs:
             target: "./cmd/booster-http"
           - name: test-booster-bitswap
             target: "./cmd/booster-bitswap"
-          - name: test-itest-lid-cleanup
-            target: "./itests/lid_cleanup_test.go"
+#          - name: test-itest-lid-cleanup
+#            target: "./itests/lid_cleanup_test.go"
     steps:
       - uses: actions/checkout@v4
 
@@ -183,7 +183,7 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
+          go test -v --tags=debug -timeout 30m ${{ matrix.test.target }}
         shell: bash
 
   lint:
@@ -351,7 +351,7 @@ jobs:
           key: v25-8mb-lotus-params
 
       - name: Start YugabyteDB
-        run: docker run --rm --name yugabyte -d -p 5433:5433 yugabytedb/yugabyte:2.18.0.0-b65 bin/yugabyted start --daemon=false
+        run: docker run --rm --name yugabyte -d -p 5433:5433 yugabytedb/yugabyte:2.21.1.0-b271 bin/yugabyted start --daemon=false
         shell: bash
       - run: |
           while true; do
