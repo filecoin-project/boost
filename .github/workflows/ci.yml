@@ -22,6 +22,9 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Install Dependencies
+        uses: ./.github/actions/install-deps
+
       - name: Download Go Dependencies
         run: go mod download
         shell: bash
