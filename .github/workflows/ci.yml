@@ -12,43 +12,10 @@ env:
   GO_VERSION: 1.22.3
 
 jobs:
-  setup-go-deps:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Dependencies
-        uses: ./.github/actions/install-deps
-
-      - name: Download Go Dependencies
-        run: |
-          cd $GITHUB_WORKSPACE
-          go mod tidy
-          go mod download
-        shell: bash
-
-      - name: Cache Go Modules
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
-
-
   setup-params:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -57,17 +24,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Cache boostci params
         id: cache-params
@@ -91,13 +47,12 @@ jobs:
         run: echo "Cache saved"
 
   setup-deps:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     outputs:
       make_deps_key: ${{ steps.make_deps.outputs.key }}
       make_deps_path: ${{ steps.make_deps.outputs.path }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -147,9 +102,9 @@ jobs:
 
   build-all:
     runs-on: ubuntu-latest
-    needs: [setup-deps, setup-go-deps]
+    needs: [setup-deps]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -166,17 +121,6 @@ jobs:
           path: ${{ needs.setup-deps.outputs.make_deps_path }}
           restore-keys: |
             make-deps-
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Build Go
         run: make build-go
@@ -213,7 +157,7 @@ jobs:
           - name: test-itest-lid-cleanup
             target: "./itests/lid_cleanup_test.go"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -222,17 +166,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
@@ -254,10 +187,9 @@ jobs:
         shell: bash
 
   lint:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -266,17 +198,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Install golangci-lint
         run: |
@@ -291,7 +212,7 @@ jobs:
   gofmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -315,10 +236,9 @@ jobs:
         shell: bash
 
   cbor-check:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -327,17 +247,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
@@ -360,10 +269,9 @@ jobs:
         shell: bash
 
   docs-check:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -372,17 +280,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
@@ -401,10 +298,9 @@ jobs:
         shell: bash
 
   gen-check:
-    needs: setup-go-deps
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -413,17 +309,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore Go Modules cache
-        id: cache-go-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-mod-
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
@@ -449,7 +334,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [setup-params, setup-deps]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
@@ -458,14 +343,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          key: ${{ needs.setup-deps.outputs.make_deps_key }}
-          path: ${{ needs.setup-deps.outputs.make_deps_path }}
-          restore-keys: |
-            make-deps-
 
       - name: Cache boostci params
         uses: actions/cache@v4
@@ -493,7 +370,7 @@ jobs:
   mod-tidy-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
