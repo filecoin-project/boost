@@ -94,16 +94,30 @@ jobs:
     strategy:
       matrix:
         test-suite:
-          - itest-dummydeal_offline
-          - itest-dummydeal
-          - itest-graphsync_identity_cid
-          - itest-retrieval
-          - itest-direct_deal
-          - itest-data-segment-index
-          - itest-ipni
-          - itest-multiminer-graphsync
-          - booster-http
-          - booster-bitswap
+          - name: test-itest-dummydeal_offline
+            target: "./itests/dummydeal_offline_test.go"
+          - name: test-itest-dummydeal
+            target: "./itests/dummydeal_test.go"
+          - name: test-graphsync_identity_cid
+            target: "./itests/graphsync_identity_cid_test.go"
+          - name: test-itest-retrieval
+            target: "./itests/graphsync_retrieval_test.go"
+          - name: test-itest-direct_deal
+            target: "./itests/ddo_test.go"
+          - name: test-all
+            target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
+          - name: test-itest-data-segment-index
+            target: "./itests/data_segment_index_retrieval_test.go"
+          - name: test-itest-ipni
+            target: "./itests/ipni_publish_test.go"
+          - name: test-itest-multiminer-graphsync
+            target: "./itests/multiminer_retrieval_graphsync_test.go"
+          - name: test-booster-http
+            target: "./cmd/booster-http"
+          - name: test-booster-bitswap
+            target: "./cmd/booster-bitswap"
+          - name: test-itest-lid-cleanup
+            target: "./itests/lid_cleanup_test.go"
     steps:
       - uses: actions/checkout@v2
 
@@ -205,7 +219,7 @@ jobs:
 
       - name: Lint
         run: |
-          golangci-lint run -v --timeout 2m
+          golangci-lint run -v --timeout 15m
         shell: bash
 
   gofmt:
