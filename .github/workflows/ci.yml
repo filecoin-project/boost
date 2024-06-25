@@ -48,6 +48,9 @@ jobs:
 
   setup-deps:
     runs-on: ubuntu-latest
+    outputs:
+      make_deps_key: ${{ steps.make_deps.outputs.key }}
+      make_deps_path: ${{ steps.make_deps.outputs.path }}
     steps:
       - uses: actions/checkout@v2
 
@@ -200,63 +203,6 @@ jobs:
         run: |
           go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
         shell: bash
-
-#  build-macos:
-#    runs-on: macos-latest
-#    steps:
-#      - uses: actions/checkout@v2
-#
-#      - name: Setup Go
-#        uses: ./.github/actions/setup-go
-#        with:
-#          go-version: ${{ env.GO_VERSION }}
-#
-#      - name: Install dependencies
-#        run: |
-#          brew update
-#          brew install pkg-config
-#        shell: bash
-#
-#      - name: Install Rust
-#        run: |
-#          curl https://sh.rustup.rs -sSf | sh -s -- -y
-#        shell: bash
-#
-#      - name: Install hwloc
-#        run: |
-#          mkdir ~/hwloc
-#          curl --location https://download.open-mpi.org/release/hwloc/v2.4/hwloc-2.4.1.tar.gz --output ~/hwloc/hwloc-2.4.1.tar.gz
-#          cd ~/hwloc
-#          tar -xvzpf hwloc-2.4.1.tar.gz
-#          cd hwloc-2.4.1
-#          ./configure && make && sudo make install
-#        shell: bash
-#
-#      - name: Build MacOS
-#        run: make debug
-#        shell: bash
-#
-#      - name: Check tag and version output match
-#        run: ./scripts/version-check.sh ./boost
-#        shell: bash
-#
-#      - name: Store Artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: boost
-#          path: boost
-#
-#      - name: Create Darwin directory and move boost
-#        run: |
-#          mkdir darwin
-#          mv boost darwin/
-#        shell: bash
-#
-#      - name: Persist to workspace
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: darwin
-#          path: darwin
 
   lint:
     runs-on: ubuntu-latest
