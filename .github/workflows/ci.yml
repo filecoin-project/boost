@@ -131,7 +131,7 @@ jobs:
     needs: [setup-params, setup-deps]
     strategy:
       matrix:
-        test:
+        test-suite:
           - name: test-itest-dummydeal_offline
             target: "./itests/dummydeal_offline_test.go"
           - name: test-itest-dummydeal
@@ -183,7 +183,7 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -v --tags=debug -timeout 30m ${{ matrix.test.target }}
+          go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
         shell: bash
 
   lint:
