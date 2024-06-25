@@ -7,10 +7,18 @@ runs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y openssh-client git ocl-icd-opencl-dev libhwloc-dev hwloc
+        sudo apt-get install -y openssh-client git ocl-icd-opencl-dev libhwloc-dev
+      shell: bash
+
     - name: Fetch all tags
       run: git fetch --all
+      shell: bash
+
     - name: Sync submodules
       run: git submodule sync
+      shell: bash
+
     - name: Update submodules
       run: git submodule update --init
+      shell: bash
+

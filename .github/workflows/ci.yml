@@ -26,7 +26,8 @@ jobs:
         uses: ./.github/actions/install-deps
 
       - name: Build Go
-        run: make build-go
+        run: make build
+        shell: bash
 
       - name: Store Artifacts
         uses: actions/upload-artifact@v2
@@ -38,6 +39,7 @@ jobs:
         run: |
           mkdir linux
           mv boost linux/
+        shell: bash
 
       - name: Persist to workspace
         uses: actions/upload-artifact@v2
@@ -77,6 +79,7 @@ jobs:
       - name: Run tests
         run: |
           go test -v --tags=debug -timeout 30m ./...
+        shell: bash
 
   build-macos:
     runs-on: macos-latest
@@ -92,10 +95,12 @@ jobs:
         run: |
           brew update
           brew install pkg-config
+        shell: bash
 
       - name: Install Rust
         run: |
           curl https://sh.rustup.rs -sSf | sh -s -- -y
+        shell: bash
 
       - name: Install hwloc
         run: |
@@ -105,12 +110,15 @@ jobs:
           tar -xvzpf hwloc-2.4.1.tar.gz
           cd hwloc-2.4.1
           ./configure && make && sudo make install
+        shell: bash
 
       - name: Build MacOS
         run: make debug
+        shell: bash
 
       - name: Check tag and version output match
         run: ./scripts/version-check.sh ./boost
+        shell: bash
 
       - name: Store Artifacts
         uses: actions/upload-artifact@v2
@@ -122,6 +130,7 @@ jobs:
         run: |
           mkdir darwin
           mv boost darwin/
+        shell: bash
 
       - name: Persist to workspace
         uses: actions/upload-artifact@v2
@@ -145,10 +154,12 @@ jobs:
       - name: Install golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.56.2
+        shell: bash
 
       - name: Lint
         run: |
           golangci-lint run -v --timeout 2m
+        shell: bash
 
   gofmt:
     runs-on: ubuntu-latest
@@ -166,12 +177,15 @@ jobs:
       - name: Check gofmt
         run: |
           ! go fmt ./... 2>&1 | read
+        shell: bash
 
       - name: Git diff check
         run: git --no-pager diff
+        shell: bash
 
       - name: Git diff quiet
         run: git --no-pager diff --quiet
+        shell: bash
 
   cbor-check:
     runs-on: ubuntu-latest
@@ -188,18 +202,23 @@ jobs:
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
+        shell: bash
 
       - name: Install cbor-gen-for
         run: go install github.com/hannahhoward/cbor-gen-for
+        shell: bash
 
       - name: Generate CBOR
         run: make cbor-gen
+        shell: bash
 
       - name: Git diff check
         run: git --no-pager diff
+        shell: bash
 
       - name: Git diff quiet
         run: git --no-pager diff --quiet
+        shell: bash
 
   docs-check:
     runs-on: ubuntu-latest
@@ -216,15 +235,19 @@ jobs:
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
+        shell: bash
 
       - name: Generate Docs
         run: make docsgen
+        shell: bash
 
       - name: Git diff check
         run: git --no-pager diff
+        shell: bash
 
       - name: Git diff quiet
         run: git --no-pager diff --quiet
+        shell: bash
 
   gen-check:
     runs-on: ubuntu-latest
@@ -241,18 +264,23 @@ jobs:
 
       - name: Install goimports
         run: go install golang.org/x/tools/cmd/goimports
+        shell: bash
 
       - name: Install cbor-gen-for
         run: go install github.com/hannahhoward/cbor-gen-for
+        shell: bash
 
       - name: Generate Code
         run: make gen
+        shell: bash
 
       - name: Git diff check
         run: git --no-pager diff
+        shell: bash
 
       - name: Git diff quiet
         run: git --no-pager diff --quiet
+        shell: bash
 
   lid-docker-compose:
     runs-on: ubuntu-latest
@@ -282,6 +310,7 @@ jobs:
           done
         shell: bash
       - name: Run LID integration tests
+        shell: bash
         run: |
           set -x
           make test-lid
@@ -301,3 +330,4 @@ jobs:
 
       - name: Run mod tidy check
         run: go mod tidy -v
+        shell: bash
