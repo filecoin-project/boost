@@ -1,0 +1,50 @@
+name: 'Cache Dependencies'
+description: 'Cache dependencies and parameters'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate cache key for dependencies
+      id: make_deps
+      env:
+        CACHE_KEY: ${{ runner.os }}-${{ runner.arch }}-make-deps-${{ hashFiles('./.git/modules/extern/filecoin-ffi/HEAD') }}
+        CACHE_PATH: |
+          ./extern/filecoin-ffi/filcrypto.h
+          ./extern/filecoin-ffi/libfilcrypto.a
+          ./extern/filecoin-ffi/filcrypto.pc
+      run: |
+        echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
+        echo -e "path<<EOF\n$CACHE_PATH\nEOF" | tee -a $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Restore cache for dependencies
+      id: restore_make_deps
+      uses: actions/cache@v2
+      with:
+        key: ${{ steps.make_deps.outputs.key }}
+        path: ${{ steps.make_deps.outputs.path }}
+        restore-keys: |
+          make-deps-
+
+    - name: Install dependencies if cache miss
+      if: steps.restore_make_deps.outputs.cache-hit != 'true'
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        # Install system dependencies
+        sudo apt-get update
+        sudo apt-get install -y required-packages
+        # Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        # Install project dependencies
+        make deps
+      shell: bash
+
+    - name: Save dependencies to cache
+      if: steps.restore_make_deps.outputs.cache-hit != 'true'
+      uses: actions/cache@v2
+      with:
+        key: ${{ steps.make_deps.outputs.key }}
+        path: ${{ steps.make_deps.outputs.path }}
