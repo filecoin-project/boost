@@ -187,6 +187,7 @@ jobs:
         shell: bash
 
   lint:
+    needs: [setup-deps]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -198,6 +199,14 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ needs.setup-deps.outputs.make_deps_key }}
+          path: ${{ needs.setup-deps.outputs.make_deps_path }}
+          restore-keys: |
+            make-deps-
 
       - name: Install golangci-lint
         run: |
@@ -224,7 +233,7 @@ jobs:
 
       - name: Check gofmt
         run: |
-          ! go fmt ./... 2>&1 | read
+          go fmt ./...
         shell: bash
 
       - name: Git diff check
