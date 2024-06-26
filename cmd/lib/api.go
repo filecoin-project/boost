@@ -11,6 +11,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/lib/sa"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/piecedirectory/types"
@@ -22,7 +23,6 @@ import (
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/config"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -103,7 +103,7 @@ type MultiMinerAccessor struct {
 	storageApiInfos []string
 	fullnodeApi     v1api.FullNode
 	readers         map[address.Address]types.PieceReader
-	sas             map[address.Address]dagstore.SectorAccessor
+	sas             map[address.Address]sa.SectorAccessor
 	closeOnce       sync.Once
 	closers         []jsonrpc.ClientCloser
 	cachingDuration time.Duration
@@ -118,7 +118,7 @@ func NewMultiMinerAccessor(storageApiInfos []string, fullnodeApi v1api.FullNode,
 }
 
 func (a *MultiMinerAccessor) Start(ctx context.Context, log *logging.ZapEventLogger) error {
-	a.sas = make(map[address.Address]dagstore.SectorAccessor, len(a.storageApiInfos))
+	a.sas = make(map[address.Address]sa.SectorAccessor, len(a.storageApiInfos))
 	a.readers = make(map[address.Address]types.PieceReader, len(a.storageApiInfos))
 	a.closers = make([]jsonrpc.ClientCloser, 0, len(a.storageApiInfos))
 	for _, apiInfo := range a.storageApiInfos {
@@ -175,7 +175,7 @@ func (a *MultiMinerAccessor) IsUnsealed(ctx context.Context, minerAddr address.A
 }
 
 type sectorAccessor struct {
-	dagstore.SectorAccessor
+	sa.SectorAccessor
 	maddr address.Address
 }
 

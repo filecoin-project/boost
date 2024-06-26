@@ -5,15 +5,11 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/boost/cmd/lib/stores"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -22,17 +18,9 @@ import (
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/lib/backupds"
-	"github.com/filecoin-project/lotus/lib/unixfs"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/ipfs/go-cidutil/cidenc"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	"github.com/ipld/go-car"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
-	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
 )
@@ -301,103 +289,6 @@ var generateRandCar = &cli.Command{
 		}
 
 		fmt.Printf("Payload CID: %s, written to: %s\n", rn, np)
-
-		return nil
-	},
-}
-
-var generatecarCmd = &cli.Command{
-	Name:      "generate-car",
-	Usage:     "",
-	ArgsUsage: "<inputPath> <outputPath>",
-	Before:    before,
-	Action: func(cctx *cli.Context) error {
-		if cctx.Args().Len() != 2 {
-			return fmt.Errorf("usage: generate-car <inputPath> <outputPath>")
-		}
-
-		inPath := cctx.Args().First()
-		outPath := cctx.Args().Get(1)
-
-		ctx := lcli.ReqContext(cctx)
-
-		r := lotus_repo.NewMemory(nil)
-		lr, err := r.Lock(repo.Boost)
-		if err != nil {
-			return err
-		}
-		mds, err := lr.Datastore(ctx, "/metadata")
-		if err != nil {
-			return err
-		}
-		ds, err := backupds.Wrap(mds, "")
-		if err != nil {
-			return fmt.Errorf("opening backupds: %w", err)
-		}
-
-		// import manager - store the imports under the repo's `imports` subdirectory.
-		dir := filepath.Join(lr.Path(), "imports")
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-
-		ns := namespace.Wrap(ds, datastore.NewKey("/client"))
-		importMgr := imports.NewManager(ns, dir)
-
-		// create a temporary import to represent this job and obtain a staging CAR.
-		id, err := importMgr.CreateImport()
-		if err != nil {
-			return fmt.Errorf("failed to create temporary import: %w", err)
-		}
-		defer importMgr.Remove(id) //nolint:errcheck
-
-		tmp, err := importMgr.AllocateCAR(id)
-		if err != nil {
-			return fmt.Errorf("failed to allocate temporary CAR: %w", err)
-		}
-		defer os.Remove(tmp) //nolint:errcheck
-
-		// generate and import the UnixFS DAG into a filestore (positional reference) CAR.
-		root, err := unixfs.CreateFilestore(ctx, inPath, tmp)
-		if err != nil {
-			return fmt.Errorf("failed to import file using unixfs: %w", err)
-		}
-
-		// open the positional reference CAR as a filestore.
-		fs, err := stores.ReadOnlyFilestore(tmp)
-		if err != nil {
-			return fmt.Errorf("failed to open filestore from carv2 in path %s: %w", tmp, err)
-		}
-		defer fs.Close() //nolint:errcheck
-
-		f, err := os.Create(outPath)
-		if err != nil {
-			return err
-		}
-
-		// build a dense deterministic CAR (dense = containing filled leaves)
-		if err := car.NewSelectiveCar(
-			ctx,
-			fs,
-			[]car.Dag{{
-				Root:     root,
-				Selector: selectorparse.CommonSelector_ExploreAllRecursively,
-			}},
-			car.MaxTraversalLinks(config.MaxTraversalLinks),
-		).Write(
-			f,
-		); err != nil {
-			return fmt.Errorf("failed to write CAR to output file: %w", err)
-		}
-
-		err = f.Close()
-		if err != nil {
-			return err
-		}
-
-		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
-
-		fmt.Println("Payload CID: ", encoder.Encode(root))
 
 		return nil
 	},

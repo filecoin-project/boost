@@ -2,7 +2,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
-import {PageContainer, ShortClientAddress, ShortDealID, ShortDealLink} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
 import sendImg from './bootstrap-icons/icons/send.svg'
 import './DealPublish.css'

@@ -1,7 +1,7 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
-    DealsListQuery, LegacyDealsCountQuery, SectorStatusQuery,
+    DealsListQuery, LegacyDealsCountQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -206,7 +206,7 @@ export function SearchBox(props) {
         return () => {
           document.removeEventListener("mousedown", checkIfClickedOutside)
         }
-      }, [displayFilters])
+      }, [displayFilters, toggleFilters])
 
     return <div className="search">
         <DebounceInput
@@ -372,12 +372,12 @@ function DealRowAnnounceError({deal}) {
 
     return <div id={messageBoxId}>
         <span>
-            <img id={warningImgElId} className="warning" src={warningImg} />
+            <img id={warningImgElId} className="warning" src={warningImg}  alt={"warning"}/>
             <span>Error: IndexingAndAnnouncing</span>
         </span>
         <span id={warningMsgElId} className="warning-msg">
             <span className="message-text">
-                <img className="warning" src={warningImg} />
+                <img className="warning" src={warningImg}  alt={"warning"}/>
                 <span id={warningMsgElId}>{deal.Message}</span>
             </span>
             <DealActions deal={deal} refetchQueries={[DealsListQuery]} compact={true} />

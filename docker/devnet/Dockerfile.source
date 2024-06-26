@@ -71,6 +71,8 @@ RUN make build/.filecoin-install
 COPY . /go/src
 ##############################################
 COPY --from=react-builder /src/react/build /go/src/react/build
+RUN go install github.com/ipld/go-car/cmd/car@latest \
+ && cp $GOPATH/bin/car /usr/local/bin/
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
@@ -119,6 +121,7 @@ COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/boost /usr/local/bin/
 COPY --from=builder /go/src/boostx /usr/local/bin/
 COPY --from=builder /go/src/boostd-data /usr/local/bin/
+COPY --from=builder /usr/local/bin/car /usr/local/bin/
 COPY docker/devnet/boost/entrypoint.sh /app/
 COPY docker/devnet/boost/sample/* /app/sample/
 RUN boost -v

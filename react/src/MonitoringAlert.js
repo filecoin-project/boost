@@ -23,7 +23,7 @@ export function MonitoringAlert(props) {
     return (
         <div id="monitoring-alert" className="showing">
             <div className="message">
-                <img src={warnImg} />
+                <img src={warnImg}  alt={"warning"}/>
                 <span>{count} messages stuck in <Link to="/mpool">Message Pool</Link></span>
             </div>
         </div>

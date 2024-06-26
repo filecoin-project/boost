@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/golang/mock/gomock"
 	"github.com/ipni/go-libipni/metadata"
@@ -336,7 +335,7 @@ func (m mockApiStorageMiner) StorageRedeclareLocal(ctx context.Context, id *stor
 type meshCreatorStub struct {
 }
 
-var _ idxprov.MeshCreator = (*meshCreatorStub)(nil)
+//var _ idxprov.MeshCreator = (*meshCreatorStub)(nil)
 
 func (m *meshCreatorStub) Connect(context.Context) error {
 	return nil

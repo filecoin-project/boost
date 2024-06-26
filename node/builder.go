@@ -45,6 +45,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-statemachine/fsm"
 	lotus_api "github.com/filecoin-project/lotus/api"
+	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_journal "github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/journal/alerting"
@@ -106,7 +107,6 @@ var (
 	AutoNATSvcKey        = special{10} // Libp2p option
 	BandwidthReporterKey = special{11} // Libp2p option
 	ConnGaterKey         = special{12} // libp2p option
-	DAGStoreKey          = special{13} // constructor returns multiple values
 	ResourceManagerKey   = special{14} // Libp2p option
 	UserAgentKey         = special{15} // Libp2p option
 )
@@ -121,16 +121,12 @@ const (
 	// the system starts, so that it's available for all other components.
 	InitJournalKey = invoke(iota)
 
-	// System processes.
-	InitMemoryWatchdog
-
 	// health checks
 	CheckFDLimit
 
 	// libp2p
 	PstoreAddSelfKeysKey
 	StartListeningKey
-	BootstrapKey
 
 	// miner
 	StartProviderDataTransferKey
@@ -212,6 +208,7 @@ var LibP2P = Options(
 	Override(DefaultTransportsKey, lp2p.DefaultTransports),
 
 	// Host
+	Override(new(lbuild.BuildVersion), lbuild.MinerUserVersion()),
 	Override(new(lotus_lp2p.RawHost), lotus_lp2p.Host),
 	Override(new(host.Host), lotus_lp2p.RoutedHost),
 	Override(new(lotus_lp2p.BaseIpfsRouting), lotus_lp2p.DHTRouting(dht.ModeAuto)),

@@ -12,7 +12,6 @@ import (
 	ipfsblockstore "github.com/ipfs/boxo/blockstore"
 
 	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
 type (
@@ -67,7 +66,6 @@ type (
 type ChainBitswap exchange.Interface
 type ChainBlockService bserv.BlockService
 
-type ClientImportMgr *imports.Manager
 type ClientBlockstore blockstore.BasicBlockstore
 type ClientDealStore *statestore.StateStore
 type ClientDatastore datastore.Batching
