@@ -31,7 +31,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/storedask"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -776,29 +775,6 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 func (f *TestFramework) WaitMsg(mcid cid.Cid) error {
 	_, err := f.FullNode.StateWaitMsg(f.ctx, mcid, 1, 1e10, true)
 	return err
-}
-
-func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error {
-	for {
-		di, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
-		if err != nil {
-			return err
-		}
-
-		switch di.State {
-		case legacytypes.StorageDealAwaitingPreCommit, legacytypes.StorageDealSealing:
-		case legacytypes.StorageDealProposalRejected:
-			return errors.New("deal rejected")
-		case legacytypes.StorageDealFailing:
-			return errors.New("deal failed")
-		case legacytypes.StorageDealError:
-			return fmt.Errorf("deal errored: %s", di.Message)
-		case legacytypes.StorageDealActive:
-			return nil
-		}
-
-		time.Sleep(2 * time.Second)
-	}
 }
 
 func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
