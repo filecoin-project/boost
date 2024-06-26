@@ -690,7 +690,7 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 		// Deal was not found in boost DB - check in legacy markets
 		md, legacyErr := w.legacyProv.ByPropCid(proposalCid)
 		if legacyErr == nil {
-			// Found the deal, get an interator over the piece
+			// Found the deal, get an iterator over the piece
 			return provideF(proposalCid.String(), false, md.Proposal.PieceCID)
 		}
 

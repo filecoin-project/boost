@@ -102,7 +102,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 		for iter.Scan(&maddrStr) {
 			pmaddr, err := address.NewFromString(maddrStr)
 			if err != nil {
-				return fmt.Errorf("getting miners for pieces: parsing miner adddress '%s': %w", maddrStr, err)
+				return fmt.Errorf("getting miners for pieces: parsing miner address '%s': %w", maddrStr, err)
 			}
 
 			newPieceWithMaddrLk.Lock()
