@@ -160,7 +160,6 @@ function getTransferRate(samples) {
 
 export function humanTransferRate(bytesPerSecond) {
     // Convert from bytes to kbps or Mbps
-    var transferRate = ""
     const kbps = (bytesPerSecond*8) / 1024
     if (kbps < 1024) {
         if (kbps < 10) {

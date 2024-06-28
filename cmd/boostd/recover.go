@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	saccessor "github.com/filecoin-project/boost/lib/sa"
 	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -30,7 +31,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -44,7 +44,7 @@ import (
 
 var (
 	dr          *DisasterRecovery
-	sa          dagstore.SectorAccessor
+	sa          saccessor.SectorAccessor
 	fullnodeApi v1api.FullNode
 	minerApi    api.StorageMiner
 	pd          *piecedirectory.PieceDirectory
@@ -541,240 +541,240 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 }
 
 func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID abi.DealID, piececid cid.Cid, piecesize abi.PaddedPieceSize, offset abi.UnpaddedPieceSize, l string) error {
-    logger.Debugw("processing piece", "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
+	logger.Debugw("processing piece", "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
 
-    cdi := uint64(chainDealID)
-    sid := uint64(sectorid)
+	cdi := uint64(chainDealID)
+	sid := uint64(sectorid)
 
-    // Ensure the SectorStatus and PieceStatus maps are initialized
-    if dr.Sectors[sid] == nil {
-        dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
-    }
-    if dr.Sectors[sid].Deals == nil {
-        dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
-    }
+	// Ensure the SectorStatus and PieceStatus maps are initialized
+	if dr.Sectors[sid] == nil {
+		dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
+	}
+	if dr.Sectors[sid].Deals == nil {
+		dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
+	}
 
-    dr.Sectors[sid].Deals[cdi] = &PieceStatus{
-        PieceCID:    piececid,
-        PieceSize:   piecesize,
-        PieceOffset: offset,
-        IsUnsealed:  false,
-    }
+	dr.Sectors[sid].Deals[cdi] = &PieceStatus{
+		PieceCID:    piececid,
+		PieceSize:   piecesize,
+		PieceOffset: offset,
+		IsUnsealed:  false,
+	}
 
-    if dr.HaveBoostDealsAndPieceStore { // sanity check on piece store / piece info vs chain data and inferred piece size / offset data
-        pi, err := ps.GetPieceInfo(piececid)
-        if err != nil {
-            logger.Errorw("can't get piece info from piece store", "piececid", piececid, "sector", sid, "err", err)
-        } else {
-            var found bool
-            for _, di := range pi.Deals {
-                if di.DealID == chainDealID {
-                    found = true
+	if dr.HaveBoostDealsAndPieceStore { // sanity check on piece store / piece info vs chain data and inferred piece size / offset data
+		pi, err := ps.GetPieceInfo(piececid)
+		if err != nil {
+			logger.Errorw("can't get piece info from piece store", "piececid", piececid, "sector", sid, "err", err)
+		} else {
+			var found bool
+			for _, di := range pi.Deals {
+				if di.DealID == chainDealID {
+					found = true
 
-                    if di.SectorID != sectorid {
-                        logger.Errorw("sector mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "got", di.SectorID)
-                    }
-                    if di.Offset != offset.Padded() {
-                        logger.Errorw("offset mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "calculated", offset.Padded(), "got from ps", di.Offset)
-                    }
-                    if di.Length != piecesize {
-                        logger.Errorw("length/piece size mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got from ps", di.Length)
-                    }
-                }
-            }
-            if !found {
-                logger.Errorw("chain deal not found in piece info", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "pi", spew.Sdump(pi))
-            }
-        }
-    }
+					if di.SectorID != sectorid {
+						logger.Errorw("sector mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "got", di.SectorID)
+					}
+					if di.Offset != offset.Padded() {
+						logger.Errorw("offset mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "calculated", offset.Padded(), "got from ps", di.Offset)
+					}
+					if di.Length != piecesize {
+						logger.Errorw("length/piece size mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got from ps", di.Length)
+					}
+				}
+			}
+			if !found {
+				logger.Errorw("chain deal not found in piece info", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "pi", spew.Sdump(pi))
+			}
+		}
+	}
 
-    defer func(start time.Time) {
-        took := time.Since(start)
-        dr.Sectors[sid].Deals[cdi].ProcessingTook = took
-        logger.Debugw("processed piece", "took", took, "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
-    }(time.Now())
+	defer func(start time.Time) {
+		took := time.Since(start)
+		dr.Sectors[sid].Deals[cdi].ProcessingTook = took
+		logger.Debugw("processed piece", "took", took, "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
+	}(time.Now())
 
-    reader, isUnsealed, err := safeUnsealSector(ctx, sectorid, offset, piecesize)
-    if err != nil {
-        return err
-    }
-    defer func() {
-        if reader != nil {
-            reader.Close()
-        }
-    }()
-    if !isUnsealed {
-        return fmt.Errorf("sector %d is not unsealed", sid)
-    }
+	reader, isUnsealed, err := safeUnsealSector(ctx, sectorid, offset, piecesize)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if reader != nil {
+			reader.Close()
+		}
+	}()
+	if !isUnsealed {
+		return fmt.Errorf("sector %d is not unsealed", sid)
+	}
 
-    dr.Sectors[sid].Deals[cdi].IsUnsealed = true
-    dr.Sectors[sid].Deals[cdi].GotDataReader = true
+	dr.Sectors[sid].Deals[cdi].IsUnsealed = true
+	dr.Sectors[sid].Deals[cdi].GotDataReader = true
 
-    if !ignoreLID { // populate LID
-        var shouldGenerateNewDeal bool
+	if !ignoreLID { // populate LID
+		var shouldGenerateNewDeal bool
 
-        var di model.DealInfo
+		var di model.DealInfo
 
-        if dr.HaveBoostDealsAndPieceStore { // successfully loaded boost sqlite db and piece store => try to infer dealinfo
-            // find the deal corresponding to the deal info's DealID
-            proposalCid, okLegacy := dr.PropCidByChainDealID[chainDealID]
-            uuid, okBoost := dr.BoostDeals[chainDealID]
+		if dr.HaveBoostDealsAndPieceStore { // successfully loaded boost sqlite db and piece store => try to infer dealinfo
+			// find the deal corresponding to the deal info's DealID
+			proposalCid, okLegacy := dr.PropCidByChainDealID[chainDealID]
+			uuid, okBoost := dr.BoostDeals[chainDealID]
 
-            if !okLegacy && !okBoost {
-                logger.Errorw("can't find boost deal or legacy deal",
-                    "piececid", piececid, "chain-deal-id", chainDealID)
+			if !okLegacy && !okBoost {
+				logger.Errorw("can't find boost deal or legacy deal",
+					"piececid", piececid, "chain-deal-id", chainDealID)
 
-                shouldGenerateNewDeal = true
-            } else {
-                isLegacy := false
-                if uuid == "" {
-                    uuid = proposalCid.String()
-                    isLegacy = true
-                }
+				shouldGenerateNewDeal = true
+			} else {
+				isLegacy := false
+				if uuid == "" {
+					uuid = proposalCid.String()
+					isLegacy = true
+				}
 
-                di = model.DealInfo{
-                    DealUuid:    uuid,
-                    IsLegacy:    isLegacy,
-                    ChainDealID: chainDealID,
-                    MinerAddr:   maddr,
-                    SectorID:    sectorid,
-                    PieceOffset: offset.Padded(),
-                    PieceLength: piecesize,
-                }
-            }
-        }
+				di = model.DealInfo{
+					DealUuid:    uuid,
+					IsLegacy:    isLegacy,
+					ChainDealID: chainDealID,
+					MinerAddr:   maddr,
+					SectorID:    sectorid,
+					PieceOffset: offset.Padded(),
+					PieceLength: piecesize,
+				}
+			}
+		}
 
-        if !dr.HaveBoostDealsAndPieceStore || shouldGenerateNewDeal { // missing boost sqlite db and piece store, so generate new dealinfo
-            // in the future we could also regenerate boost db sqlite??
+		if !dr.HaveBoostDealsAndPieceStore || shouldGenerateNewDeal { // missing boost sqlite db and piece store, so generate new dealinfo
+			// in the future we could also regenerate boost db sqlite??
 
-            di = model.DealInfo{
-                DealUuid:    uuid.NewString(),
-                IsLegacy:    false,
-                ChainDealID: chainDealID,
-                MinerAddr:   maddr,
-                SectorID:    sectorid,
-                PieceOffset: offset.Padded(),
-                PieceLength: piecesize,
-            }
-        }
+			di = model.DealInfo{
+				DealUuid:    uuid.NewString(),
+				IsLegacy:    false,
+				ChainDealID: chainDealID,
+				MinerAddr:   maddr,
+				SectorID:    sectorid,
+				PieceOffset: offset.Padded(),
+				PieceLength: piecesize,
+			}
+		}
 
-        timeAddIndex := time.Now()
+		timeAddIndex := time.Now()
 
-        err = pd.AddDealForPiece(ctx, piececid, di)
-        if err != nil {
-            logger.Errorw("can't add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+		err = pd.AddDealForPiece(ctx, piececid, di)
+		if err != nil {
+			logger.Errorw("can't add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
 
-            return err
-        }
+			return err
+		}
 
-        logger.Infow("added index", "took", time.Since(timeAddIndex), "sector", di.SectorID, "piececid", piececid, "chain-deal-id", di.ChainDealID, "uuid", di.DealUuid)
-    }
+		logger.Infow("added index", "took", time.Since(timeAddIndex), "sector", di.SectorID, "piececid", piececid, "chain-deal-id", di.ChainDealID, "uuid", di.DealUuid)
+	}
 
-    if !ignoreCommp { // commp over data reader
-        w := &writer.Writer{}
-        _, err = io.CopyBuffer(w, reader, make([]byte, writer.CommPBuf))
-        if err != nil {
-            return fmt.Errorf("copy into commp writer: %w", err)
-        }
+	if !ignoreCommp { // commp over data reader
+		w := &writer.Writer{}
+		_, err = io.CopyBuffer(w, reader, make([]byte, writer.CommPBuf))
+		if err != nil {
+			return fmt.Errorf("copy into commp writer: %w", err)
+		}
 
-        commp, err := w.Sum()
-        if err != nil {
-            return fmt.Errorf("computing commP failed: %w", err)
-        }
+		commp, err := w.Sum()
+		if err != nil {
+			return fmt.Errorf("computing commP failed: %w", err)
+		}
 
-        encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
-        _ = encoder
+		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
+		_ = encoder
 
-        if !commp.PieceCID.Equals(piececid) {
-            return fmt.Errorf("calculated commp doesn't match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
-        }
-    }
+		if !commp.PieceCID.Equals(piececid) {
+			return fmt.Errorf("calculated commp doesn't match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
+		}
+	}
 
-    return nil
+	return nil
 }
 
 func processSector(ctx context.Context, key types.TipSetKey, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
-    logger.Debugw("processing sector", "sector", info.SectorNumber, "deals", info.DealIDs)
+	logger.Debugw("processing sector", "sector", info.SectorNumber, "deals", info.DealIDs)
 
-    sectorid := info.SectorNumber
-    sid := uint64(sectorid)
+	sectorid := info.SectorNumber
+	sid := uint64(sectorid)
 
-    var gotErr bool
+	var gotErr bool
 
-    // Ensure the SectorStatus map is initialized
-    if dr.Sectors[sid] == nil {
-        dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
-    }
-    if dr.Sectors[sid].Deals == nil {
-        dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
-    }
+	// Ensure the SectorStatus map is initialized
+	if dr.Sectors[sid] == nil {
+		dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
+	}
+	if dr.Sectors[sid].Deals == nil {
+		dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
+	}
 
-    // Start time for deferred function
-    start := time.Now()
+	// Start time for deferred function
+	start := time.Now()
 
-    defer func() {
-        took := time.Since(start)
-        dr.Sectors[sid].ProcessingTook = took
-        if gotErr {
-            logger.Debugw("processed sector with errors", "sector", sectorid, "took", took, "deals", info.DealIDs)
-        } else {
-            logger.Debugw("successfully processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
-        }
-    }()
+	defer func() {
+		took := time.Since(start)
+		dr.Sectors[sid].ProcessingTook = took
+		if gotErr {
+			logger.Debugw("processed sector with errors", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		} else {
+			logger.Debugw("successfully processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		}
+	}()
 
-    err := dr.MarkSectorInProgress(sectorid)
-    if err != nil {
-        return false, false, err
-    }
+	err := dr.MarkSectorInProgress(sectorid)
+	if err != nil {
+		return false, false, err
+	}
 
-    nextoffset := uint64(0)
-    for _, did := range info.DealIDs {
-        marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, key)
-        if err != nil {
-            if strings.Contains(err.Error(), "not found") {
-                logger.Warnw("deal present in sector, but not in market actor state, so probably expired", "sector", sectorid, "deal", did, "err", err)
-                break
-            } else {
-                return false, false, err
-            }
-        }
+	nextoffset := uint64(0)
+	for _, did := range info.DealIDs {
+		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, key)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				logger.Warnw("deal present in sector, but not in market actor state, so probably expired", "sector", sectorid, "deal", did, "err", err)
+				break
+			} else {
+				return false, false, err
+			}
+		}
 
-        l := "(not a string)"
-        if marketDeal.Proposal.Label.IsString() {
-            l, err = marketDeal.Proposal.Label.ToString()
-            if err != nil {
-                return false, false, err
-            }
-        }
+		l := "(not a string)"
+		if marketDeal.Proposal.Label.IsString() {
+			l, err = marketDeal.Proposal.Label.ToString()
+			if err != nil {
+				return false, false, err
+			}
+		}
 
-        if nextoffset%uint64(marketDeal.Proposal.PieceSize.Unpadded()) != 0 {
-            currentoffset := nextoffset
-            nextoffset = 0
-            for nextoffset < currentoffset {
-                nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
-            }
-        }
+		if nextoffset%uint64(marketDeal.Proposal.PieceSize.Unpadded()) != 0 {
+			currentoffset := nextoffset
+			nextoffset = 0
+			for nextoffset < currentoffset {
+				nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
+			}
+		}
 
-        err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
-        nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
-        if err != nil {
-            if dr.Sectors[sid].Deals[uint64(did)] == nil {
-                dr.Sectors[sid].Deals[uint64(did)] = &PieceStatus{}
-            }
-            dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
-            dr.PieceErrors++
-            gotErr = true
-            logger.Errorw("got piece error", "sector", sectorid, "deal", did, "err", err)
-            continue
-        }
-    }
+		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
+		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
+		if err != nil {
+			if dr.Sectors[sid].Deals[uint64(did)] == nil {
+				dr.Sectors[sid].Deals[uint64(did)] = &PieceStatus{}
+			}
+			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
+			dr.PieceErrors++
+			gotErr = true
+			logger.Errorw("got piece error", "sector", sectorid, "deal", did, "err", err)
+			continue
+		}
+	}
 
-    err = dr.CompleteSector(sectorid)
-    if err != nil {
-        return false, false, err
-    }
+	err = dr.CompleteSector(sectorid)
+	if err != nil {
+		return false, false, err
+	}
 
-    return true, true, nil
+	return true, true, nil
 }
 
 func getActorAddress(ctx context.Context, cctx *cli.Context) (maddr address.Address, err error) {

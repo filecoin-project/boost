@@ -16,7 +16,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_full.go -package=mocks . FullNode
@@ -55,32 +54,6 @@ type MinerSectors struct {
 	Active uint64
 	// Sectors with failed proofs.
 	Faulty uint64
-}
-
-type ImportRes struct {
-	Root     cid.Cid
-	ImportID imports.ID
-}
-
-type Import struct {
-	Key imports.ID
-	Err string
-
-	Root *cid.Cid
-
-	// Source is the provenance of the import, e.g. "import", "unknown", else.
-	// Currently useless but may be used in the future.
-	Source string
-
-	// FilePath is the path of the original file. It is important that the file
-	// is retained at this path, because it will be referenced during
-	// the transfer (when we do the UnixFS chunking, we don't duplicate the
-	// leaves, but rather point to chunks of the original data through
-	// positional references).
-	FilePath string
-
-	// CARPath is the path of the CAR file containing the DAG for this import.
-	CARPath string
 }
 
 type MsgLookup struct {
@@ -209,37 +182,37 @@ type MarketDealState struct {
 	SlashEpoch       abi.ChainEpoch // -1 if deal never slashed
 }
 
-func MakeDealState(mds market.DealState) MarketDealState {
-	return MarketDealState{
-		SectorStartEpoch: mds.SectorStartEpoch(),
-		LastUpdatedEpoch: mds.LastUpdatedEpoch(),
-		SlashEpoch:       mds.SlashEpoch(),
-	}
-}
-
-type mstate struct {
-	s MarketDealState
-}
-
-func (m mstate) SectorStartEpoch() abi.ChainEpoch {
-	return m.s.SectorStartEpoch
-}
-
-func (m mstate) LastUpdatedEpoch() abi.ChainEpoch {
-	return m.s.LastUpdatedEpoch
-}
-
-func (m mstate) SlashEpoch() abi.ChainEpoch {
-	return m.s.SlashEpoch
-}
-
-func (m mstate) Equals(o market.DealState) bool {
-	return market.DealStatesEqual(m, o)
-}
-
-func (m MarketDealState) Iface() market.DealState {
-	return mstate{m}
-}
+//func MakeDealState(mds market.DealState) MarketDealState {
+//	return MarketDealState{
+//		SectorStartEpoch: mds.SectorStartEpoch(),
+//		LastUpdatedEpoch: mds.LastUpdatedEpoch(),
+//		SlashEpoch:       mds.SlashEpoch(),
+//	}
+//}
+//
+//type mstate struct {
+//	s MarketDealState
+//}
+//
+//func (m mstate) SectorStartEpoch() abi.ChainEpoch {
+//	return m.s.SectorStartEpoch
+//}
+//
+//func (m mstate) LastUpdatedEpoch() abi.ChainEpoch {
+//	return m.s.LastUpdatedEpoch
+//}
+//
+//func (m mstate) SlashEpoch() abi.ChainEpoch {
+//	return m.s.SlashEpoch
+//}
+//
+//func (m mstate) Equals(o market.DealState) bool {
+//	return market.DealStatesEqual(m, o)
+//}
+//
+//func (m MarketDealState) Iface() market.DealState {
+//	return mstate{m}
+//}
 
 type InvocResult struct {
 	MsgCid         cid.Cid

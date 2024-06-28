@@ -130,9 +130,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -146,9 +144,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -162,9 +158,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -192,13 +186,11 @@ Response:
   "CreatedAt": "0001-01-01T00:00:00Z",
   "ClientDealProposal": {
     "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
+      "PieceCID": null,
       "PieceSize": 1032,
       "VerifiedDeal": true,
-      "Client": "f01234",
-      "Provider": "f01234",
+      "Client": "\u003cempty\u003e",
+      "Provider": "\u003cempty\u003e",
       "Label": "",
       "StartEpoch": 10101,
       "EndEpoch": 10101,
@@ -214,9 +206,7 @@ Response:
   "IsOffline": true,
   "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "DealDataRoot": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  "DealDataRoot": null,
   "InboundFilePath": "string value",
   "Transfer": {
     "Type": "string value",
@@ -247,9 +237,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -260,13 +248,11 @@ Response:
   "CreatedAt": "0001-01-01T00:00:00Z",
   "ClientDealProposal": {
     "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
+      "PieceCID": null,
       "PieceSize": 1032,
       "VerifiedDeal": true,
-      "Client": "f01234",
-      "Provider": "f01234",
+      "Client": "\u003cempty\u003e",
+      "Provider": "\u003cempty\u003e",
       "Label": "",
       "StartEpoch": 10101,
       "EndEpoch": 10101,
@@ -282,9 +268,7 @@ Response:
   "IsOffline": true,
   "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "DealDataRoot": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  "DealDataRoot": null,
   "InboundFilePath": "string value",
   "Transfer": {
     "Type": "string value",
@@ -318,10 +302,8 @@ Inputs:
   {
     "DealUUID": "07070707-0707-0707-0707-070707070707",
     "AllocationID": 0,
-    "PieceCid": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "ClientAddr": "f01234",
+    "PieceCid": null,
+    "ClientAddr": "\u003cempty\u003e",
     "StartEpoch": 10101,
     "EndEpoch": 10101,
     "FilePath": "string value",
@@ -353,13 +335,11 @@ Inputs:
     "IsOffline": true,
     "ClientDealProposal": {
       "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
+        "PieceCID": null,
         "PieceSize": 1032,
         "VerifiedDeal": true,
-        "Client": "f01234",
-        "Provider": "f01234",
+        "Client": "\u003cempty\u003e",
+        "Provider": "\u003cempty\u003e",
         "Label": "",
         "StartEpoch": 10101,
         "EndEpoch": 10101,
@@ -372,9 +352,7 @@ Inputs:
         "Data": "Ynl0ZSBhcnJheQ=="
       }
     },
-    "DealDataRoot": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "DealDataRoot": null,
     "Transfer": {
       "Type": "string value",
       "ClientID": "string value",
@@ -417,13 +395,11 @@ Inputs:
     "CreatedAt": "0001-01-01T00:00:00Z",
     "ClientDealProposal": {
       "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
+        "PieceCID": null,
         "PieceSize": 1032,
         "VerifiedDeal": true,
-        "Client": "f01234",
-        "Provider": "f01234",
+        "Client": "\u003cempty\u003e",
+        "Provider": "\u003cempty\u003e",
         "Label": "",
         "StartEpoch": 10101,
         "EndEpoch": 10101,
@@ -439,9 +415,7 @@ Inputs:
     "IsOffline": true,
     "CleanupData": true,
     "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "DealDataRoot": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "DealDataRoot": null,
     "InboundFilePath": "string value",
     "Transfer": {
       "Type": "string value",
@@ -465,12 +439,7 @@ Inputs:
 ]
 ```
 
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
+Response: `null`
 
 ### BoostIndexerAnnounceDealRemoved
 
@@ -480,18 +449,11 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
+Response: `null`
 
 ### BoostIndexerAnnounceLatest
 
@@ -500,12 +462,7 @@ Perms: admin
 
 Inputs: `null`
 
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
+Response: `null`
 
 ### BoostIndexerAnnounceLatestHttp
 
@@ -521,12 +478,7 @@ Inputs:
 ]
 ```
 
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
+Response: `null`
 
 ### BoostIndexerAnnounceLegacyDeal
 
@@ -536,18 +488,11 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
+Response: `null`
 
 ### BoostIndexerListMultihashes
 
@@ -576,9 +521,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -586,13 +529,11 @@ Response:
 ```json
 {
   "Proposal": {
-    "PieceCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "PieceCID": null,
     "PieceSize": 1032,
     "VerifiedDeal": true,
-    "Client": "f01234",
-    "Provider": "f01234",
+    "Client": "\u003cempty\u003e",
+    "Provider": "\u003cempty\u003e",
     "Label": "",
     "StartEpoch": 10101,
     "EndEpoch": 10101,
@@ -604,9 +545,7 @@ Response:
     "Type": 2,
     "Data": "Ynl0ZSBhcnJheQ=="
   },
-  "ProposalCid": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  "ProposalCid": null,
   "AddFundsCid": null,
   "PublishCid": null,
   "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
@@ -620,9 +559,7 @@ Response:
   "FundsReserved": "0",
   "Ref": {
     "TransferType": "string value",
-    "Root": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "Root": null,
     "PieceCid": null,
     "PieceSize": 1024,
     "RawBlockSize": 42
@@ -724,7 +661,7 @@ Response:
     "VerifiedPrice": "0",
     "MinPieceSize": 1032,
     "MaxPieceSize": 1032,
-    "Miner": "f01234",
+    "Miner": "\u003cempty\u003e",
     "Timestamp": 10101,
     "Expiry": 10101,
     "SeqNo": 42
@@ -1268,9 +1205,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -1293,9 +1228,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  null,
   "string value"
 ]
 ```

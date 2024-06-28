@@ -62,13 +62,13 @@ printf "\n\n \
 
 printf "6. After that, you need to generate a car file for data you want to store on Filecoin (${ci}/app/public/sample.txt${cn}), \
 and note down its ${ci}payload-cid${cn}. \
-We will use the ${ci}boostx${cn} utility\n \
- : ${ci}boostx generate-car /app/public/sample.txt /app/public/sample.car${cn}\n\n"
+We will use the ${ci}car${cn} utility\n \
+ : ${ci}car c -f /app/public/sample.car --version 1 /app/public/sample.txt${cn}\n\n"
 read -rsp $'Press any key to execute it...\n\n' -n1 key
+rm -rf /app/public/sample.car
+car c -f /app/public/sample.car --version 1 /app/public/sample.txt
 
-boostx generate-car /app/public/sample.txt /app/public/sample.car
-
-PAYLOAD_CID=`boostx generate-car /app/public/sample.txt /app/public/sample.car | grep CID | cut -d: -f2 | xargs`
+PAYLOAD_CID=`car root /app/public/sample.car`
 printf "\n\nDone. We noted payload-cid = ${ci}$PAYLOAD_CID${cn}\n \
 ###################################################################################\n"
 ###################################################################################
@@ -119,12 +119,13 @@ curl -X POST -H "Content-Type: application/json" -d '{"query":"mutation { dealPu
 printf "\nDone.\n\n \
 ###################################################################################\n"
 ###################################################################################
-printf "10. To retrieve the file from the ${cb}lotus${cn} system you can use \n\
-${ci}lotus client retrieve${cn} or ${ci}lotus client cat${cn} commands.\n\
-: ${ci}lotus client cat --miner t01000 $PAYLOAD_CID ${cn}\n\n"
+printf "10. To retrieve the file from the ${cb}storage provider${cn} system you can use \n\
+${ci}boost retrieve${cn} command.\n\
+: ${ci}boost retrieve -p t01000 -o /app/output $PAYLOAD_CID ${cn}\n\n"
 
 read -rsp $'Press any key to show the file content...\n\n' -n1 key
-until lotus client cat --miner t01000 $PAYLOAD_CID 
+until boost retrieve -p t01000 -o /app/output $PAYLOAD_CID
+cat /app/output/sample.txt
 do  
     printf "\nFile publishing may take time, please wait some time until the deal is finished and try again.\n\n" 
     read -rsp $'Press any key to try again...\n' -n1 key 

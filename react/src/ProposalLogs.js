@@ -6,7 +6,7 @@ import {
 } from "./gql";
 import moment from "moment";
 import React, {useState} from "react";
-import {PageContainer, ShortClientAddress, ShortDealID, ShortDealLink} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat, durationNanoToString} from "./util-date";
 import {TimestampFormat} from "./timestamp";

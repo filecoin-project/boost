@@ -22,7 +22,6 @@ import {
     PieceDoctorPage,
     InspectPiecePage,
     LIDPage,
-    NoUnsealedSectorPieces,
     NoUnsealedSectorPage,
     PiecePayloadCids,
 } from "./LID";

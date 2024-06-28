@@ -135,9 +135,9 @@ export function isContractAddress(addr) {
 }
 
 export function isInteger(num){
-    const isNum = (typeof(num) === 'number' || typeof(num) === "string" && num.trim() !== '') && !isNaN(num);
+    const isNum = (typeof(num) === 'number' || (typeof(num) === "string" && num.trim() !== '')) && !isNaN(num);
     if (!isNum) {
         return false
     }
-    return (num+'').indexOf('.') == -1
+    return (num+'').indexOf('.') === -1
 }
