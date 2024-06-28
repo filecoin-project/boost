@@ -106,6 +106,9 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	lotus-miner actor set-addrs /dns/boost/tcp/50000
 	echo Registered
 
+	curl -X POST -H "Content-Type: application/json" -d '{"query":"mutation { storageAskUpdate (update: { Price: 0, VerifiedPrice: 0 } ) }"}' http://localhost:8080/graphql/query
+	echo Price SET TO 0
+
 	touch $BOOST_PATH/.register.boost
 	echo Try to stop boost...
     kill -15 $BOOST_PID || kill -9 $BOOST_PID

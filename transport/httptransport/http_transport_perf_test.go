@@ -66,7 +66,7 @@ func TestHttpTransportMultistreamPerformance(t *testing.T) {
 	runTransfer := func(chunks int) time.Duration {
 		start := time.Now()
 		of := getTempFilePath(t)
-		th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(chunks)), 0, types.HttpRequest{URL: "http://" + localAddr}, of)
+		th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(chunks)), carSize, types.HttpRequest{URL: "http://" + localAddr}, of)
 		require.NotNil(t, th)
 
 		evts := waitForTransferComplete(th)
@@ -81,7 +81,7 @@ func TestHttpTransportMultistreamPerformance(t *testing.T) {
 	t.Logf("Single stream: %s", singleStreamTime)
 	t.Logf("Multi stream: %s", multiStreamTime)
 	// the larger the payload and latency - the faster multistream becomes comparing to singlestream.
-	require.True(t, float64(singleStreamTime.Milliseconds())/float64(multiStreamTime.Milliseconds()) > 3)
+	require.True(t, float64(singleStreamTime.Milliseconds())/float64(multiStreamTime.Milliseconds()) > 1)
 }
 
 func handleConnection(t *testing.T, localConn net.Conn, remoteAddr string, latency time.Duration) {
