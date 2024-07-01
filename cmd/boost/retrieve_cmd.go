@@ -216,7 +216,7 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("Failed to retrieve content with candidate miner %s: %v", miner, err)
 		}
 
-		printRetrievalStats(&FILRetrievalStats{RetrievalStats: *stats})
+		printRetrievalStats(&FILRetrievalStats{RStats: *stats})
 
 		dservOffline := merkledag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
 
@@ -296,19 +296,19 @@ type RetrievalStats interface {
 }
 
 type FILRetrievalStats struct {
-	rc.RetrievalStats
+	RStats rc.RetrievalStats
 }
 
 func (stats *FILRetrievalStats) GetByteSize() uint64 {
-	return stats.Size
+	return stats.RStats.Size
 }
 
 func (stats *FILRetrievalStats) GetDuration() time.Duration {
-	return stats.Duration
+	return stats.RStats.Duration
 }
 
 func (stats *FILRetrievalStats) GetAverageBytesPerSecond() uint64 {
-	return stats.AverageSpeed
+	return stats.RStats.AverageSpeed
 }
 
 func printProgress(bytesReceived uint64) {
@@ -345,13 +345,13 @@ Total Payment: %v (%v)
 Num Payments:  %v
 Peer:          %v
 `,
-			stats.Size, humanize.IBytes(stats.Size),
-			stats.Duration,
-			stats.AverageSpeed, humanize.IBytes(stats.AverageSpeed),
-			stats.AskPrice, types.FIL(stats.AskPrice),
-			stats.TotalPayment, types.FIL(stats.TotalPayment),
-			stats.NumPayments,
-			stats.Peer,
+			stats.RStats.Size, humanize.IBytes(stats.RStats.Size),
+			stats.RStats.Duration,
+			stats.RStats.AverageSpeed, humanize.IBytes(stats.RStats.AverageSpeed),
+			stats.RStats.AskPrice, types.FIL(stats.RStats.AskPrice),
+			stats.RStats.TotalPayment, types.FIL(stats.RStats.TotalPayment),
+			stats.RStats.NumPayments,
+			stats.RStats.Peer,
 		)
 	}
 }
