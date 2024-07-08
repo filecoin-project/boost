@@ -29,7 +29,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.2
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.14.0-dev
+	github.com/filecoin-project/go-state-types v0.14.0-rc5
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -63,7 +63,7 @@ require (
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/libp2p/go-libp2p v0.34.1
+	github.com/libp2p/go-libp2p v0.35.0
 	github.com/libp2p/go-libp2p-gostream v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-http v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.25.2
@@ -121,7 +121,7 @@ require (
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20231225121904-e25f5bc08668 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/daaku/go.zipexe v1.0.2 // indirect
@@ -132,14 +132,14 @@ require (
 	github.com/dgraph-io/ristretto v0.1.1 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/drand/drand v1.5.11 // indirect
-	github.com/drand/kyber v1.3.0 // indirect
+	github.com/drand/kyber v1.3.1 // indirect
 	github.com/drand/kyber-bls12381 v0.3.1 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.14.0 // indirect
 	github.com/elastic/go-sysinfo v1.11.0 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/etclabscore/go-jsonschema-walk v0.0.6 // indirect
-	github.com/filecoin-project/filecoin-ffi v1.25.0-dev.1 // indirect
+	github.com/filecoin-project/filecoin-ffi v1.28.0-rc2 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.3.0 // indirect
@@ -275,7 +275,7 @@ require (
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
-	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	github.com/zondax/hid v0.9.2 // indirect
 	github.com/zondax/ledger-go v0.14.3 // indirect
 	go.uber.org/dig v1.17.1 // indirect
@@ -303,7 +303,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.12
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/go-data-segment v0.0.1
-	github.com/filecoin-project/lotus v1.27.1
+	github.com/filecoin-project/lotus v1.28.0-rc4
 	github.com/ipfs/boxo v0.20.0
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0
@@ -320,10 +320,12 @@ require (
 
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
+	github.com/Kubuxu/go-broadcast v0.0.0-20240621161059-1a8c90734cd6 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc8 // indirect
+	github.com/filecoin-project/go-f3 v0.0.3-0.20240702063402-d48771055cf4 // indirect
 	github.com/gammazero/channelqueue v0.2.1 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/georgysavva/scany/v2 v2.1.3 // indirect
