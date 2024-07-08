@@ -35,7 +35,7 @@ const (
 	factor               = 1.5
 	maxReconnectAttempts = 15
 
-	nChunks = 5
+	numChunks = 5
 )
 
 type httpError struct {
@@ -90,7 +90,7 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 		maxBackoffWait:       maxBackOff,
 		backOffFactor:        factor,
 		maxReconnectAttempts: maxReconnectAttempts,
-		nChunks:              nChunks,
+		nChunks:              numChunks,
 		dl:                   dealLogger.Subsystem("http-transport"),
 	}
 	for _, o := range opts {
@@ -153,9 +153,9 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	h.dl.Infow(duuid, "existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
 
 	// default to a single stream for libp2p urls as libp2p server doesn't support range requests
-	Chunks := h.nChunks
+	nChunks := h.nChunks
 	if u.Scheme == "libp2p" || dealInfo.DealSize < 10*readBufferSize {
-		Chunks = 1
+		nChunks = 1
 	}
 
 	// construct the transfer instance that will act as the transfer handler
@@ -174,7 +174,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		},
 		maxReconnectAttempts: h.maxReconnectAttempts,
 		dl:                   h.dl,
-		nChunks:              Chunks,
+		nChunks:              nChunks,
 	}
 
 	cleanupFns := []func(){
@@ -292,15 +292,15 @@ func (t *transfer) execute(ctx context.Context) error {
 
 	// Check if the control file exists and create it if it doesn't. Control file captures the number of chunks that the transfer has been started with.
 	// If the number of chunks changes half way through, the transfer should continue with the same chunking setting.
-	chunks := t.nChunks
+	nchunks := t.nChunks
 	if errors.Is(err, os.ErrNotExist) {
 		// if the output file is not empty, but there is no control file then that must be a continuation of a transfer from before chunking was introduced.
 		// in that case set nChunks to one.
 		if outputStats.Size() > 0 && controlStats == nil {
-			chunks = 1
+			nchunks = 1
 		}
 
-		err := t.writeControlFile(controlFile, transferConfig{chunks})
+		err := t.writeControlFile(controlFile, transferConfig{nchunks})
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to create control file %s: %w", controlFile, err)}
 		}
@@ -311,7 +311,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to read control file %s: %w", controlFile, err)}
 		}
-		chunks = conf.NChunks
+		nchunks = conf.NChunks
 	}
 
 	// Create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
@@ -365,15 +365,15 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 	}
 
-	chunkSize := dealSize / int64(chunks)
+	chunkSize := dealSize / int64(nchunks)
 	lastAppendedChunk := int(outputStats.Size() / chunkSize)
 
-	downloaders := make([]*downloader, 0, chunks-lastAppendedChunk)
+	downloaders := make([]*downloader, 0, nchunks-lastAppendedChunk)
 
-	for i := lastAppendedChunk; i < chunks; i++ {
+	for i := lastAppendedChunk; i < nchunks; i++ {
 		rangeStart := int64(i) * chunkSize
 		var rangeEnd int64
-		if i == chunks-1 {
+		if i == nchunks-1 {
 			rangeEnd = dealSize
 		} else {
 			rangeEnd = rangeStart + chunkSize
