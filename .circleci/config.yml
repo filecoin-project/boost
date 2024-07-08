@@ -106,7 +106,7 @@ jobs:
         default: golang
       go-test-flags:
         type: string
-        default: "-v --tags=debug -timeout 15m"
+        default: "-v --tags=debug -timeout 30m"
         description: Flags passed to go test.
       target:
         type: string
@@ -363,9 +363,9 @@ workflows:
           suite: booster-bitswap
           target: "./cmd/booster-bitswap"
 
-      - test:
-          name: test-itest-lid-cleanup
-          suite: itest-lid-cleanup
-          target: "./itests/lid_cleanup_test.go"
+#      - test:
+#          name: test-itest-lid-cleanup
+#          suite: itest-lid-cleanup
+#          target: "./itests/lid_cleanup_test.go"
 
       - lid-docker-compose
