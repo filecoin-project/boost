@@ -13,7 +13,7 @@ env:
 
 jobs:
   setup-params:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,7 @@ jobs:
         run: echo "Cache saved"
 
   setup-deps:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       make_deps_key: ${{ steps.make_deps.outputs.key }}
       make_deps_path: ${{ steps.make_deps.outputs.path }}
@@ -101,7 +101,7 @@ jobs:
           path: ${{ steps.make_deps.outputs.path }}
 
   build-all:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [setup-deps]
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +127,7 @@ jobs:
         shell: bash
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [setup-params, setup-deps]
     strategy:
       matrix:
@@ -188,7 +188,7 @@ jobs:
 
   lint:
     needs: [setup-deps]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -219,7 +219,7 @@ jobs:
         shell: bash
 
   gofmt:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -245,7 +245,7 @@ jobs:
         shell: bash
 
   cbor-check:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -278,7 +278,7 @@ jobs:
         shell: bash
 
   docs-check:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -307,7 +307,7 @@ jobs:
         shell: bash
 
   gen-check:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -340,7 +340,7 @@ jobs:
         shell: bash
 
   lid-docker-compose:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [setup-params, setup-deps]
     steps:
       - uses: actions/checkout@v4
@@ -377,7 +377,7 @@ jobs:
         shell: bash
 
   mod-tidy-check:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
