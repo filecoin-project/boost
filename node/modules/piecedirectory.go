@@ -56,6 +56,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					// Set up a local index directory service that connects to the yugabyte db
 					settings := yugabyte.DBSettings{
 						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
+						Username:      cfg.LocalIndexDirectory.Yugabyte.Username,
+						Password:      cfg.LocalIndexDirectory.Yugabyte.Password,
 						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
 					}
 					migrator := yugabyte.NewMigrator(settings, address.Address(maddr))

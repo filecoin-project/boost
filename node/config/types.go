@@ -265,6 +265,10 @@ type LocalIndexDirectoryYugabyteConfig struct {
 	ConnectString string
 	// The yugabyte cassandra hosts eg ["127.0.0.1"]
 	Hosts []string
+	// The yugabyte cassandra username eg "cassandra"
+	Username string
+	// The yugabyte cassandra password eg "cassandra"
+	Password string
 }
 
 type LocalIndexDirectoryConfig struct {

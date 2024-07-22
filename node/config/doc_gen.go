@@ -698,6 +698,18 @@ as this task consumes considerable resources and time`,
 
 			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
+		{
+			Name: "Username",
+			Type: "string",
+
+			Comment: `The yugabyte cassandra username eg "cassandra"`,
+		},
+		{
+			Name: "Password",
+			Type: "string",
+
+			Comment: `The yugabyte cassandra password eg "cassandra"`,
+		},
 	},
 	"MonitoringConfig": []DocField{
 		{

@@ -42,6 +42,10 @@ const InsertConcurrency = 4
 type DBSettings struct {
 	// The cassandra hosts to connect to
 	Hosts []string
+	// The cassandra password to use
+	Username string
+	// The cassandra password to use
+	Password string
 	// The postgres connect string
 	ConnectString string
 	// The number of threads to use when inserting into the PayloadToPieces index
@@ -89,8 +93,7 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 		settings.InsertConcurrency = InsertConcurrency
 	}
 
-	cluster := gocql.NewCluster(settings.Hosts...)
-	cluster.Timeout = time.Duration(settings.CQLTimeout) * time.Second
+	cluster := NewCluster(settings)
 	cluster.Keyspace = defaultKeyspace
 	s := &Store{
 		settings: settings,
