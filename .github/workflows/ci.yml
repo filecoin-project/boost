@@ -272,10 +272,19 @@ jobs:
             sleep 1;
           done
         shell: bash
-      - name: Run LID integration tests
-        run: |
-          set -x
-          make test-lid
+
+      - run: |
+          cd extern/boostd-data
+          go test -v ./...
+
+#      - name: Run LID integration tests
+#        run: |
+#          set -x
+#          make test-lid
+#        shell: bash
+
+      - name: Clean up YugabyteDB
+        run: docker stop yugabyte
         shell: bash
 
   mod-tidy-check:
