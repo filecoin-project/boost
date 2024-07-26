@@ -12,8 +12,21 @@ env:
   GO_VERSION: 1.22.3
 
 jobs:
+  setup-runners:
+    runs-on: [self-hosted, base1]
+
+    steps:
+      - name: Start GitHub Runners
+        run: |
+          start_github_runners.sh
+        shell: bash
+
+      - name: Wait for Runners to Be Ready
+        run: sleep 60
+
   setup-params:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
+    needs: [setup-runners]
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +60,8 @@ jobs:
         run: echo "Cache saved"
 
   setup-deps:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
+    needs: [setup-runners]
     outputs:
       make_deps_key: ${{ steps.make_deps.outputs.key }}
       make_deps_path: ${{ steps.make_deps.outputs.path }}
@@ -101,7 +115,7 @@ jobs:
           path: ${{ steps.make_deps.outputs.path }}
 
   build-all:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     needs: [setup-deps]
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +141,7 @@ jobs:
         shell: bash
 
   test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     needs: [setup-params, setup-deps]
     strategy:
       matrix:
@@ -188,7 +202,7 @@ jobs:
 
   lint:
     needs: [setup-deps]
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
@@ -219,7 +233,7 @@ jobs:
         shell: bash
 
   gofmt:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
@@ -245,7 +259,7 @@ jobs:
         shell: bash
 
   cbor-check:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
@@ -278,7 +292,7 @@ jobs:
         shell: bash
 
   docs-check:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
@@ -307,7 +321,7 @@ jobs:
         shell: bash
 
   gen-check:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
@@ -340,7 +354,7 @@ jobs:
         shell: bash
 
   lid-docker-compose:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     needs: [setup-params, setup-deps]
     steps:
       - uses: actions/checkout@v4
@@ -377,7 +391,7 @@ jobs:
         shell: bash
 
   mod-tidy-check:
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker]
     steps:
       - uses: actions/checkout@v4
 
