@@ -24,10 +24,8 @@ func TestSegmentParsing(t *testing.T) {
 	rd, err := os.Open("testdata/segment.car")
 	require.NoError(t, err)
 
-	recs, err := parsePieceWithDataSegmentIndex(pieceCid, carSize, rd)
+	_, err = parsePieceWithDataSegmentIndex(pieceCid, carSize, rd)
 	require.NoError(t, err)
-
-	t.Log(recs)
 
 	err = rd.Close()
 	require.NoError(t, err)
