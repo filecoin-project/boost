@@ -60,7 +60,7 @@ jobs:
           - name: test-itest-direct_deal
             target: "./itests/ddo_test.go"
           - name: test-all
-            target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
+            target: "`go list ./... | grep -v boost/db | grep -v boost/storagemarket | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
           - name: test-itest-data-segment-index
             target: "./itests/data_segment_index_retrieval_test.go"
           - name: test-itest-ipni
@@ -71,8 +71,13 @@ jobs:
             target: "./cmd/booster-http"
           - name: test-booster-bitswap
             target: "./cmd/booster-bitswap"
-#          - name: test-itest-lid-cleanup
-#            target: "./itests/lid_cleanup_test.go"
+          - name: test-itest-lid-cleanup
+            target: "./itests/lid_cleanup_test.go"
+          - name: test-provider
+            target: "./storagemarket"
+          - name: test-sql-db
+            target: "./db"
+        
     steps:
       - uses: actions/checkout@v4
 
@@ -276,12 +281,6 @@ jobs:
       - run: |
           cd extern/boostd-data
           go test -v ./...
-
-#      - name: Run LID integration tests
-#        run: |
-#          set -x
-#          make test-lid
-#        shell: bash
 
       - name: Clean up YugabyteDB
         run: docker stop yugabyte
