@@ -12,111 +12,15 @@ env:
   GO_VERSION: 1.22.3
 
 jobs:
-  setup-runners:
-    runs-on: [self-hosted, base1]
-
-    steps:
-      - name: Start GitHub Runners
-        run: |
-          start_github_runners.sh
-        shell: bash
-
-      - name: Wait for Runners to Be Ready
-        run: sleep 60
-
   setup-params:
     runs-on: [self-hosted, docker]
-    needs: [setup-runners]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Dependencies
-        uses: ./.github/actions/install-deps
-
-      - name: Cache boostci params
-        id: cache-params
-        uses: actions/cache@v4
-        with:
-          path: /var/tmp/filecoin-proof-parameters/
-          key: v25-8mb-lotus-params
-
-      - name: Run boostci
-        if: steps.cache-params.outputs.cache-hit != 'true'
-        run: make boostci
-        shell: bash
-
       - name: Fetch parameters
-        if: steps.cache-params.outputs.cache-hit != 'true'
-        run: ./boostci fetch-params 8388608
+        run: lotus fetch-params 8388608
         shell: bash
-
-      - name: Save parameters to cache
-        if: steps.cache-params.outputs.cache-hit != 'true'
-        run: echo "Cache saved"
-
-  setup-deps:
-    runs-on: [self-hosted, docker]
-    needs: [setup-runners]
-    outputs:
-      make_deps_key: ${{ steps.make_deps.outputs.key }}
-      make_deps_path: ${{ steps.make_deps.outputs.path }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Dependencies
-        uses: ./.github/actions/install-deps
-
-      - name: Generate cache key for dependencies
-        id: make_deps
-        env:
-          CACHE_KEY: ${{ runner.os }}-${{ runner.arch }}-make-deps-${{ hashFiles('./.git/modules/extern/filecoin-ffi/HEAD') }}
-          CACHE_PATH: |
-            ./extern/filecoin-ffi/filcrypto.h
-            ./extern/filecoin-ffi/libfilcrypto.a
-            ./extern/filecoin-ffi/filcrypto.pc
-        run: |
-          echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
-          echo -e "path<<EOF\n$CACHE_PATH\nEOF" | tee -a $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Restore cache for dependencies
-        id: restore_make_deps
-        uses: actions/cache@v4
-        with:
-          key: ${{ steps.make_deps.outputs.key }}
-          path: ${{ steps.make_deps.outputs.path }}
-          restore-keys: |
-            make-deps-
-
-      - name: Install dependencies if cache miss
-        if: steps.restore_make_deps.outputs.cache-hit != 'true'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # Install project dependencies
-          make deps
-        shell: bash
-
-      - name: Save dependencies to cache
-        if: steps.restore_make_deps.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          key: ${{ steps.make_deps.outputs.key }}
-          path: ${{ steps.make_deps.outputs.path }}
 
   build-all:
     runs-on: [self-hosted, docker]
-    needs: [setup-deps]
     steps:
       - uses: actions/checkout@v4
 
@@ -128,13 +32,12 @@ jobs:
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
 
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          key: ${{ needs.setup-deps.outputs.make_deps_key }}
-          path: ${{ needs.setup-deps.outputs.make_deps_path }}
-          restore-keys: |
-            make-deps-
+      - name: Install FFI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make deps
+        shell: bash
 
       - name: Build Go
         run: make build-go
@@ -142,7 +45,7 @@ jobs:
 
   test:
     runs-on: [self-hosted, docker]
-    needs: [setup-params, setup-deps]
+    needs: [setup-params]
     strategy:
       matrix:
         test-suite:
@@ -181,19 +84,12 @@ jobs:
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
 
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          key: ${{ needs.setup-deps.outputs.make_deps_key }}
-          path: ${{ needs.setup-deps.outputs.make_deps_path }}
-          restore-keys: |
-            make-deps-
-
-      - name: Cache boostci params
-        uses: actions/cache@v4
-        with:
-          path: /var/tmp/filecoin-proof-parameters/
-          key: v25-8mb-lotus-params
+      - name: Install FFI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make deps
+        shell: bash
 
       - name: Run tests
         run: |
@@ -201,8 +97,7 @@ jobs:
         shell: bash
 
   lint:
-    needs: [setup-deps]
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -214,13 +109,12 @@ jobs:
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
 
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          key: ${{ needs.setup-deps.outputs.make_deps_key }}
-          path: ${{ needs.setup-deps.outputs.make_deps_path }}
-          restore-keys: |
-            make-deps-
+      - name: Install FFI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make deps
+        shell: bash
 
       - name: Install golangci-lint
         run: |
@@ -233,7 +127,7 @@ jobs:
         shell: bash
 
   gofmt:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -259,7 +153,7 @@ jobs:
         shell: bash
 
   cbor-check:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -292,7 +186,7 @@ jobs:
         shell: bash
 
   docs-check:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -321,7 +215,7 @@ jobs:
         shell: bash
 
   gen-check:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -355,7 +249,7 @@ jobs:
 
   lid-docker-compose:
     runs-on: [self-hosted, docker]
-    needs: [setup-params, setup-deps]
+    needs: [setup-params]
     steps:
       - uses: actions/checkout@v4
 
@@ -366,12 +260,6 @@ jobs:
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Cache boostci params
-        uses: actions/cache@v4
-        with:
-          path: /var/tmp/filecoin-proof-parameters/
-          key: v25-8mb-lotus-params
 
       - name: Start YugabyteDB
         run: docker run --rm --name yugabyte -d -p 5433:5433 yugabytedb/yugabyte:2.21.1.0-b271 bin/yugabyted start --daemon=false
@@ -391,7 +279,7 @@ jobs:
         shell: bash
 
   mod-tidy-check:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
