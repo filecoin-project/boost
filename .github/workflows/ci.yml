@@ -12,8 +12,26 @@ env:
   GO_VERSION: 1.22.3
 
 jobs:
+  ci-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+
+      - name: Run actionlint
+        run: actionlint
+
   setup-params:
     runs-on: [self-hosted, docker]
+    needs: [ci-lint]
     steps:
       - name: Fetch parameters
         run: lotus fetch-params 8388608
@@ -21,6 +39,7 @@ jobs:
 
   build-all:
     runs-on: [self-hosted, docker]
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -103,6 +122,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -133,6 +153,7 @@ jobs:
 
   gofmt:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -159,6 +180,7 @@ jobs:
 
   cbor-check:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -192,6 +214,7 @@ jobs:
 
   docs-check:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -221,6 +244,7 @@ jobs:
 
   gen-check:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -255,6 +279,8 @@ jobs:
   lid-docker-compose:
     runs-on: [self-hosted, docker]
     needs: [setup-params]
+    env:
+      CONTAINER_NAME: yugabyte-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -267,11 +293,11 @@ jobs:
         uses: ./.github/actions/install-deps
 
       - name: Start YugabyteDB
-        run: docker run --rm --name yugabyte -d -p 5433:5433 yugabytedb/yugabyte:2.21.1.0-b271 bin/yugabyted start --daemon=false
+        run: docker run --rm --name ${{ env.CONTAINER_NAME }} -d -p 5433:5433 yugabytedb/yugabyte:2.21.1.0-b271 bin/yugabyted start --daemon=false
         shell: bash
       - run: |
           while true; do
-            status=$(docker exec yugabyte bin/yugabyted status);
+            status=$(docker exec ${{ env.CONTAINER_NAME }} bin/yugabyted status);
             echo $status;
             echo $status | grep Running && break;
             sleep 1;
@@ -283,11 +309,13 @@ jobs:
           go test -v ./...
 
       - name: Clean up YugabyteDB
-        run: docker stop yugabyte
+        if: always()
+        run: docker stop ${{ env.CONTAINER_NAME }}
         shell: bash
 
   mod-tidy-check:
     runs-on: ubuntu-latest
+    needs: [ci-lint]
     steps:
       - uses: actions/checkout@v4
 

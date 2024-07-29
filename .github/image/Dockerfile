@@ -5,10 +5,21 @@ FROM golang:1.22-bullseye AS builder
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the entire project directory to the working directory
-COPY . .
+# Install Git
+RUN apt-get update && apt-get install -y git
 
-# Download all the dependencies
+# Clone the repositories
+RUN git clone https://github.com/filecoin-project/boost.git
+RUN git clone https://github.com/filecoin-project/curio.git
+
+# Download Go dependencies for Boost
+WORKDIR /app/boost
+RUN git submodule update --init
+RUN go mod download
+
+# Download Go dependencies for Curio
+WORKDIR /app/boost
+RUN git submodule update --init
 RUN go mod download
 
 # Stage 2: Install Lotus binary
