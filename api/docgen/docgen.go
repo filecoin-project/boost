@@ -16,6 +16,7 @@ import (
 	types2 "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
@@ -44,6 +45,13 @@ func addExample(v interface{}) {
 }
 
 func init() {
+	addr, err := address.NewIDAddress(1234)
+	if err != nil {
+		panic(err)
+	}
+
+	ExampleValues[reflect.TypeOf(addr)] = addr
+
 	pid, err := peer.Decode("12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
 	if err != nil {
 		panic(err)
