@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -140,7 +140,7 @@ func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dt
 	offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
 	return func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
 		offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
-		return func(ctx context.Context, state retrievalmarket.ProviderDealState) (bool, string, error) {
+		return func(ctx context.Context, state legacyretrievaltypes.ProviderDealState) (bool, string, error) {
 			b, err := onlineOk()
 			if err != nil {
 				return false, "miner error", err

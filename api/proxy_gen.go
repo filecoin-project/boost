@@ -7,15 +7,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-jsonrpc/auth"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
-	lapi "github.com/filecoin-project/lotus/api"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -36,29 +32,11 @@ type BoostStruct struct {
 	NetStruct
 
 	Internal struct {
-		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
-
 		BlockstoreGet func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
 
 		BlockstoreGetSize func(p0 context.Context, p1 cid.Cid) (int, error) `perm:"read"`
 
 		BlockstoreHas func(p0 context.Context, p1 cid.Cid) (bool, error) `perm:"read"`
-
-		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreGC func(p0 context.Context) ([]DagstoreShardResult, error) `perm:"admin"`
-
-		BoostDagstoreInitializeAll func(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) `perm:"admin"`
-
-		BoostDagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"admin"`
-
-		BoostDagstorePiecesContainingMultihash func(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) `perm:"read"`
-
-		BoostDagstoreRecoverShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreRegisterShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
@@ -70,75 +48,31 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerAnnounceDeal func(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) `perm:"admin"`
+
+		BoostIndexerAnnounceDealRemoved func(p0 context.Context, p1 cid.Cid) (cid.Cid, error) `perm:"admin"`
+
 		BoostIndexerAnnounceLatest func(p0 context.Context) (cid.Cid, error) `perm:"admin"`
 
 		BoostIndexerAnnounceLatestHttp func(p0 context.Context, p1 []string) (cid.Cid, error) `perm:"admin"`
 
-		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+		BoostIndexerAnnounceLegacyDeal func(p0 context.Context, p1 cid.Cid) (cid.Cid, error) `perm:"admin"`
 
-		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
+		BoostIndexerListMultihashes func(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) `perm:"admin"`
+
+		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) `perm:"admin"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
-		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsConsiderOfflineStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsConsiderOnlineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsConsiderOnlineStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsConsiderUnverifiedStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsConsiderVerifiedStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
-
-		DealsPieceCidBlocklist func(p0 context.Context) ([]cid.Cid, error) `perm:"admin"`
-
-		DealsSetConsiderOfflineRetrievalDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetConsiderOfflineStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetConsiderOnlineRetrievalDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetConsiderOnlineStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetConsiderUnverifiedStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetConsiderVerifiedStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
-
-		DealsSetPieceCidBlocklist func(p0 context.Context, p1 []cid.Cid) error `perm:"admin"`
-
-		MarketCancelDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
-
-		MarketDataTransferUpdates func(p0 context.Context) (<-chan DataTransferChannel, error) `perm:"write"`
-
-		MarketGetAsk func(p0 context.Context) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
-
-		MarketGetRetrievalAsk func(p0 context.Context) (*retrievalmarket.Ask, error) `perm:"read"`
-
-		MarketImportDealData func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"write"`
-
-		MarketListDataTransfers func(p0 context.Context) ([]DataTransferChannel, error) `perm:"write"`
-
-		MarketListIncompleteDeals func(p0 context.Context) ([]storagemarket.MinerDeal, error) `perm:"read"`
-
-		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
-
-		MarketPendingDeals func(p0 context.Context) (lapi.PendingDealInfo, error) `perm:"write"`
-
-		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
-
-		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
-
-		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
+		MarketGetAsk func(p0 context.Context) (*legacytypes.SignedStorageAsk, error) `perm:"read"`
 
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
 
-		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
+		PdCleanup func(p0 context.Context) error `perm:"admin"`
 
-		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
+		PdRemoveDealForPiece func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
 	}
 }
 
@@ -267,17 +201,6 @@ type WalletStruct struct {
 type WalletStub struct {
 }
 
-func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
-	if s.Internal.ActorSectorSize == nil {
-		return *new(abi.SectorSize), ErrNotSupported
-	}
-	return s.Internal.ActorSectorSize(p0, p1)
-}
-
-func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
-	return *new(abi.SectorSize), ErrNotSupported
-}
-
 func (s *BoostStruct) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
 	if s.Internal.BlockstoreGet == nil {
 		return *new([]byte), ErrNotSupported
@@ -309,94 +232,6 @@ func (s *BoostStruct) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error
 
 func (s *BoostStub) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
 	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreDestroyShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreDestroyShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreGC(p0 context.Context) ([]DagstoreShardResult, error) {
-	if s.Internal.BoostDagstoreGC == nil {
-		return *new([]DagstoreShardResult), ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreGC(p0)
-}
-
-func (s *BoostStub) BoostDagstoreGC(p0 context.Context) ([]DagstoreShardResult, error) {
-	return *new([]DagstoreShardResult), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
-	if s.Internal.BoostDagstoreInitializeAll == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreInitializeAll(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreInitializeShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreInitializeShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShardInfo, error) {
-	if s.Internal.BoostDagstoreListShards == nil {
-		return *new([]DagstoreShardInfo), ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreListShards(p0)
-}
-
-func (s *BoostStub) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShardInfo, error) {
-	return *new([]DagstoreShardInfo), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
-	if s.Internal.BoostDagstorePiecesContainingMultihash == nil {
-		return *new([]cid.Cid), ErrNotSupported
-	}
-	return s.Internal.BoostDagstorePiecesContainingMultihash(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
-	return *new([]cid.Cid), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreRecoverShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreRecoverShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreRegisterShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreRegisterShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
@@ -454,6 +289,28 @@ func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
 }
 
+func (s *BoostStruct) BoostIndexerAnnounceDeal(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceDeal == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceDeal(p0 context.Context, p1 *smtypes.ProviderDealState) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceDealRemoved(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceDealRemoved == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceDealRemoved(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceDealRemoved(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
 func (s *BoostStruct) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
 	if s.Internal.BoostIndexerAnnounceLatest == nil {
 		return *new(cid.Cid), ErrNotSupported
@@ -476,26 +333,37 @@ func (s *BoostStub) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []stri
 	return *new(cid.Cid), ErrNotSupported
 }
 
-func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+func (s *BoostStruct) BoostIndexerAnnounceLegacyDeal(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceLegacyDeal == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceLegacyDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceLegacyDeal(p0 context.Context, p1 cid.Cid) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) {
 	if s.Internal.BoostIndexerListMultihashes == nil {
 		return *new([]multihash.Multihash), ErrNotSupported
 	}
 	return s.Internal.BoostIndexerListMultihashes(p0, p1)
 }
 
-func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) {
 	return *new([]multihash.Multihash), ErrNotSupported
 }
 
-func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	if s.Internal.BoostMakeDeal == nil {
-		return nil, ErrNotSupported
+func (s *BoostStruct) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {
+	if s.Internal.BoostLegacyDealByProposalCid == nil {
+		return *new(legacytypes.MinerDeal), ErrNotSupported
 	}
-	return s.Internal.BoostMakeDeal(p0, p1)
+	return s.Internal.BoostLegacyDealByProposalCid(p0, p1)
 }
 
-func (s *BoostStub) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	return nil, ErrNotSupported
+func (s *BoostStub) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {
+	return *new(legacytypes.MinerDeal), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
@@ -509,290 +377,15 @@ func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p
 	return nil, ErrNotSupported
 }
 
-func (s *BoostStruct) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderOfflineRetrievalDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderOfflineRetrievalDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsConsiderOfflineStorageDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderOfflineStorageDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderOfflineStorageDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderOfflineStorageDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsConsiderOnlineRetrievalDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderOnlineRetrievalDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderOnlineRetrievalDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderOnlineRetrievalDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsConsiderOnlineStorageDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderOnlineStorageDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderOnlineStorageDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderOnlineStorageDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsConsiderUnverifiedStorageDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderUnverifiedStorageDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderUnverifiedStorageDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderUnverifiedStorageDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsConsiderVerifiedStorageDeals(p0 context.Context) (bool, error) {
-	if s.Internal.DealsConsiderVerifiedStorageDeals == nil {
-		return false, ErrNotSupported
-	}
-	return s.Internal.DealsConsiderVerifiedStorageDeals(p0)
-}
-
-func (s *BoostStub) DealsConsiderVerifiedStorageDeals(p0 context.Context) (bool, error) {
-	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
-	if s.Internal.DealsPieceCidBlocklist == nil {
-		return *new([]cid.Cid), ErrNotSupported
-	}
-	return s.Internal.DealsPieceCidBlocklist(p0)
-}
-
-func (s *BoostStub) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
-	return *new([]cid.Cid), ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderOfflineRetrievalDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderOfflineRetrievalDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderOfflineRetrievalDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderOfflineRetrievalDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderOfflineStorageDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderOfflineStorageDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderOfflineStorageDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderOfflineStorageDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderOnlineRetrievalDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderOnlineRetrievalDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderOnlineRetrievalDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderOnlineRetrievalDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderOnlineStorageDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderOnlineStorageDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderOnlineStorageDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderOnlineStorageDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderUnverifiedStorageDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderUnverifiedStorageDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderUnverifiedStorageDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderUnverifiedStorageDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetConsiderVerifiedStorageDeals(p0 context.Context, p1 bool) error {
-	if s.Internal.DealsSetConsiderVerifiedStorageDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetConsiderVerifiedStorageDeals(p0, p1)
-}
-
-func (s *BoostStub) DealsSetConsiderVerifiedStorageDeals(p0 context.Context, p1 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
-	if s.Internal.DealsSetPieceCidBlocklist == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.DealsSetPieceCidBlocklist(p0, p1)
-}
-
-func (s *BoostStub) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
-	if s.Internal.MarketCancelDataTransfer == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.MarketCancelDataTransfer(p0, p1, p2, p3)
-}
-
-func (s *BoostStub) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) MarketDataTransferUpdates(p0 context.Context) (<-chan DataTransferChannel, error) {
-	if s.Internal.MarketDataTransferUpdates == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.MarketDataTransferUpdates(p0)
-}
-
-func (s *BoostStub) MarketDataTransferUpdates(p0 context.Context) (<-chan DataTransferChannel, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) MarketGetAsk(p0 context.Context) (*storagemarket.SignedStorageAsk, error) {
+func (s *BoostStruct) MarketGetAsk(p0 context.Context) (*legacytypes.SignedStorageAsk, error) {
 	if s.Internal.MarketGetAsk == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.MarketGetAsk(p0)
 }
 
-func (s *BoostStub) MarketGetAsk(p0 context.Context) (*storagemarket.SignedStorageAsk, error) {
+func (s *BoostStub) MarketGetAsk(p0 context.Context) (*legacytypes.SignedStorageAsk, error) {
 	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
-	if s.Internal.MarketGetRetrievalAsk == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.MarketGetRetrievalAsk(p0)
-}
-
-func (s *BoostStub) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) MarketImportDealData(p0 context.Context, p1 cid.Cid, p2 string) error {
-	if s.Internal.MarketImportDealData == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.MarketImportDealData(p0, p1, p2)
-}
-
-func (s *BoostStub) MarketImportDealData(p0 context.Context, p1 cid.Cid, p2 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) MarketListDataTransfers(p0 context.Context) ([]DataTransferChannel, error) {
-	if s.Internal.MarketListDataTransfers == nil {
-		return *new([]DataTransferChannel), ErrNotSupported
-	}
-	return s.Internal.MarketListDataTransfers(p0)
-}
-
-func (s *BoostStub) MarketListDataTransfers(p0 context.Context) ([]DataTransferChannel, error) {
-	return *new([]DataTransferChannel), ErrNotSupported
-}
-
-func (s *BoostStruct) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
-	if s.Internal.MarketListIncompleteDeals == nil {
-		return *new([]storagemarket.MinerDeal), ErrNotSupported
-	}
-	return s.Internal.MarketListIncompleteDeals(p0)
-}
-
-func (s *BoostStub) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
-	return *new([]storagemarket.MinerDeal), ErrNotSupported
-}
-
-func (s *BoostStruct) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
-	if s.Internal.MarketListRetrievalDeals == nil {
-		return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
-	}
-	return s.Internal.MarketListRetrievalDeals(p0)
-}
-
-func (s *BoostStub) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
-	return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
-}
-
-func (s *BoostStruct) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
-	if s.Internal.MarketPendingDeals == nil {
-		return *new(lapi.PendingDealInfo), ErrNotSupported
-	}
-	return s.Internal.MarketPendingDeals(p0)
-}
-
-func (s *BoostStub) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
-	return *new(lapi.PendingDealInfo), ErrNotSupported
-}
-
-func (s *BoostStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
-	if s.Internal.MarketRestartDataTransfer == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.MarketRestartDataTransfer(p0, p1, p2, p3)
-}
-
-func (s *BoostStub) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) MarketSetAsk(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error {
-	if s.Internal.MarketSetAsk == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.MarketSetAsk(p0, p1, p2, p3, p4, p5)
-}
-
-func (s *BoostStub) MarketSetAsk(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
-	if s.Internal.MarketSetRetrievalAsk == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.MarketSetRetrievalAsk(p0, p1)
-}
-
-func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
-	return ErrNotSupported
 }
 
 func (s *BoostStruct) OnlineBackup(p0 context.Context, p1 string) error {
@@ -817,26 +410,26 @@ func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) erro
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
-	if s.Internal.RuntimeSubsystems == nil {
-		return *new(lapi.MinerSubsystems), ErrNotSupported
+func (s *BoostStruct) PdCleanup(p0 context.Context) error {
+	if s.Internal.PdCleanup == nil {
+		return ErrNotSupported
 	}
-	return s.Internal.RuntimeSubsystems(p0)
+	return s.Internal.PdCleanup(p0)
 }
 
-func (s *BoostStub) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
-	return *new(lapi.MinerSubsystems), ErrNotSupported
+func (s *BoostStub) PdCleanup(p0 context.Context) error {
+	return ErrNotSupported
 }
 
-func (s *BoostStruct) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
-	if s.Internal.SectorsRefs == nil {
-		return *new(map[string][]lapi.SealedRef), ErrNotSupported
+func (s *BoostStruct) PdRemoveDealForPiece(p0 context.Context, p1 cid.Cid, p2 string) error {
+	if s.Internal.PdRemoveDealForPiece == nil {
+		return ErrNotSupported
 	}
-	return s.Internal.SectorsRefs(p0)
+	return s.Internal.PdRemoveDealForPiece(p0, p1, p2)
 }
 
-func (s *BoostStub) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
-	return *new(map[string][]lapi.SealedRef), ErrNotSupported
+func (s *BoostStub) PdRemoveDealForPiece(p0 context.Context, p1 cid.Cid, p2 string) error {
+	return ErrNotSupported
 }
 
 func (s *ChainIOStruct) ChainHasObj(p0 context.Context, p1 cid.Cid) (bool, error) {

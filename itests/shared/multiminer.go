@@ -23,6 +23,8 @@ type RetrievalTest struct {
 	SampleFilePath string
 	CarFilepath    string
 	RootCid        cid.Cid
+	PieceCid       cid.Cid
+	TempDir        string
 }
 
 func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
@@ -35,7 +37,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 	// Set up two miners, each with a separate boost instance connected to it
 	ensemble := kit.NewEnsemble(t)
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true), framework.WithEnsemble(ensemble))
+	opts = append(opts, framework.WithEnsemble(ensemble))
 	boostAndMiner1 := framework.NewTestFramework(ctx, t, opts...)
 	boostAndMiner2 := framework.NewTestFramework(ctx, t, opts...)
 	ensemble.Start()
@@ -59,7 +61,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 
 		// Set up the second boost instance so that it can read sector data
 		// not only from the second miner, but also from the first miner
-		cfg.Dealmaking.GraphsyncStorageAccessApiInfo = []string{cfg.SectorIndexApiInfo, miner1ApiInfo}
+		cfg.Retrievals.Graphsync.GraphsyncStorageAccessApiInfo = []string{cfg.SectorIndexApiInfo, miner1ApiInfo}
 
 		// Set up some other ports so they don't clash
 		cfg.Graphql.Port = 8081
@@ -111,5 +113,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 		SampleFilePath: randomFilepath,
 		CarFilepath:    carFilepath,
 		RootCid:        rootCid,
+		PieceCid:       res.DealParams.ClientDealProposal.Proposal.PieceCID,
+		TempDir:        tempdir,
 	})
 }

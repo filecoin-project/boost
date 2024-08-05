@@ -99,7 +99,7 @@ export function RetrievalLogDetail(props) {
                 </tr>
 
                 {/* If retrieval deal ID is zero, assume it's an indexer retrieval */}
-                {retrieval.DealID == 0 ? (
+                {retrieval.DealID === 0 ? (
                     <tr>
                         <th>Ad CID</th>
                         <td>{retrieval.PayloadCID}</td>

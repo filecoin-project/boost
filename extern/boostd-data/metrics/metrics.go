@@ -51,6 +51,7 @@ var (
 	SuccessUnflagPieceCount               = stats.Int64("success_unflag_piece_count", "Counter of unflag piece success", stats.UnitDimensionless)
 	SuccessFlaggedPiecesListCount         = stats.Int64("success_flagged_pieces_list_count", "Counter of flagged pieces list success", stats.UnitDimensionless)
 	SuccessFlaggedPiecesCountCount        = stats.Int64("success_flagged_pieces_count_count", "Counter of flagged pieces count success", stats.UnitDimensionless)
+	SuccessUntrackPieceCount              = stats.Int64("success_untrack_piece", "Counter of untrack piece success", stats.UnitDimensionless)
 	FailureAddDealForPieceCount           = stats.Int64("failure_add_deal_for_piece_count", "Counter of add deal failure", stats.UnitDimensionless)
 	FailureAddIndexCount                  = stats.Int64("failure_add_index_count", "Counter of add index failure", stats.UnitDimensionless)
 	FailureIsIndexedCount                 = stats.Int64("failure_is_indexed_count", "Counter of is indexed failure", stats.UnitDimensionless)
@@ -72,6 +73,7 @@ var (
 	FailureUnflagPieceCount               = stats.Int64("failure_unflag_piece_count", "Counter of unflag piece failure", stats.UnitDimensionless)
 	FailureFlaggedPiecesListCount         = stats.Int64("failure_flagged_pieces_list_count", "Counter of flagged pieces list failure", stats.UnitDimensionless)
 	FailureFlaggedPiecesCountCount        = stats.Int64("failure_flagged_pieces_count_count", "Counter of flagged pieces count failure", stats.UnitDimensionless)
+	FailureUntrackPieceCount              = stats.Int64("failure_untrack_piece", "Counter of untrack piece failure", stats.UnitDimensionless)
 )
 
 var (
@@ -110,6 +112,7 @@ var (
 	SuccessUnflagPieceCountView               = &view.View{Measure: SuccessUnflagPieceCount, Aggregation: view.Count()}
 	SuccessFlaggedPiecesListCountView         = &view.View{Measure: SuccessFlaggedPiecesListCount, Aggregation: view.Count()}
 	SuccessFlaggedPiecesCountCountView        = &view.View{Measure: SuccessFlaggedPiecesCountCount, Aggregation: view.Count()}
+	SuccessUntrackPieceCountView              = &view.View{Measure: SuccessUntrackPieceCount, Aggregation: view.Count()}
 	FailureAddDealForPieceCountView           = &view.View{Measure: FailureAddDealForPieceCount, Aggregation: view.Count()}
 	FailureAddIndexCountView                  = &view.View{Measure: FailureAddIndexCount, Aggregation: view.Count()}
 	FailureIsIndexedCountView                 = &view.View{Measure: FailureIsIndexedCount, Aggregation: view.Count()}
@@ -131,6 +134,7 @@ var (
 	FailureUnflagPieceCountView               = &view.View{Measure: FailureUnflagPieceCount, Aggregation: view.Count()}
 	FailureFlaggedPiecesListCountView         = &view.View{Measure: FailureFlaggedPiecesListCount, Aggregation: view.Count()}
 	FailureFlaggedPiecesCountCountView        = &view.View{Measure: FailureFlaggedPiecesCountCount, Aggregation: view.Count()}
+	FailureUntrackPieceCountView              = &view.View{Measure: FailureUntrackPieceCount, Aggregation: view.Count()}
 )
 
 // DefaultViews is an array of OpenCensus views for metric gathering purposes
@@ -159,6 +163,7 @@ var DefaultViews = func() []*view.View {
 		SuccessUnflagPieceCountView,
 		SuccessFlaggedPiecesListCountView,
 		SuccessFlaggedPiecesCountCountView,
+		SuccessUntrackPieceCountView,
 		FailureAddDealForPieceCountView,
 		FailureAddIndexCountView,
 		FailureIsIndexedCountView,
@@ -180,6 +185,7 @@ var DefaultViews = func() []*view.View {
 		FailureUnflagPieceCountView,
 		FailureFlaggedPiecesListCountView,
 		FailureFlaggedPiecesCountCountView,
+		FailureUntrackPieceCountView,
 	}
 	//views = append(views, blockstore.DefaultViews...)
 	views = append(views, rpcmetrics.DefaultViews...)

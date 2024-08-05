@@ -10,8 +10,13 @@ export function MinerAddress() {
     }
 
     return (
-        <div className="miner-address">
-            {data.minerAddress}
-        </div>
+        data.minerAddress.IsCurio === true ?
+            <div className="miner-address">
+                {data.minerAddress.MinerID} (Curio)
+            </div>
+            :
+            <div className="miner-address">
+                {data.minerAddress.MinerID}
+            </div>
     )
 }

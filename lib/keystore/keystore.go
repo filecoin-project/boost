@@ -58,7 +58,7 @@ func (fsr *DiskKeyStore) List() ([]string, error) {
 	return keys, nil
 }
 
-// Get gets a key out of keystore and returns types.KeyInfo coresponding to named key
+// Get gets a key out of keystore and returns types.KeyInfo corresponding to named key
 func (fsr *DiskKeyStore) Get(name string) (types.KeyInfo, error) {
 
 	encName := base32.RawStdEncoding.EncodeToString([]byte(name))

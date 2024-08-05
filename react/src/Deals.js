@@ -1,7 +1,7 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
-    DealsListQuery, LegacyDealsCountQuery, SectorStatusQuery,
+    DealsListQuery, LegacyDealsCountQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -206,7 +206,7 @@ export function SearchBox(props) {
         return () => {
           document.removeEventListener("mousedown", checkIfClickedOutside)
         }
-      }, [displayFilters])
+      }, [displayFilters, toggleFilters])
 
     return <div className="search">
         <DebounceInput
@@ -365,34 +365,19 @@ function DealRowAnnounceError({deal}) {
         })
 
         return function () {
-            warningImg.removeEventListener("mouseover")
-            messageBox.removeEventListener("mouseleave")
+            warningImg.removeEventListener("mouseover", this)
+            messageBox.removeEventListener("mouseleave", this)
         }
     })
-
-    const {data, loading, error} = useQuery(SectorStatusQuery, {
-        pollInterval: 10000,
-        fetchPolicy: 'network-only',
-        variables: {
-            sectorNumber: deal.Sector.ID
-        }
-    })
-
-    if (error) {
-        return <span>Sealer: {error.message}</span>
-    }
-    if (loading) {
-        return null
-    }
 
     return <div id={messageBoxId}>
         <span>
-            <img id={warningImgElId} className="warning" src={warningImg} />
-            <span>Sealer: {data.sectorStatus.State}</span>
+            <img id={warningImgElId} className="warning" src={warningImg}  alt={"warning"}/>
+            <span>Error: IndexingAndAnnouncing</span>
         </span>
         <span id={warningMsgElId} className="warning-msg">
             <span className="message-text">
-                <img className="warning" src={warningImg} />
+                <img className="warning" src={warningImg}  alt={"warning"}/>
                 <span id={warningMsgElId}>{deal.Message}</span>
             </span>
             <DealActions deal={deal} refetchQueries={[DealsListQuery]} compact={true} />
@@ -455,6 +440,7 @@ export function StorageDealsMenuItem(props) {
                 </Link>
             ) : null}
 
+            <DirectDealsCount />
             <LegacyStorageDealsCount />
         </div>
     )
@@ -471,22 +457,22 @@ export function SealingStatusInfo(props) {
             The deal can be in one of the following sealing states:
             <p>
                 <i>To be Sealed</i><br/>
-                <p>
+                <span>
                     The storage deal is being processed by Boost before being handed off
                     to the sealer.
-                </p>
+                </span>
             </p>
             <p>
                 <i>Sealer: </i><br/>
-                <p>
+                <span>
                     The deal has been handed off to the sealing subsystem and is being sealed.
-                </p>
+                </span>
             </p>
             <p>
                 <i>Complete</i><br/>
-                <p>
+                <span>
                     The sector containing the deal has expired or the deal errored out.
-                </p>
+                </span>
             </p>
         </Info>
     </span>
@@ -498,15 +484,15 @@ export function SizeInfo(props) {
             Size column displays different sizes based on the deal type
             <p>
                 <i>Online Deals</i><br/>
-                <p>
+                <span>
                     Transfer Size or the car size specified in the deal proposal
-                </p>
+                </span>
             </p>
             <p>
                 <i>Offline</i><br/>
-                <p>
+                <span>
                     Piece size specified in the deal proposal
-                </p>
+                </span>
             </p>
         </Info>
     </span>

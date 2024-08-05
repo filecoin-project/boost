@@ -1,8 +1,6 @@
-/* global BigInt */
-
 import React, {useEffect} from "react";
-import {useQuery, useSubscription} from "@apollo/react-hooks";
-import {DealSubscription, DirectDealQuery, EpochQuery, LegacyDealQuery} from "./gql";
+import {useQuery,} from "@apollo/react-hooks";
+import {DirectDealQuery, EpochQuery} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";

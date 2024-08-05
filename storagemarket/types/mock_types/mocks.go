@@ -9,11 +9,10 @@ import (
 	io "io"
 	reflect "reflect"
 
-	storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	types "github.com/filecoin-project/boost/storagemarket/types"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
-	api "github.com/filecoin-project/lotus/api"
+	piece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
 )
@@ -42,7 +41,7 @@ func (m *MockPieceAdder) EXPECT() *MockPieceAdderMockRecorder {
 }
 
 // AddPiece mocks base method.
-func (m *MockPieceAdder) AddPiece(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (m *MockPieceAdder) AddPiece(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddPiece", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(abi.SectorNumber)
@@ -157,10 +156,10 @@ func (m *MockChainDealManager) EXPECT() *MockChainDealManagerMockRecorder {
 }
 
 // WaitForPublishDeals mocks base method.
-func (m *MockChainDealManager) WaitForPublishDeals(arg0 context.Context, arg1 cid.Cid, arg2 market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (m *MockChainDealManager) WaitForPublishDeals(arg0 context.Context, arg1 cid.Cid, arg2 market.DealProposal) (*types.PublishDealsWaitResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForPublishDeals", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*storagemarket.PublishDealsWaitResult)
+	ret0, _ := ret[0].(*types.PublishDealsWaitResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -2,10 +2,11 @@ package dtypes
 
 import (
 	"context"
-	"github.com/ipfs/go-cid"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
@@ -92,4 +93,4 @@ type GetMaxDealStartDelayFunc func() (time.Duration, error)
 type StorageDealFilter dealfilter.StorageDealFilter
 type RetrievalDealFilter dealfilter.RetrievalDealFilter
 
-type RetrievalPricingFunc func(ctx context.Context, dealPricingParams retrievalmarket.PricingInput) (retrievalmarket.Ask, error)
+type RetrievalPricingFunc func(ctx context.Context, dealPricingParams legacyretrievaltypes.PricingInput) (legacyretrievaltypes.Ask, error)

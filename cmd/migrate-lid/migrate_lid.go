@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
@@ -21,8 +20,9 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/node/modules"
@@ -767,7 +767,7 @@ func migrateReversePiece(ctx context.Context, pieceCid cid.Cid, pieceDir StoreMi
 	var pieceStoreDeals []piecestore.DealInfo
 	pieceStorePieceInfo, err := ps.GetPieceInfo(pieceCid)
 	if err != nil {
-		if !errors.Is(err, retrievalmarket.ErrNotFound) {
+		if !errors.Is(err, legacyretrievaltypes.ErrNotFound) {
 			return 0, fmt.Errorf("getting piece info from piece store for piece %s", pieceCid)
 		}
 	} else {

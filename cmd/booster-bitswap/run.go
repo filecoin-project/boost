@@ -194,7 +194,7 @@ var runCmd = &cli.Command{
 		}
 
 		// Connect to the storage API(s) and create a piece reader
-		sa := lib.NewMultiMinerAccessor(cctx.StringSlice("api-storage"), fullnodeApi)
+		sa := lib.NewMultiMinerAccessor(cctx.StringSlice("api-storage"), fullnodeApi, time.Second*60)
 		err = sa.Start(ctx, log)
 		if err != nil {
 			return err

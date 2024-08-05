@@ -5,86 +5,32 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
 	graphsync "github.com/filecoin-project/boost-graphsync/impl"
 	gsnet "github.com/filecoin-project/boost-graphsync/network"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/metrics"
+	retrievalimpl "github.com/filecoin-project/boost/retrievalmarket/server"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/ipfs/kubo/core/node/helpers"
-	"github.com/ipld/go-ipld-prime"
-	provider "github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/engine"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
 )
 
-var _ server.AskGetter = (*ProxyAskGetter)(nil)
-
-// ProxyAskGetter is used to avoid circular dependencies:
-// RetrievalProvider depends on RetrievalGraphsync, which depends on RetrievalProvider's
-// GetAsk method.
-// We create an AskGetter that returns zero-priced asks by default.
-// Then we set the AskGetter to the RetrievalProvider after it's been created.
-type ProxyAskGetter struct {
-	server.AskGetter
-}
-
-func (ag *ProxyAskGetter) GetAsk() *retrievalmarket.Ask {
-	if ag.AskGetter == nil {
-		return &retrievalmarket.Ask{
-			PricePerByte: abi.NewTokenAmount(0),
-			UnsealPrice:  abi.NewTokenAmount(0),
-		}
-	}
-	return ag.AskGetter.GetAsk()
-}
-
-func NewAskGetter() *ProxyAskGetter {
-	return &ProxyAskGetter{}
-}
-
-func SetAskGetter(proxy *ProxyAskGetter, rp retrievalmarket.RetrievalProvider) {
-	proxy.AskGetter = rp
-}
-
-// LinkSystemProv is used to avoid circular dependencies
-type LinkSystemProv struct {
-	*ipld.LinkSystem
-}
-
-func NewLinkSystemProvider() *LinkSystemProv {
-	return &LinkSystemProv{}
-}
-
-func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
-	return p.LinkSystem
-}
-
-func SetLinkSystem(proxy *LinkSystemProv, prov provider.Interface) {
-	e, ok := prov.(*engine.Engine)
-	if ok {
-		proxy.LinkSystem = e.LinkSystem()
-	}
-}
-
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
-func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa *lib.MultiMinerAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa *lib.MultiMinerAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
+func RetrievalGraphsync(parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter server.RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, sa *lib.MultiMinerAccessor, askGetter server.RetrievalAskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
 		// Graphsync tracks metrics separately, pass nil blockMetrics to the remote blockstore
 		rb := remoteblockstore.NewRemoteBlockstore(pid, nil)
 
 		// Create a Graphsync instance
-		mkgs := Graphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
+		mkgs := Graphsync(parallelTransfersForRetrieval)
 		gs := mkgs(mctx, lc, rb, pid, h)
 
 		// Wrap the Graphsync instance with a handler for unpaid retrieval requests
@@ -94,7 +40,8 @@ func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersFor
 			SectorAccessor: sa,
 			AskStore:       askGetter,
 		}
-		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps, ls)
+
+		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +62,7 @@ func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersFor
 	}
 }
 
-func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, pid *piecedirectory.PieceDirectory, h host.Host) dtypes.StagingGraphsync {
+func Graphsync(parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, pid *piecedirectory.PieceDirectory, h host.Host) dtypes.StagingGraphsync {
 	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, pid *piecedirectory.PieceDirectory, h host.Host) dtypes.StagingGraphsync {
 		graphsyncNetwork := gsnet.NewFromLibp2pHost(h)
 		lsys := storeutil.LinkSystemForBlockstore(ibs)
@@ -123,9 +70,7 @@ func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePe
 			graphsyncNetwork,
 			lsys,
 			graphsync.RejectAllRequestsByDefault(),
-			graphsync.MaxInProgressIncomingRequests(parallelTransfersForRetrieval),
-			graphsync.MaxInProgressIncomingRequestsPerPeer(parallelTransfersForStoragePerPeer),
-			graphsync.MaxInProgressOutgoingRequests(parallelTransfersForStorage),
+			graphsync.MaxInProgressOutgoingRequests(parallelTransfersForRetrieval),
 			graphsync.MaxLinksPerIncomingRequests(config.MaxTraversalLinks),
 			graphsync.MaxLinksPerOutgoingRequests(config.MaxTraversalLinks))
 

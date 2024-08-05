@@ -17,13 +17,13 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/lib/sa"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-data-segment/datasegment"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/lib/readerutil"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
@@ -154,6 +154,12 @@ func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address
 	defer func(start time.Time) { log.Debugw("piece directory ; PiecesCount span", "took", time.Since(start)) }(time.Now())
 
 	return ps.store.PiecesCount(ctx, maddr)
+}
+
+func (ps *PieceDirectory) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	defer func(start time.Time) { log.Debugw("piece directory ; PiecesList span", "took", time.Since(start)) }(time.Now())
+
+	return ps.store.ListPieces(ctx)
 }
 
 func (ps *PieceDirectory) ScanProgress(ctx context.Context, maddr address.Address) (*bdtypes.ScanProgress, error) {
@@ -311,6 +317,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
+
 	defer reader.Close() //nolint:errcheck
 
 	// Try to parse data as containing a data segment index
@@ -418,7 +425,18 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
+
+	// We seek to end of reader to avoid EOF encountered when parsing the segments
+	// This should be fixed on Miner side permanently before removing this chunk of code
+	_, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		log.Debugw("Failed to seek to the end of the piece reader")
+		return nil, fmt.Errorf("could not seek to end of piece reader: %w", err)
+	}
+
+	// Wind back the seeker
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
+		log.Debugw("Failed to seek to data segment index", "error", err)
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
 	}
 
@@ -427,14 +445,21 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		Reader: r,
 		cnt:    &readsCnt,
 	}
-	indexData, err := datasegment.ParseDataSegmentIndex(bufio.NewReaderSize(cr, PodsiBuffesrSize))
+	panicked := false
+	indexData, err := parseDataSegmentIndex(pieceCid, bufio.NewReaderSize(cr, PodsiBuffesrSize), &panicked)
 	if err != nil {
+		log.Debugw("Failed to parse data segment index", "error", err)
 		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+	}
+	if panicked {
+		log.Debugw("Internal panic while parsing data segment index")
+		return nil, fmt.Errorf("could not parse data segment index because of an internal panic")
 	}
 
 	log.Debugw("podsi: parsed data segment index", "segments", len(indexData.Entries), "reads", readsCnt, "time", time.Since(start).String())
 
 	if len(indexData.Entries) == 0 {
+		log.Debugw("No data segments found")
 		return nil, fmt.Errorf("no data segments found")
 	}
 
@@ -469,6 +494,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	}
 
 	if err := eg.Wait(); err != nil {
+		log.Debugw("Failed to calculate valid entries", "error", err)
 		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
 	}
 
@@ -478,7 +504,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	}
 
 	if len(validSegments) == 0 {
-		return nil, fmt.Errorf("no data segments found")
+		log.Debugw("No valid data segments found")
+		return nil, fmt.Errorf("no valid data segments found")
 	}
 
 	log.Debugw("podsi: validated data segment index", "validSegments", len(validSegments), "time", time.Since(start).String())
@@ -499,7 +526,7 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 
 		subRecs, err := parseRecordsFromCar(bufio.NewReaderSize(cr, PodsiBuffesrSize))
 		if err != nil {
-			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
+			log.Debugw("Failed to parse data segment", "error", err)
 			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
 		}
 		for i := range subRecs {
@@ -511,6 +538,21 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 	log.Debugw("podsi: parsed records from data segments", "recs", len(recs), "reads", readsCnt, "time", time.Since(start).String())
 
 	return recs, nil
+}
+
+// parseDataSegmentIndex is a temporary wrapper around datasegment.ParseDataSegmentIndex that exists only as a workaround
+// for "slice bounds out of range" panic inside lotus. This funciton should be removed once the panic is fixed.
+func parseDataSegmentIndex(pieceCid cid.Cid, unpaddedReader io.Reader, panicked *bool) (datasegment.IndexData, error) {
+	defer func() {
+		// This is a temporary workaround to handle "slice bounds out of range" errors in podsi indexing.
+		// The bug affects a minor number of deals, so recovering here will help to unblock the users.
+		// TODO: remove this recover when the underlying bug is figured out and fixed.
+		if err := recover(); err != nil {
+			*panicked = true
+			log.Errorw("Recovered from panic and skipped indexing the piece.", "piece", pieceCid, "error", err)
+		}
+	}()
+	return datasegment.ParseDataSegmentIndex(unpaddedReader)
 }
 
 func validateEntries(entries []datasegment.SegmentDesc) ([]datasegment.SegmentDesc, error) {
@@ -795,7 +837,11 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			// Seek to the section offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
 			// Read the block data
-			readCid, data, err := util.ReadNode(bufio.NewReader(readerAt))
+			bufferSize := 4096
+			if offsetSize.Size < 4096 {
+				bufferSize = int(offsetSize.Size)
+			}
+			readCid, data, err := util.ReadNode(bufio.NewReaderSize(readerAt, bufferSize))
 			if err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
 			}
@@ -879,6 +925,7 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		}
 
 		return int(offsetSize.Size), nil
+
 	}
 
 	return 0, merr
@@ -975,7 +1022,7 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 }
 
 type SectorAccessorAsPieceReader struct {
-	dagstore.SectorAccessor
+	sa.SectorAccessor
 }
 
 func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {

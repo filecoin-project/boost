@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 )
 
 type legacyDealResolver struct {
-	storagemarket.MinerDeal
+	legacytypes.MinerDeal
 	transferred uint64
 }
 
@@ -28,7 +28,7 @@ func (r *resolver) LegacyDeal(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, fmt.Errorf("parsing deal signed proposal cid %s: %w", args.ID, err)
 	}
 
-	dl, err := r.legacyProv.GetLocalDeal(signedPropCid)
+	dl, err := r.legacyDeals.ByPropCid(signedPropCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting deal with signed proposal cid %s: %w", args.ID, err)
 	}
@@ -36,16 +36,8 @@ func (r *resolver) LegacyDeal(ctx context.Context, args struct{ ID graphql.ID })
 	return r.withTransferState(ctx, dl), nil
 }
 
-func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.MinerDeal) *legacyDealResolver {
+func (r *resolver) withTransferState(ctx context.Context, dl legacytypes.MinerDeal) *legacyDealResolver {
 	dr := &legacyDealResolver{MinerDeal: dl}
-	if dl.TransferChannelId != nil {
-		st, err := r.legacyDT.ChannelState(ctx, *dl.TransferChannelId)
-		if err != nil {
-			log.Warnw("getting transfer channel id %s: %s", *dl.TransferChannelId, err)
-		} else {
-			dr.transferred = st.Received()
-		}
-	}
 	return dr
 }
 
@@ -71,26 +63,26 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 	}
 
 	// Get the total number of deals
-	dealCount, err := r.legacyProv.LocalDealCount()
+	dealCount, err := r.legacyDeals.DealCount(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting deal count: %w", err)
 	}
 
 	var more bool
-	var pageDeals []storagemarket.MinerDeal
+	var pageDeals []legacytypes.MinerDeal
 	if args.Query.Value != nil && *args.Query.Value != "" {
 		// If there is a search query, assume the query is the deal
 		// proposal cid and try to fetch the corresponding deal
 		propCidQuery, err := cid.Parse(*args.Query.Value)
 		if err == nil {
-			dl, err := r.legacyProv.GetLocalDeal(propCidQuery)
+			dl, err := r.legacyDeals.ByPropCid(propCidQuery)
 			if err == nil {
-				pageDeals = []storagemarket.MinerDeal{dl}
+				pageDeals = []legacytypes.MinerDeal{dl}
 			}
 		}
 	} else {
 		// Get a page worth of deals, plus one extra so we can see if there are more deals
-		pageDeals, err = r.legacyProv.ListLocalDealsPage(startPropCid, offset, limit+1)
+		pageDeals, err = r.legacyDeals.ListLocalDealsPage(startPropCid, offset, limit+1)
 		if err != nil {
 			return nil, fmt.Errorf("getting page of deals: %w", err)
 		}
@@ -215,11 +207,11 @@ func (r *legacyDealResolver) InboundCARPath() string {
 }
 
 func (r *legacyDealResolver) Status() string {
-	return storagemarket.DealStates[r.State]
+	return legacytypes.DealStates[r.State]
 }
 
 func (r *legacyDealResolver) Message() string {
-	if r.MinerDeal.Message == "" && r.State == storagemarket.StorageDealTransferring {
+	if r.MinerDeal.Message == "" && r.State == legacytypes.StorageDealTransferring {
 		switch r.transferred {
 		case 0:
 			return "Transferring"

@@ -191,8 +191,8 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 				}
 			}
 
-			// If the state hasnt been set it should be in the cache, mark it so we dont remove
-			// This may get overriden by the sealed status if it comes after in the list, which is fine
+			// If the state hasn't been set it should be in the cache, mark it so we dont remove
+			// This may get overridden by the sealed status if it comes after in the list, which is fine
 			if _, ok := sectorStates[sectorDecl.SectorID]; !ok {
 				sectorStates[sectorDecl.SectorID] = db.SealStateCache
 			}

@@ -71,7 +71,10 @@ const EpochQuery = gql`
 
 const MinerAddressQuery = gql`
     query AppMinerAddressQuery {
-        minerAddress
+        minerAddress {
+            MinerID
+            IsCurio
+        }
     }
 `;
 
@@ -170,6 +173,7 @@ const DirectDealsListQuery = gql`
                     Offset
                     Length
                 }
+                SealingState
             }
             totalCount
             more
@@ -525,12 +529,6 @@ const DirectDealQuery = gql`
     }
 `;
 
-const PiecesWithRootPayloadCidQuery = gql`
-    query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
-        piecesWithRootPayloadCid(payloadCid: $payloadCid)
-    }
-`;
-
 const PiecesWithPayloadCidQuery = gql`
     query AppPiecesWithPayloadCidQuery($payloadCid: String!) {
         piecesWithPayloadCid(payloadCid: $payloadCid)
@@ -585,6 +583,7 @@ const PieceStatusQuery = gql`
                     IsLegacy
                     CreatedAt
                     DealDataRoot
+                    IsDirect
                 }
                 Sector {
                     ID
@@ -646,16 +645,6 @@ const StorageQuery = gql`
     }
 `;
 
-const LegacyStorageQuery = gql`
-    query AppLegacyStorageQuery {
-        legacyStorage {
-            Capacity
-            Used
-            MountPoint
-        }
-    }
-`;
-
 const SealingPipelineQuery = gql`
     query AppSealingPipelineQuery {
         sealingpipeline {
@@ -667,6 +656,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SnapDealsWaitDealsSectors {
@@ -677,6 +667,7 @@ const SealingPipelineQuery = gql`
                     ID
                     Size
                     IsLegacy
+                    IsDirect
                 }
             }
             SectorStates {
@@ -800,6 +791,7 @@ const DealPublishQuery = gql`
                 }
                 ClientAddress
                 PieceSize
+                IsDirect
             }
         }
     }
@@ -924,7 +916,6 @@ export {
     FlaggedPiecesCountQuery,
     LIDQuery,
     StorageQuery,
-    LegacyStorageQuery,
     FundsQuery,
     FundsLogsQuery,
     DealPublishQuery,

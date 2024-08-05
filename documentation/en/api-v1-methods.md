@@ -1,8 +1,6 @@
 # Groups
 * [](#)
   * [Discover](#discover)
-* [Actor](#actor)
-  * [ActorSectorSize](#actorsectorsize)
 * [Auth](#auth)
   * [AuthNew](#authnew)
   * [AuthVerify](#authverify)
@@ -11,57 +9,26 @@
   * [BlockstoreGetSize](#blockstoregetsize)
   * [BlockstoreHas](#blockstorehas)
 * [Boost](#boost)
-  * [BoostDagstoreDestroyShard](#boostdagstoredestroyshard)
-  * [BoostDagstoreGC](#boostdagstoregc)
-  * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
-  * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
-  * [BoostDagstoreListShards](#boostdagstorelistshards)
-  * [BoostDagstorePiecesContainingMultihash](#boostdagstorepiecescontainingmultihash)
-  * [BoostDagstoreRecoverShard](#boostdagstorerecovershard)
-  * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
+  * [BoostIndexerAnnounceDeal](#boostindexerannouncedeal)
+  * [BoostIndexerAnnounceDealRemoved](#boostindexerannouncedealremoved)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
+  * [BoostIndexerAnnounceLegacyDeal](#boostindexerannouncelegacydeal)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
-  * [BoostMakeDeal](#boostmakedeal)
+  * [BoostLegacyDealByProposalCid](#boostlegacydealbyproposalcid)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
-* [Deals](#deals)
-  * [DealsConsiderOfflineRetrievalDeals](#dealsconsiderofflineretrievaldeals)
-  * [DealsConsiderOfflineStorageDeals](#dealsconsiderofflinestoragedeals)
-  * [DealsConsiderOnlineRetrievalDeals](#dealsconsideronlineretrievaldeals)
-  * [DealsConsiderOnlineStorageDeals](#dealsconsideronlinestoragedeals)
-  * [DealsConsiderUnverifiedStorageDeals](#dealsconsiderunverifiedstoragedeals)
-  * [DealsConsiderVerifiedStorageDeals](#dealsconsiderverifiedstoragedeals)
-  * [DealsPieceCidBlocklist](#dealspiececidblocklist)
-  * [DealsSetConsiderOfflineRetrievalDeals](#dealssetconsiderofflineretrievaldeals)
-  * [DealsSetConsiderOfflineStorageDeals](#dealssetconsiderofflinestoragedeals)
-  * [DealsSetConsiderOnlineRetrievalDeals](#dealssetconsideronlineretrievaldeals)
-  * [DealsSetConsiderOnlineStorageDeals](#dealssetconsideronlinestoragedeals)
-  * [DealsSetConsiderUnverifiedStorageDeals](#dealssetconsiderunverifiedstoragedeals)
-  * [DealsSetConsiderVerifiedStorageDeals](#dealssetconsiderverifiedstoragedeals)
-  * [DealsSetPieceCidBlocklist](#dealssetpiececidblocklist)
 * [I](#i)
   * [ID](#id)
 * [Log](#log)
   * [LogList](#loglist)
   * [LogSetLevel](#logsetlevel)
 * [Market](#market)
-  * [MarketCancelDataTransfer](#marketcanceldatatransfer)
-  * [MarketDataTransferUpdates](#marketdatatransferupdates)
   * [MarketGetAsk](#marketgetask)
-  * [MarketGetRetrievalAsk](#marketgetretrievalask)
-  * [MarketImportDealData](#marketimportdealdata)
-  * [MarketListDataTransfers](#marketlistdatatransfers)
-  * [MarketListIncompleteDeals](#marketlistincompletedeals)
-  * [MarketListRetrievalDeals](#marketlistretrievaldeals)
-  * [MarketPendingDeals](#marketpendingdeals)
-  * [MarketRestartDataTransfer](#marketrestartdatatransfer)
-  * [MarketSetAsk](#marketsetask)
-  * [MarketSetRetrievalAsk](#marketsetretrievalask)
 * [Net](#net)
   * [NetAddrsListen](#netaddrslisten)
   * [NetAgentVersion](#netagentversion)
@@ -90,10 +57,8 @@
   * [OnlineBackup](#onlinebackup)
 * [Pd](#pd)
   * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
-* [Runtime](#runtime)
-  * [RuntimeSubsystems](#runtimesubsystems)
-* [Sectors](#sectors)
-  * [SectorsRefs](#sectorsrefs)
+  * [PdCleanup](#pdcleanup)
+  * [PdRemoveDealForPiece](#pdremovedealforpiece)
 ## 
 
 
@@ -115,23 +80,6 @@ Response:
   "openrpc": "1.2.6"
 }
 ```
-
-## Actor
-
-
-### ActorSectorSize
-There are not yet any comments for this method.
-
-Perms: read
-
-Inputs:
-```json
-[
-  "f01234"
-]
-```
-
-Response: `34359738368`
 
 ## Auth
 
@@ -182,9 +130,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -198,9 +144,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -214,9 +158,7 @@ Perms: read
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -224,146 +166,6 @@ Response: `true`
 
 ## Boost
 
-
-### BoostDagstoreDestroyShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreGC
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-    "Success": false,
-    "Error": "\u003cerror\u003e"
-  }
-]
-```
-
-### BoostDagstoreInitializeAll
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  {
-    "MaxConcurrency": 123,
-    "IncludeSealed": true
-  }
-]
-```
-
-Response:
-```json
-{
-  "Key": "string value",
-  "Event": "string value",
-  "Success": true,
-  "Error": "string value",
-  "Total": 123,
-  "Current": 123
-}
-```
-
-### BoostDagstoreInitializeShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreListShards
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-    "State": "ShardStateAvailable",
-    "Error": "\u003cerror\u003e"
-  }
-]
-```
-
-### BoostDagstorePiecesContainingMultihash
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  "Bw=="
-]
-```
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-### BoostDagstoreRecoverShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
-
-### BoostDagstoreRegisterShard
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "string value"
-]
-```
-
-Response: `{}`
 
 ### BoostDeal
 
@@ -384,9 +186,7 @@ Response:
   "CreatedAt": "0001-01-01T00:00:00Z",
   "ClientDealProposal": {
     "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
+      "PieceCID": null,
       "PieceSize": 1032,
       "VerifiedDeal": true,
       "Client": "f01234",
@@ -406,9 +206,7 @@ Response:
   "IsOffline": true,
   "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "DealDataRoot": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  "DealDataRoot": null,
   "InboundFilePath": "string value",
   "Transfer": {
     "Type": "string value",
@@ -439,9 +237,7 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
@@ -452,9 +248,7 @@ Response:
   "CreatedAt": "0001-01-01T00:00:00Z",
   "ClientDealProposal": {
     "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
+      "PieceCID": null,
       "PieceSize": 1032,
       "VerifiedDeal": true,
       "Client": "f01234",
@@ -474,9 +268,7 @@ Response:
   "IsOffline": true,
   "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "DealDataRoot": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
+  "DealDataRoot": null,
   "InboundFilePath": "string value",
   "Transfer": {
     "Type": "string value",
@@ -510,9 +302,7 @@ Inputs:
   {
     "DealUUID": "07070707-0707-0707-0707-070707070707",
     "AllocationID": 0,
-    "PieceCid": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "PieceCid": null,
     "ClientAddr": "f01234",
     "StartEpoch": 10101,
     "EndEpoch": 10101,
@@ -545,9 +335,7 @@ Inputs:
     "IsOffline": true,
     "ClientDealProposal": {
       "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
+        "PieceCID": null,
         "PieceSize": 1032,
         "VerifiedDeal": true,
         "Client": "f01234",
@@ -564,9 +352,7 @@ Inputs:
         "Data": "Ynl0ZSBhcnJheQ=="
       }
     },
-    "DealDataRoot": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "DealDataRoot": null,
     "Transfer": {
       "Type": "string value",
       "ClientID": "string value",
@@ -596,42 +382,7 @@ Inputs: `null`
 
 Response: `{}`
 
-### BoostIndexerAnnounceLatest
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
-
-### BoostIndexerAnnounceLatestHttp
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  [
-    "string value"
-  ]
-]
-```
-
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
-
-### BoostIndexerListMultihashes
+### BoostIndexerAnnounceDeal
 
 
 Perms: admin
@@ -640,34 +391,11 @@ Inputs:
 ```json
 [
   {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-Response:
-```json
-[
-  "Bw=="
-]
-```
-
-### BoostMakeDeal
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  {
-    "DealUUID": "07070707-0707-0707-0707-070707070707",
-    "IsOffline": true,
+    "DealUuid": "07070707-0707-0707-0707-070707070707",
+    "CreatedAt": "0001-01-01T00:00:00Z",
     "ClientDealProposal": {
       "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
+        "PieceCID": null,
         "PieceSize": 1032,
         "VerifiedDeal": true,
         "Client": "f01234",
@@ -684,26 +412,168 @@ Inputs:
         "Data": "Ynl0ZSBhcnJheQ=="
       }
     },
-    "DealDataRoot": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
+    "IsOffline": true,
+    "CleanupData": true,
+    "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "DealDataRoot": null,
+    "InboundFilePath": "string value",
     "Transfer": {
       "Type": "string value",
       "ClientID": "string value",
       "Params": "Ynl0ZSBhcnJheQ==",
       "Size": 42
     },
-    "RemoveUnsealedCopy": true,
-    "SkipIPNIAnnounce": true
+    "ChainDealID": 5432,
+    "PublishCID": null,
+    "SectorID": 9,
+    "Offset": 1032,
+    "Length": 1032,
+    "Checkpoint": 1,
+    "CheckpointAt": "0001-01-01T00:00:00Z",
+    "Err": "string value",
+    "Retry": "auto",
+    "NBytesReceived": 9,
+    "FastRetrieval": true,
+    "AnnounceToIPNI": true
   }
+]
+```
+
+Response: `null`
+
+### BoostIndexerAnnounceDealRemoved
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  null
+]
+```
+
+Response: `null`
+
+### BoostIndexerAnnounceLatest
+
+
+Perms: admin
+
+Inputs: `null`
+
+Response: `null`
+
+### BoostIndexerAnnounceLatestHttp
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    "string value"
+  ]
+]
+```
+
+Response: `null`
+
+### BoostIndexerAnnounceLegacyDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  null
+]
+```
+
+Response: `null`
+
+### BoostIndexerListMultihashes
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "Ynl0ZSBhcnJheQ=="
+]
+```
+
+Response:
+```json
+[
+  "Bw=="
+]
+```
+
+### BoostLegacyDealByProposalCid
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  null
 ]
 ```
 
 Response:
 ```json
 {
-  "Accepted": true,
-  "Reason": "string value"
+  "Proposal": {
+    "PieceCID": null,
+    "PieceSize": 1032,
+    "VerifiedDeal": true,
+    "Client": "f01234",
+    "Provider": "f01234",
+    "Label": "",
+    "StartEpoch": 10101,
+    "EndEpoch": 10101,
+    "StoragePricePerEpoch": "0",
+    "ProviderCollateral": "0",
+    "ClientCollateral": "0"
+  },
+  "ClientSignature": {
+    "Type": 2,
+    "Data": "Ynl0ZSBhcnJheQ=="
+  },
+  "ProposalCid": null,
+  "AddFundsCid": null,
+  "PublishCid": null,
+  "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  "State": 42,
+  "PiecePath": "",
+  "MetadataPath": "",
+  "SlashEpoch": 10101,
+  "FastRetrieval": true,
+  "Message": "string value",
+  "FundsReserved": "0",
+  "Ref": {
+    "TransferType": "string value",
+    "Root": null,
+    "PieceCid": null,
+    "PieceSize": 1024,
+    "RawBlockSize": 42
+  },
+  "AvailableForRetrieval": true,
+  "DealID": 5432,
+  "CreationTime": "0001-01-01T00:00:00Z",
+  "TransferChannelId": {
+    "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "ID": 3
+  },
+  "SectorNumber": 9,
+  "InboundCAR": "string value"
 }
 ```
 
@@ -728,181 +598,6 @@ Response:
   "Reason": "string value"
 }
 ```
-
-## Deals
-
-
-### DealsConsiderOfflineRetrievalDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOfflineStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOnlineRetrievalDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderOnlineStorageDeals
-There are not yet any comments for this method.
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderUnverifiedStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsConsiderVerifiedStorageDeals
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response: `true`
-
-### DealsPieceCidBlocklist
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-### DealsSetConsiderOfflineRetrievalDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOfflineStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOnlineRetrievalDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderOnlineStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderUnverifiedStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetConsiderVerifiedStorageDeals
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  true
-]
-```
-
-Response: `{}`
-
-### DealsSetPieceCidBlocklist
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  [
-    {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    }
-  ]
-]
-```
-
-Response: `{}`
 
 ## I
 
@@ -951,62 +646,6 @@ Response: `{}`
 ## Market
 
 
-### MarketCancelDataTransfer
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  3,
-  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  true
-]
-```
-
-Response: `{}`
-
-### MarketDataTransferUpdates
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "TransferID": 3,
-  "Status": 1,
-  "BaseCID": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "IsInitiator": true,
-  "IsSender": true,
-  "Voucher": "string value",
-  "Message": "string value",
-  "OtherPeer": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  "Transferred": 42,
-  "Stages": {
-    "Stages": [
-      {
-        "Name": "string value",
-        "Description": "string value",
-        "CreatedTime": "0001-01-01T00:00:00Z",
-        "UpdatedTime": "0001-01-01T00:00:00Z",
-        "Logs": [
-          {
-            "Log": "string value",
-            "UpdatedTime": "0001-01-01T00:00:00Z"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
 ### MarketGetAsk
 
 
@@ -1033,293 +672,6 @@ Response:
   }
 }
 ```
-
-### MarketGetRetrievalAsk
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "PricePerByte": "0",
-  "UnsealPrice": "0",
-  "PaymentInterval": 42,
-  "PaymentIntervalIncrease": 42
-}
-```
-
-### MarketImportDealData
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "string value"
-]
-```
-
-Response: `{}`
-
-### MarketListDataTransfers
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "TransferID": 3,
-    "Status": 1,
-    "BaseCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "IsInitiator": true,
-    "IsSender": true,
-    "Voucher": "string value",
-    "Message": "string value",
-    "OtherPeer": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "Transferred": 42,
-    "Stages": {
-      "Stages": [
-        {
-          "Name": "string value",
-          "Description": "string value",
-          "CreatedTime": "0001-01-01T00:00:00Z",
-          "UpdatedTime": "0001-01-01T00:00:00Z",
-          "Logs": [
-            {
-              "Log": "string value",
-              "UpdatedTime": "0001-01-01T00:00:00Z"
-            }
-          ]
-        }
-      ]
-    }
-  }
-]
-```
-
-### MarketListIncompleteDeals
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "Proposal": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "PieceSize": 1032,
-      "VerifiedDeal": true,
-      "Client": "f01234",
-      "Provider": "f01234",
-      "Label": "",
-      "StartEpoch": 10101,
-      "EndEpoch": 10101,
-      "StoragePricePerEpoch": "0",
-      "ProviderCollateral": "0",
-      "ClientCollateral": "0"
-    },
-    "ClientSignature": {
-      "Type": 2,
-      "Data": "Ynl0ZSBhcnJheQ=="
-    },
-    "ProposalCid": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "AddFundsCid": null,
-    "PublishCid": null,
-    "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "State": 42,
-    "PiecePath": ".lotusminer/fstmp123",
-    "MetadataPath": ".lotusminer/fstmp123",
-    "SlashEpoch": 10101,
-    "FastRetrieval": true,
-    "Message": "string value",
-    "FundsReserved": "0",
-    "Ref": {
-      "TransferType": "string value",
-      "Root": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "PieceCid": null,
-      "PieceSize": 1024,
-      "RawBlockSize": 42
-    },
-    "AvailableForRetrieval": true,
-    "DealID": 5432,
-    "CreationTime": "0001-01-01T00:00:00Z",
-    "TransferChannelId": {
-      "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "ID": 3
-    },
-    "SectorNumber": 9,
-    "InboundCAR": "string value"
-  }
-]
-```
-
-### MarketListRetrievalDeals
-There are not yet any comments for this method.
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "PayloadCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "ID": 5,
-    "Selector": {
-      "Raw": "Ynl0ZSBhcnJheQ=="
-    },
-    "PieceCID": null,
-    "PricePerByte": "0",
-    "PaymentInterval": 42,
-    "PaymentIntervalIncrease": 42,
-    "UnsealPrice": "0",
-    "StoreID": 42,
-    "ChannelID": {
-      "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-      "ID": 3
-    },
-    "PieceInfo": {
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "Deals": [
-        {
-          "DealID": 5432,
-          "SectorID": 9,
-          "Offset": 1032,
-          "Length": 1032
-        }
-      ]
-    },
-    "Status": 0,
-    "Receiver": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-    "TotalSent": 42,
-    "FundsReceived": "0",
-    "Message": "string value",
-    "CurrentInterval": 42,
-    "LegacyProtocol": true
-  }
-]
-```
-
-### MarketPendingDeals
-
-
-Perms: write
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "Deals": [
-    {
-      "Proposal": {
-        "PieceCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "PieceSize": 1032,
-        "VerifiedDeal": true,
-        "Client": "f01234",
-        "Provider": "f01234",
-        "Label": "",
-        "StartEpoch": 10101,
-        "EndEpoch": 10101,
-        "StoragePricePerEpoch": "0",
-        "ProviderCollateral": "0",
-        "ClientCollateral": "0"
-      },
-      "ClientSignature": {
-        "Type": 2,
-        "Data": "Ynl0ZSBhcnJheQ=="
-      }
-    }
-  ],
-  "PublishPeriodStart": "0001-01-01T00:00:00Z",
-  "PublishPeriod": 60000000000
-}
-```
-
-### MarketRestartDataTransfer
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  3,
-  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
-  true
-]
-```
-
-Response: `{}`
-
-### MarketSetAsk
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  "0",
-  "0",
-  10101,
-  1032,
-  1032
-]
-```
-
-Response: `{}`
-
-### MarketSetRetrievalAsk
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  {
-    "PricePerByte": "0",
-    "UnsealPrice": "0",
-    "PaymentInterval": 42,
-    "PaymentIntervalIncrease": 42
-  }
-]
-```
-
-Response: `{}`
 
 ## Net
 
@@ -1853,53 +1205,33 @@ Perms: admin
 Inputs:
 ```json
 [
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  null
 ]
 ```
 
 Response: `{}`
 
-## Runtime
+### PdCleanup
 
 
-### RuntimeSubsystems
-RuntimeSubsystems returns the subsystems that are enabled
-in this instance.
-
-
-Perms: read
+Perms: admin
 
 Inputs: `null`
 
-Response:
+Response: `{}`
+
+### PdRemoveDealForPiece
+
+
+Perms: admin
+
+Inputs:
 ```json
 [
-  "Markets"
+  null,
+  "string value"
 ]
 ```
 
-## Sectors
-
-
-### SectorsRefs
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "98000": [
-    {
-      "SectorID": 100,
-      "Offset": 10485760,
-      "Size": 1048576
-    }
-  ]
-}
-```
+Response: `{}`
 

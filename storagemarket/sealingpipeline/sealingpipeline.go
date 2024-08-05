@@ -20,6 +20,7 @@ type API interface {
 	SectorsList(context.Context) ([]abi.SectorNumber, error)
 	SectorsSummary(ctx context.Context) (map[api.SectorState]int, error)
 	SectorsListInStates(context.Context, []api.SectorState) ([]abi.SectorNumber, error)
+	Version(context.Context) (api.APIVersion, error)
 }
 
 func GetStatus(ctx context.Context, api API) (*Status, error) {

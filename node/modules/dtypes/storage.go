@@ -2,19 +2,16 @@ package dtypes
 
 import (
 	graphsync "github.com/filecoin-project/boost-graphsync"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
-	dtnet "github.com/filecoin-project/go-data-transfer/network"
+	"github.com/filecoin-project/boost/datatransfer"
+	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 	"github.com/filecoin-project/go-statestore"
 	bserv "github.com/ipfs/boxo/blockservice"
-	exchange "github.com/ipfs/boxo/exchange"
+	"github.com/ipfs/boxo/exchange"
 	"github.com/ipfs/go-datastore"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost-gfm/storagemarket/impl/requestvalidation"
 	ipfsblockstore "github.com/ipfs/boxo/blockstore"
 
 	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
 type (
@@ -69,24 +66,16 @@ type (
 type ChainBitswap exchange.Interface
 type ChainBlockService bserv.BlockService
 
-type ClientImportMgr *imports.Manager
 type ClientBlockstore blockstore.BasicBlockstore
 type ClientDealStore *statestore.StateStore
-type ClientRequestValidator *requestvalidation.UnifiedRequestValidator
 type ClientDatastore datastore.Batching
 
 type Graphsync graphsync.GraphExchange
 
-// ClientDataTransfer is a data transfer manager for the client
-type ClientDataTransfer datatransfer.Manager
-type ProviderDataTransfer datatransfer.Manager
 type ProviderTransferNetwork dtnet.DataTransferNetwork
 type ProviderTransport datatransfer.Transport
 
 type ProviderDealStore *statestore.StateStore
-type ProviderPieceStore piecestore.PieceStore
-
-type ProviderRequestValidator *requestvalidation.UnifiedRequestValidator
 
 type StagingBlockstore blockstore.BasicBlockstore
 type StagingGraphsync graphsync.GraphExchange

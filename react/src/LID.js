@@ -1,4 +1,3 @@
-/* global BigInt */
 import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     LIDQuery,
@@ -8,7 +7,7 @@ import {
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
 import React, {useState, useEffect} from "react";
-import {PageContainer, ShortCID, ShortDealLink} from "./Components";
+import {PageContainer, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
@@ -18,7 +17,7 @@ import './Inspect.css'
 import {Pagination} from "./Pagination";
 import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
-import {addCommas, humanFileSize} from "./util";
+import {addCommas} from "./util";
 import closeImg from "./bootstrap-icons/icons/x-circle.svg";
 
 const lidBasePath = '/piece-doctor'
@@ -184,25 +183,6 @@ function PiecesInfo() {
             sector containing the piece was deleted.
         </p>
     </Info>
-}
-
-function BlockStatsSection() {
-    return <div>
-        <h3>Block Stats</h3>
-
-        <table className="block-stats">
-            <tbody>
-            <tr>
-                <th>Total blocks:</th>
-                <td>{addCommas(32129310123)}</td>
-            </tr>
-            <tr>
-                <th>Avg Block size:</th>
-                <td>{humanFileSize(256*1024)}</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
 }
 
 // Page listing pieces flagged by the piece doctor
@@ -581,8 +561,8 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
         return <div>No piece found with piece CID {pieceCid}</div>
     }
 
-    const searchIsAnyCid = searchQuery && searchQuery != pieceCid
-    const searchIsPieceCid = searchQuery && searchQuery == pieceCid
+    const searchIsAnyCid = searchQuery && searchQuery !== pieceCid
+    const searchIsPieceCid = searchQuery && searchQuery === pieceCid
     const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
     const indexRegistered = pieceStatus.IndexStatus.Status === 'Registered'
     const canReIndex = (indexFailed || indexRegistered) && hasUnsealedCopy(pieceStatus)
@@ -597,7 +577,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <td>
                             <span><strong>{searchQuery}</strong></span>
                             &nbsp;
-                            <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
+                            <a className="download" target="_blank" href={"/download/block/"+searchQuery} rel="noreferrer">
                                 Download block
                             </a>
                         </td>
@@ -680,6 +660,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <th>CreatedAt</th>
                         <th>Deal ID</th>
                         <th>Legacy Deal</th>
+                        <th>Direct Deal</th>
                         <th>Sector Number</th>
                         <th>Piece Offset</th>
                         <th>Piece Length</th>
@@ -688,12 +669,13 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     {pieceStatus.Deals.map(deal => (
                         <tr key={deal.Deal.ID}>
                             <td>{moment(deal.Deal.CreatedAt).format(dateFormat)}</td>
-                            <td><ShortDealLink id={deal.Deal.ID} isLegacy={deal.Deal.IsLegacy} /></td>
+                            <td><ShortDealLink id={deal.Deal.ID} isLegacy={deal.Deal.IsLegacy} isDirect={deal.Deal.IsDirect}/></td>
                             <td>{deal.Deal.IsLegacy ? 'Yes' : 'No'}</td>
-                            <td>{deal.Sector.ID+''}</td>
-                            <td>{deal.Sector.Offset+''}</td>
-                            <td>{deal.Sector.Length+''}</td>
-                            <td><SealStatus status={deal.SealStatus} /></td>
+                            <td>{deal.Deal.IsDirect ? 'Yes' : 'No'}</td>
+                            <td>{deal.Sector.ID + ''}</td>
+                            <td>{deal.Sector.Offset + ''}</td>
+                            <td>{deal.Sector.Length + ''}</td>
+                            <td><SealStatus status={deal.SealStatus}/></td>
                         </tr>
                     ))}
                     </tbody>
@@ -712,16 +694,16 @@ function SealStatus({status}) {
     switch (status.Status) {
         case 'HasUnsealedCopy': return 'Yes';
         case 'NoUnsealedCopy':  return 'No';
+        default: return <>
+            <span>Unknown</span>
+            <Info>
+                The sealing status of the sector is unknown.
+                This could be because the sealing status caches are out of sync, or
+                it could be because the sector is corrupted.
+                Check the contents of the sector to ensure it is not corrupted.
+            </Info>
+        </>
     }
-    return <>
-        <span>Unknown</span>
-        <Info>
-            The sealing status of the sector is unknown.
-            This could be because the sealing status caches are out of sync, or
-            it could be because the sector is corrupted.
-            Check the contents of the sector to ensure it is not corrupted.
-        </Info>
-    </>
 }
 
 function SearchBox(props) {
@@ -842,7 +824,7 @@ export function PiecePayloadCids() {
                                     {payload.Multihash}
                                 </td>
                                 <td>
-                                    <a className="download" target="_blank" href={"/download/block/"+payload.PayloadCid}>
+                                    <a className="download" target="_blank" href={"/download/block/"+payload.PayloadCid} rel="noreferrer">
                                         Download block
                                     </a>
                                 </td>

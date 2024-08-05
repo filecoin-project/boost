@@ -249,7 +249,7 @@ func TestDealSizeIsZero(t *testing.T) {
 	defer svr.Close()
 
 	of := getTempFilePath(t)
-	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), 0, types.HttpRequest{URL: svr.URL}, of)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)), 0, types.HttpRequest{URL: svr.URL}, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)
@@ -276,7 +276,7 @@ func TestFailIfDealSizesDontMatch(t *testing.T) {
 	defer svr.Close()
 
 	of := getTempFilePath(t)
-	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), carSize/2, types.HttpRequest{URL: svr.URL}, of)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)), carSize/2, types.HttpRequest{URL: svr.URL}, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)
@@ -379,10 +379,10 @@ func TestDownloadFromPrivateIPs(t *testing.T) {
 	require.NoError(t, err)
 
 	// do not allow download from private IP addresses by default
-	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)).Execute(ctx, bz, dealInfo)
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)).Execute(ctx, bz, dealInfo)
 	require.Error(t, err, "downloading from private addresses is not allowed")
 	// allow download from private addresses if explicitly enabled
-	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks), AllowPrivateIPsOpt(true)).Execute(ctx, bz, dealInfo)
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks), AllowPrivateIPsOpt(true)).Execute(ctx, bz, dealInfo)
 	require.NoError(t, err)
 }
 
@@ -423,7 +423,7 @@ func TestDontFollowHttpRedirects(t *testing.T) {
 	defer redirectSvr.Close()
 
 	of := getTempFilePath(t)
-	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), carSize, types.HttpRequest{URL: redirectSvr.URL}, of)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)), carSize, types.HttpRequest{URL: redirectSvr.URL}, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)

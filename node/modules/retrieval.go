@@ -7,11 +7,9 @@ import (
 	"path"
 	"time"
 
-	lotus_retrievalmarket "github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -29,7 +27,7 @@ import (
 // based off the host and boost config
 func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, error) {
 	// if BitswapPublicAddresses is empty, that means we'll be serving bitswap directly from this host, so just return host multiaddresses
-	if len(cfg.Dealmaking.BitswapPublicAddresses) == 0 {
+	if len(cfg.Retrievals.Bitswap.BitswapPublicAddresses) == 0 {
 		maddr, err := peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
 			ID:    h.ID(),
 			Addrs: h.Addrs(),
@@ -45,7 +43,7 @@ func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, e
 
 	// parse all of the public multiaddrs
 	var addrs []multiaddr.Multiaddr
-	for _, addrString := range cfg.Dealmaking.BitswapPublicAddresses {
+	for _, addrString := range cfg.Retrievals.Bitswap.BitswapPublicAddresses {
 		addr, err := multiaddr.NewMultiaddr(addrString)
 		if err != nil {
 			return nil, fmt.Errorf("Could not parse bitswap address '%s' as multiaddr: %w", addrString, err)
@@ -54,9 +52,9 @@ func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, e
 	}
 
 	// in order to make these multiaddrs fully dialable, we encapsulate the bitswap peer id inside of them
-	bsPeerID, err := peer.Decode(cfg.Dealmaking.BitswapPeerID)
+	bsPeerID, err := peer.Decode(cfg.Retrievals.Bitswap.BitswapPeerID)
 	if err != nil {
-		return nil, fmt.Errorf("Could not parse bitswap peer id '%s': %w", cfg.Dealmaking.BitswapPeerID, err)
+		return nil, fmt.Errorf("Could not parse bitswap peer id '%s': %w", cfg.Retrievals.Bitswap.BitswapPeerID, err)
 	}
 	return peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
 		ID:    bsPeerID,
@@ -85,12 +83,12 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 
 		// If there's an http retrieval address specified, add HTTP to the list
 		// of supported protocols
-		if cfg.Dealmaking.HTTPRetrievalMultiaddr != "" {
-			maddr, err := multiaddr.NewMultiaddr(cfg.Dealmaking.HTTPRetrievalMultiaddr)
+		if cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr != "" {
+			maddr, err := multiaddr.NewMultiaddr(cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr)
 			if err != nil {
 				msg := "HTTPRetrievalURL must be in multi-address format. "
 				msg += "Could not parse '%s' as multiaddr: %w"
-				return nil, fmt.Errorf(msg, cfg.Dealmaking.HTTPRetrievalMultiaddr, err)
+				return nil, fmt.Errorf(msg, cfg.Retrievals.HTTP.HTTPRetrievalMultiaddr, err)
 			}
 			protos = append(protos, types.Protocol{
 				Name:      "http",
@@ -100,7 +98,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 
 		// If there's a bitswap peer address specified, add bitswap to the list
 		// of supported protocols
-		if cfg.Dealmaking.BitswapPeerID != "" {
+		if cfg.Retrievals.Bitswap.BitswapPeerID != "" {
 			addrs, err := bitswapMultiAddrs(cfg, h)
 			if err != nil {
 				return nil, err
@@ -156,19 +154,15 @@ func NewRetrievalLogDB(db *RetrievalSqlDB) *rtvllog.RetrievalLogDB {
 }
 
 // Write graphsync retrieval updates to the database
-func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
-	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
-		rel := rtvllog.NewRetrievalLog(db, duration, dt, stalledDuration, gsur)
+func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, gsur *server.GraphsyncUnpaidRetrieval) {
+	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, gsur *server.GraphsyncUnpaidRetrieval) {
+		rel := rtvllog.NewRetrievalLog(db, duration, stalledDuration, gsur)
 
 		relctx, cancel := context.WithCancel(context.Background())
 		type unsubFn func()
 		var unsubs []unsubFn
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				unsubs = append(unsubs, unsubFn(m.SubscribeToEvents(rel.OnRetrievalEvent)))
-				unsubs = append(unsubs, unsubFn(m.SubscribeToQueryEvents(rel.OnQueryEvent)))
-				unsubs = append(unsubs, unsubFn(m.SubscribeToValidationEvents(rel.OnValidationEvent)))
-				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToMarketsEvents(rel.OnRetrievalEvent)))
 				rel.Start(relctx)
@@ -189,8 +183,8 @@ func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.Proto
 	return func(h host.Host) (*protocolproxy.ProtocolProxy, error) {
 		peerConfig := map[peer.ID][]protocol.ID{}
 		// add bitswap if a peer id is set AND the peer is only private
-		if cfg.Dealmaking.BitswapPeerID != "" && len(cfg.Dealmaking.BitswapPublicAddresses) == 0 {
-			bsPeerID, err := peer.Decode(cfg.Dealmaking.BitswapPeerID)
+		if cfg.Retrievals.Bitswap.BitswapPeerID != "" && len(cfg.Retrievals.Bitswap.BitswapPublicAddresses) == 0 {
+			bsPeerID, err := peer.Decode(cfg.Retrievals.Bitswap.BitswapPeerID)
 			if err != nil {
 				return nil, err
 			}

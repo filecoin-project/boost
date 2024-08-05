@@ -3,14 +3,13 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
@@ -109,13 +108,16 @@ func (d *DirectDealsDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*ty
 	return d.list(ctx, 0, 0, "PieceCID=?", pieceCid.String())
 }
 
-func (d *DirectDealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.DirectDeal, error) {
-	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
-	if err != nil {
-		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
-	}
+func (d *DirectDealsDB) BySectorID(ctx context.Context, sectorID abi.SectorNumber) ([]*types.DirectDeal, error) {
+	return d.list(ctx, 0, 0, "SectorID=?", sectorID)
+}
 
-	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
+func (d *DirectDealsDB) ActiveByPieceAllocID(ctx context.Context, piece cid.Cid, alloc verifreg.AllocationId) ([]*types.DirectDeal, error) {
+	whereArgs := []interface{}{}
+	whereArgs = append(whereArgs, piece.String())
+	whereArgs = append(whereArgs, uint64(alloc))
+	whereArgs = append(whereArgs, dealcheckpoints.Complete.String())
+	return d.list(ctx, 0, 0, "PieceCID=? AND AllocationID=? AND Checkpoint != ?", whereArgs...)
 }
 
 func (d *DirectDealsDB) ListAll(ctx context.Context) ([]*types.DirectDeal, error) {

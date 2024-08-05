@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/filecoin-project/go-address"
 	"io"
 	"strings"
 	"sync"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/go-address"
+
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
@@ -131,8 +131,8 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 		return mb.publishCid, nil
 	}).AnyTimes()
 
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
-		return &storagemarket.PublishDealsWaitResult{
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*types.PublishDealsWaitResult, error) {
+		return &types.PublishDealsWaitResult{
 			DealID:   mb.dealId,
 			FinalCid: mb.finalPublishCid,
 		}, nil
@@ -241,7 +241,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(ctx context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(ctx context.Context, _ cid.Cid, _ market.DealProposal) (*types.PublishDealsWaitResult, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockWaitForPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -257,7 +257,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 			return nil, ctx.Err()
 		}
 
-		return &storagemarket.PublishDealsWaitResult{
+		return &types.PublishDealsWaitResult{
 			DealID:   mb.dealId,
 			FinalCid: mb.finalPublishCid,
 		}, nil
@@ -267,7 +267,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 }
 
 func (mb *MinerStubBuilder) SetupPublishConfirmFailure(err error) *MinerStubBuilder {
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*types.PublishDealsWaitResult, error) {
 		return nil, err
 	})
 

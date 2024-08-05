@@ -4,11 +4,12 @@ import (
 	"context"
 	"io"
 
+	"github.com/filecoin-project/boost/lib/sa"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	retrievalmarket_types "github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -16,7 +17,6 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -32,9 +32,9 @@ type sectorAccessor struct {
 	full  v1api.FullNode
 }
 
-var _ retrievalmarket.SectorAccessor = (*sectorAccessor)(nil)
+var _ retrievalmarket_types.SectorAccessor = (*sectorAccessor)(nil)
 
-func NewSectorAccessor(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) dagstore.SectorAccessor {
+func NewSectorAccessor(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) sa.SectorAccessor {
 	return &sectorAccessor{address.Address(maddr), secb, pp, full}
 }
 

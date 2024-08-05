@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -25,6 +25,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
@@ -32,6 +33,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
+	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -44,6 +46,7 @@ var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
+	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
 )
 
 var (
@@ -55,6 +58,13 @@ type SealingPipelineCache struct {
 	Status     sealingpipeline.Status
 	CacheTime  time.Time
 	CacheError error
+}
+
+// PackingResult returns information about how a deal was put into a sector
+type PackingResult struct {
+	SectorNumber abi.SectorNumber
+	Offset       abi.PaddedPieceSize
+	Size         abi.PaddedPieceSize
 }
 
 // DagstoreShardRegistry provides the one method from the Dagstore that we use
@@ -74,6 +84,7 @@ type Config struct {
 	// Cache timeout for Sealing Pipeline status
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
+	Curio                       bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -146,6 +157,15 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
 	if err != nil {
 		return nil, err
+	}
+
+	v, err := sps.Version(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.Contains(v.String(), "curio") {
+		cfg.Curio = true
 	}
 
 	newDealPS, err := newDealPubsub()
@@ -223,8 +243,8 @@ func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid)
 	return deal, nil
 }
 
-func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
-	return p.askGetter.GetAsk()
+func (p *Provider) GetAsk() *legacytypes.SignedStorageAsk {
+	return p.askGetter.GetAsk(p.Address)
 }
 
 // ImportOfflineDealData is called when the Storage Provider imports data for
@@ -449,10 +469,12 @@ func (p *Provider) Start() error {
 			continue
 		}
 
-		// Fail deals if start epoch has passed
-		if err := p.checkDealProposalStartEpoch(deal); err != nil {
-			go p.failDeal(dh.Publisher, deal, err, false)
-			continue
+		// Fail deals if start epoch has passed and deal has still not been added to a sector
+		if deal.Checkpoint < dealcheckpoints.AddedPiece {
+			if serr := p.checkDealProposalStartEpoch(deal); serr != nil {
+				go p.failDeal(dh.Publisher, deal, serr, false)
+				continue
+			}
 		}
 
 		// If it's an offline deal, and the deal data hasn't yet been
@@ -487,9 +509,10 @@ func (p *Provider) Start() error {
 	// Start the transfer limiter
 	go p.xferLimiter.run(p.ctx)
 
-	// Start hourly deal log cleanup
+	// Start hourly deal and funds log cleanup
 	if p.config.DealLogDurationDays > 0 {
 		go p.dealLogger.LogCleanup(p.ctx, p.config.DealLogDurationDays)
+		go p.fundManager.LogCleanup(p.ctx, p.config.DealLogDurationDays)
 	}
 
 	log.Infow("storage provider: started")
@@ -628,18 +651,18 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 	return err
 }
 
-func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
+func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*PackingResult, error) {
 	// Sanity check - we must have published the deal before handing it off
 	// to the sealing subsystem
 	if deal.PublishCID == nil {
 		return nil, fmt.Errorf("deal.PublishCid can't be nil")
 	}
 
-	sdInfo := lapi.PieceDealInfo{
+	sdInfo := piece.PieceDealInfo{
 		DealID:       deal.ChainDealID,
 		DealProposal: &deal.ClientDealProposal.Proposal,
 		PublishCid:   deal.PublishCID,
-		DealSchedule: lapi.DealSchedule{
+		DealSchedule: piece.DealSchedule{
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   deal.ClientDealProposal.Proposal.EndEpoch,
 		},
@@ -654,7 +677,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	}
 	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
 
-	return &storagemarket.PackingResult{
+	return &PackingResult{
 		SectorNumber: sectorNum,
 		Offset:       offset,
 		Size:         pieceSize.Padded(),

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"os/exec"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket/funds"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/storagespace"
@@ -17,7 +17,7 @@ const agent = "boost"
 const jsonVersion = "2.2.0"
 
 type StorageDealFilter func(ctx context.Context, deal DealFilterParams) (bool, string, error)
-type RetrievalDealFilter func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error)
+type RetrievalDealFilter func(ctx context.Context, deal legacyretrievaltypes.ProviderDealState) (bool, string, error)
 
 func CliStorageDealFilter(cmd string) StorageDealFilter {
 	return func(ctx context.Context, deal DealFilterParams) (bool, string, error) {
@@ -43,9 +43,9 @@ func CliStorageDealFilter(cmd string) StorageDealFilter {
 }
 
 func CliRetrievalDealFilter(cmd string) RetrievalDealFilter {
-	return func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error) {
+	return func(ctx context.Context, deal legacyretrievaltypes.ProviderDealState) (bool, string, error) {
 		d := struct {
-			retrievalmarket.ProviderDealState
+			legacyretrievaltypes.ProviderDealState
 			DealType      string
 			FormatVersion string
 			Agent         string

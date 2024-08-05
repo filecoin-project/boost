@@ -1,18 +1,15 @@
 package lib
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
+	"strings"
 
-	"github.com/chzyer/readline"
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	piecestoreimpl "github.com/filecoin-project/boost-gfm/piecestore/impl"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	piecestoreimpl "github.com/filecoin-project/boost/markets/piecestore/impl"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -28,6 +25,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	ds_sync "github.com/ipfs/go-datastore/sync"
+	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v2"
 )
 
@@ -72,7 +70,7 @@ func GetPropCidByChainDealID(ctx context.Context, ds *backupds.Datastore) (map[a
 	}
 
 	// Build a mapping of chain deal ID to proposal CID
-	var list []storagemarket.MinerDeal
+	var list []legacytypes.MinerDeal
 	if err := deals.List(&list); err != nil {
 		return nil, err
 	}
@@ -121,7 +119,7 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	// Get the deals FSM
 	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
 	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
-		StateType:     storagemarket.MinerDeal{},
+		StateType:     legacytypes.MinerDeal{},
 		StateKeyField: "State",
 	}, nil, "2")
 	if err != nil {
@@ -177,12 +175,37 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 	fmt.Println("basefee:     ", types.FIL(basefee))
 	fmt.Println()
 	if !cctx.Bool("assume-yes") {
-		var yes bool
-		yes, err = confirm(ctx)
+		validate := func(input string) error {
+			if strings.EqualFold(input, "y") || strings.EqualFold(input, "yes") {
+				return nil
+			}
+			if strings.EqualFold(input, "n") || strings.EqualFold(input, "no") {
+				return nil
+			}
+			return errors.New("incorrect input")
+		}
+
+		templates := &promptui.PromptTemplates{
+			Prompt:  "{{ . }} ",
+			Valid:   "{{ . | green }} ",
+			Invalid: "{{ . | red }} ",
+			Success: "{{ . | cyan | bold }} ",
+		}
+
+		prompt := promptui.Prompt{
+			Label:     "Proceed? Yes [Y/y] / No [N/n], Ctrl+C (^C) to exit",
+			Templates: templates,
+			Validate:  validate,
+		}
+
+		var input string
+
+		input, err = prompt.Run()
 		if err != nil {
 			return
 		}
-		if !yes {
+		if strings.Contains(strings.ToLower(input), "n") {
+			fmt.Println("Message not sent")
 			return
 		}
 	}
@@ -195,34 +218,4 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 
 	sent = true
 	return
-}
-
-func confirm(ctx context.Context) (bool, error) {
-	cs := readline.NewCancelableStdin(os.Stdin)
-	go func() {
-		<-ctx.Done()
-		cs.Close() // nolint:errcheck
-	}()
-	rl := bufio.NewReader(cs)
-	for {
-		fmt.Printf("Proceed? Yes [y] / No [n]:\n")
-
-		line, _, err := rl.ReadLine()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return false, fmt.Errorf("request canceled: %w", err)
-			}
-
-			return false, fmt.Errorf("reading input: %w", err)
-		}
-
-		switch string(line) {
-		case "yes", "y":
-			return true, nil
-		case "n":
-			return false, nil
-		default:
-			return false, nil
-		}
-	}
 }

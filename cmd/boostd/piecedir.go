@@ -7,6 +7,7 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 )
@@ -16,6 +17,9 @@ var pieceDirCmd = &cli.Command{
 	Usage: "Manage Local Index Directory",
 	Subcommands: []*cli.Command{
 		pdIndexGenerate,
+		recoverCmd,
+		removeDealCmd,
+		lidCleanupCmd,
 	},
 }
 
@@ -52,6 +56,78 @@ var pdIndexGenerate = &cli.Command{
 
 		fmt.Println("Generated index in", time.Since(addStart).String())
 
+		return nil
+	},
+}
+
+var removeDealCmd = &cli.Command{
+	Name:      "remove-deal",
+	Usage:     "Removes a deal from piece metadata in LID. If the specified deal is the only one in piece metadata, index and metadata are also removed",
+	ArgsUsage: "<piece CID> <deal UUID or Proposal CID>",
+	Action: func(cctx *cli.Context) error {
+
+		ctx := lcli.ReqContext(cctx)
+
+		if cctx.Args().Len() > 2 {
+			return fmt.Errorf("must specify piece CID and deal UUID/Proposal CID")
+		}
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		// parse piececid
+		piececid, err := cid.Decode(cctx.Args().Get(0))
+		if err != nil {
+			return fmt.Errorf("parsing piece CID: %w", err)
+		}
+
+		id := cctx.Args().Get(1)
+
+		// Parse to avoid sending garbage data to API
+		dealUuid, err := uuid.Parse(id)
+		if err != nil {
+			propCid, err := cid.Decode(id)
+			if err != nil {
+				return fmt.Errorf("could not parse '%s' as deal uuid or proposal cid", id)
+			}
+			err = napi.PdRemoveDealForPiece(ctx, piececid, propCid.String())
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Deal %s removed for piece %s\n", propCid, piececid)
+			return nil
+		}
+
+		err = napi.PdRemoveDealForPiece(ctx, piececid, dealUuid.String())
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deal %s removed for piece %s\n", dealUuid, piececid)
+		return nil
+
+	},
+}
+
+var lidCleanupCmd = &cli.Command{
+	Name:  "cleanup",
+	Usage: "Triggers a cleanup for LID. Command will wait for existing cleanup jobs to finish if there are any",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		err = napi.PdCleanup(ctx)
+		if err != nil {
+			return fmt.Errorf("clean up failed: %w", err)
+		}
+		fmt.Println("LID clean up complete")
 		return nil
 	},
 }

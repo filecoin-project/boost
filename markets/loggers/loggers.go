@@ -1,49 +1,38 @@
 package marketevents
 
 import (
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-state-types/abi"
 )
 
 var log = logging.Logger("markets")
 
-// StorageClientLogger logs events from the storage client
-func StorageClientLogger(event storagemarket.ClientEvent, deal storagemarket.ClientDeal) {
-	log.Infow("storage client event", "name", storagemarket.ClientEvents[event], "proposal CID", deal.ProposalCid, "state", storagemarket.DealStates[deal.State], "message", deal.Message)
-}
-
-// StorageProviderLogger logs events from the storage provider
-func StorageProviderLogger(event storagemarket.ProviderEvent, deal storagemarket.MinerDeal) {
-	log.Infow("storage provider event", "name", storagemarket.ProviderEvents[event], "proposal CID", deal.ProposalCid, "state", storagemarket.DealStates[deal.State], "message", deal.Message)
-}
-
 // RetrievalClientLogger logs events from the retrieval client
-func RetrievalClientLogger(event retrievalmarket.ClientEvent, deal retrievalmarket.ClientDealState) {
+func RetrievalClientLogger(event legacyretrievaltypes.ClientEvent, deal legacyretrievaltypes.ClientDealState) {
 	method := log.Infow
-	if event == retrievalmarket.ClientEventBlocksReceived {
+	if event == legacyretrievaltypes.ClientEventBlocksReceived {
 		method = log.Debugw
 	}
-	method("retrieval client event", "name", retrievalmarket.ClientEvents[event], "deal ID", deal.ID, "state", retrievalmarket.DealStatuses[deal.Status], "message", deal.Message)
+	method("retrieval client event", "name", legacyretrievaltypes.ClientEvents[event], "deal ID", deal.ID, "state", legacyretrievaltypes.DealStatuses[deal.Status], "message", deal.Message)
 }
 
 // RetrievalProviderLogger logs events from the retrieval provider
-func RetrievalProviderLogger(event retrievalmarket.ProviderEvent, deal retrievalmarket.ProviderDealState) {
+func RetrievalProviderLogger(event legacyretrievaltypes.ProviderEvent, deal legacyretrievaltypes.ProviderDealState) {
 	method := log.Infow
-	if event == retrievalmarket.ProviderEventBlockSent {
+	if event == legacyretrievaltypes.ProviderEventBlockSent {
 		method = log.Debugw
 	}
-	method("retrieval provider event", "name", retrievalmarket.ProviderEvents[event], "deal ID", deal.ID, "receiver", deal.Receiver, "state", retrievalmarket.DealStatuses[deal.Status], "message", deal.Message)
+	method("retrieval provider event", "name", legacyretrievaltypes.ProviderEvents[event], "deal ID", deal.ID, "receiver", deal.Receiver, "state", legacyretrievaltypes.DealStatuses[deal.Status], "message", deal.Message)
 }
 
 // DataTransferLogger logs events from the data transfer module
-func DataTransferLogger(event datatransfer.Event, state datatransfer.ChannelState) {
+func DataTransferLogger(event datatransfer2.Event, state datatransfer2.ChannelState) {
 	log.Debugw("data transfer event",
-		"name", datatransfer.Events[event.Code],
-		"status", datatransfer.Statuses[state.Status()],
+		"name", datatransfer2.Events[event.Code],
+		"status", datatransfer2.Statuses[state.Status()],
 		"transfer ID", state.TransferID(),
 		"channel ID", state.ChannelID(),
 		"sent", state.Sent(),
@@ -68,8 +57,8 @@ func ReadyLogger(module string) func(error) {
 }
 
 type RetrievalEvent struct {
-	Event         retrievalmarket.ClientEvent
-	Status        retrievalmarket.DealStatus
+	Event         legacyretrievaltypes.ClientEvent
+	Status        legacyretrievaltypes.DealStatus
 	BytesReceived uint64
 	FundsSpent    abi.TokenAmount
 	Err           string

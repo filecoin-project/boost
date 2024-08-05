@@ -188,3 +188,14 @@ func (f *FundsDB) TotalTagged(ctx context.Context) (*TotalTagged, error) {
 
 	return tt, nil
 }
+
+func (f *FundsDB) CleanupLogs(ctx context.Context, daysOld int) error {
+
+	t := time.Now()
+	td := t.AddDate(0, 0, -1*daysOld)
+
+	qry := "DELETE from FundsLogs WHERE DealUUID IN (SELECT DISTINCT DealUUID FROM FundsLogs WHERE CreatedAt < ?)"
+
+	_, err := f.db.ExecContext(ctx, qry, td)
+	return err
+}

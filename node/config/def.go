@@ -11,14 +11,6 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-const (
-	// RetrievalPricingDefault configures the node to use the default retrieval pricing policy.
-	RetrievalPricingDefaultMode = "default"
-	// RetrievalPricingExternal configures the node to use the external retrieval pricing script
-	// configured by the user.
-	RetrievalPricingExternalMode = "external"
-)
-
 // MaxTraversalLinks configures the maximum number of links to traverse in a DAG while calculating
 // CommP and traversing a DAG with graphsync; invokes a budget on DAG depth and density.
 var MaxTraversalLinks uint64 = 32 * (1 << 20)
@@ -55,7 +47,6 @@ func defCommon() Common {
 
 }
 
-var DefaultDefaultMaxFee = types.MustParseFIL("0.07")
 var DefaultSimultaneousTransfers = uint64(20)
 
 func DefaultBoost() *Boost {
@@ -96,6 +87,7 @@ func DefaultBoost() *Boost {
 			ServiceApiInfo:        "",
 			ServiceRPCTimeout:     Duration(15 * time.Minute),
 			EnablePieceDoctor:     true,
+			LidCleanupInterval:    Duration(6 * time.Hour),
 		},
 
 		ContractDeals: ContractDealsConfig{
@@ -105,98 +97,27 @@ func DefaultBoost() *Boost {
 		},
 
 		Dealmaking: DealmakingConfig{
-			ConsiderOnlineStorageDeals:     true,
-			ConsiderOfflineStorageDeals:    true,
-			ConsiderOnlineRetrievalDeals:   true,
-			ConsiderOfflineRetrievalDeals:  true,
-			ConsiderVerifiedStorageDeals:   true,
-			ConsiderUnverifiedStorageDeals: true,
-			PieceCidBlocklist:              []cid.Cid{},
-			// TODO: It'd be nice to set this based on sector size
+			ConsiderOnlineStorageDeals:      true,
+			ConsiderOfflineStorageDeals:     true,
+			ConsiderOnlineRetrievalDeals:    true,
+			ConsiderOfflineRetrievalDeals:   true,
+			ConsiderVerifiedStorageDeals:    true,
+			ConsiderUnverifiedStorageDeals:  true,
+			PieceCidBlocklist:               []cid.Cid{},
 			MaxDealStartDelay:               Duration(time.Hour * 24 * 14),
 			ExpectedSealDuration:            Duration(time.Hour * 24),
 			MaxProviderCollateralMultiplier: 2,
-
-			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
-
-			DealProposalLogDuration: Duration(time.Hour * 24),
-			RetrievalLogDuration:    Duration(time.Hour * 24),
-			StalledRetrievalTimeout: Duration(time.Second * 30),
-
-			RetrievalPricing: &lotus_config.RetrievalPricing{
-				Strategy: RetrievalPricingDefaultMode,
-				Default: &lotus_config.RetrievalPricingDefault{
-					VerifiedDealsFreeTransfer: true,
-				},
-				External: &lotus_config.RetrievalPricingExternal{
-					Path: "",
-				},
-			},
-
-			// This should no longer be needed once LID is live
-			BlockstoreCacheMaxShards: 20, // Match default simultaneous retrievals
-			BlockstoreCacheExpiry:    Duration(30 * time.Second),
-
-			IsUnsealedCacheExpiry: Duration(5 * time.Minute),
-
-			MaxTransferDuration: Duration(24 * 3600 * time.Second),
-
-			RemoteCommp:             false,
-			MaxConcurrentLocalCommp: 1,
-
-			HttpTransferMaxConcurrentDownloads: 20,
-			HttpTransferStallTimeout:           Duration(5 * time.Minute),
-			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
-			DealLogDurationDays:                30,
-			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
-			FundsTaggingEnabled:                true,
-			EnableLegacyStorageDeals:           false,
-			ManualDealPublish:                  false,
-			BitswapPublicAddresses:             []string{},
+			StartEpochSealingBuffer:         480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
+			DealProposalLogDuration:         Duration(time.Hour * 24),
+			IsUnsealedCacheExpiry:           Duration(5 * time.Minute),
+			MaxTransferDuration:             Duration(24 * 3600 * time.Second),
+			RemoteCommp:                     false,
+			MaxConcurrentLocalCommp:         1,
+			DealLogDurationDays:             30,
+			SealingPipelineCacheTimeout:     Duration(30 * time.Second),
+			FundsTaggingEnabled:             true,
 		},
 
-		LotusDealmaking: lotus_config.DealmakingConfig{
-			ConsiderOnlineStorageDeals:     true,
-			ConsiderOfflineStorageDeals:    true,
-			ConsiderOnlineRetrievalDeals:   true,
-			ConsiderOfflineRetrievalDeals:  true,
-			ConsiderVerifiedStorageDeals:   true,
-			ConsiderUnverifiedStorageDeals: true,
-			PieceCidBlocklist:              []cid.Cid{},
-			// TODO: It'd be nice to set this based on sector size
-			MaxDealStartDelay:               lotus_config.Duration(time.Hour * 24 * 14),
-			ExpectedSealDuration:            lotus_config.Duration(time.Hour * 24),
-			PublishMsgPeriod:                lotus_config.Duration(time.Hour),
-			MaxDealsPerPublishMsg:           8,
-			MaxProviderCollateralMultiplier: 2,
-
-			SimultaneousTransfersForStorage:          DefaultSimultaneousTransfers,
-			SimultaneousTransfersForStoragePerClient: 0,
-			SimultaneousTransfersForRetrieval:        DefaultSimultaneousTransfers,
-
-			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
-
-			RetrievalPricing: &lotus_config.RetrievalPricing{
-				Strategy: RetrievalPricingDefaultMode,
-				Default: &lotus_config.RetrievalPricingDefault{
-					VerifiedDealsFreeTransfer: true,
-				},
-				External: &lotus_config.RetrievalPricingExternal{
-					Path: "",
-				},
-			},
-		},
-
-		LotusFees: FeeConfig{
-			MaxPublishDealsFee:     types.MustParseFIL("0.05"),
-			MaxMarketBalanceAddFee: types.MustParseFIL("0.007"),
-		},
-
-		DAGStore: lotus_config.DAGStoreConfig{
-			MaxConcurrentIndex:         5,
-			MaxConcurrencyStorageCalls: 100,
-			GCInterval:                 lotus_config.Duration(1 * time.Minute),
-		},
 		IndexProvider: IndexProviderConfig{
 			Enable:               true,
 			EntriesCacheCapacity: 1024,
@@ -223,8 +144,31 @@ func DefaultBoost() *Boost {
 			DataTransferPublisher: false,
 		},
 		HttpDownload: HttpDownloadConfig{
-			NChunks:         5,
-			AllowPrivateIPs: false,
+			HttpTransferMaxConcurrentDownloads: 20,
+			HttpTransferStallTimeout:           Duration(5 * time.Minute),
+			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
+			NChunks:                            5,
+			AllowPrivateIPs:                    false,
+		},
+		Retrievals: RetrievalConfig{
+			Graphsync: GraphsyncRetrievalConfig{
+				SimultaneousTransfersForRetrieval: DefaultSimultaneousTransfers,
+				RetrievalLogDuration:              Duration(time.Hour * 24),
+				StalledRetrievalTimeout:           Duration(time.Second * 30),
+				GraphsyncStorageAccessApiInfo:     []string{},
+			},
+			Bitswap: BitswapRetrievalConfig{
+				BitswapPublicAddresses: []string{},
+			},
+			HTTP: HTTPRetrievalConfig{
+				HTTPRetrievalMultiaddr: "",
+			},
+		},
+		Dealpublish: DealPublishConfig{
+			ManualDealPublish:     false,
+			PublishMsgPeriod:      Duration(time.Hour),
+			MaxDealsPerPublishMsg: 8,
+			MaxPublishDealsFee:    types.MustParseFIL("0.05"),
 		},
 	}
 	return cfg

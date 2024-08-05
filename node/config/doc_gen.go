@@ -18,6 +18,44 @@ var Doc = map[string][]DocField{
 your node if metadata log is disabled`,
 		},
 	},
+	"BitswapRetrievalConfig": []DocField{
+		{
+			Name: "BitswapPeerID",
+			Type: "string",
+
+			Comment: `The libp2p peer id used by booster-bitswap.
+Run 'booster-bitswap init' to get the peer id.
+When BitswapPeerID is not empty boostd will:
+- listen on bitswap protocols on boostd's own peer id and proxy
+requests to booster-bitswap
+- advertise boostd's peer id in bitswap records to the content indexer
+(bitswap clients connect to boostd, which proxies the requests to
+booster-bitswap)
+- list bitswap as an available transport on the retrieval transport protocol`,
+		},
+		{
+			Name: "BitswapPublicAddresses",
+			Type: "[]string",
+
+			Comment: `Public multiaddresses for booster-bitswap.
+If empty
+- booster-bitswap is assumed to be running privately
+- boostd acts as a proxy: it listens on bitswap protocols on boostd's own
+peer id and forwards them to booster-bitswap
+If public addresses are set
+- boostd announces the booster-bitswap peer id to the indexer as an
+extended provider
+- clients make connections directly to the booster-bitswap process
+(boostd does not act as a proxy)`,
+		},
+		{
+			Name: "BitswapPrivKeyFile",
+			Type: "string",
+
+			Comment: `If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
+a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
+		},
+	},
 	"Boost": []DocField{
 		{
 			Name: "ConfigVersion",
@@ -46,6 +84,12 @@ your node if metadata log is disabled`,
 		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Dealpublish",
+			Type: "DealPublishConfig",
 
 			Comment: ``,
 		},
@@ -92,20 +136,8 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
-			Name: "LotusDealmaking",
-			Type: "lotus_config.DealmakingConfig",
-
-			Comment: `Lotus configs`,
-		},
-		{
-			Name: "LotusFees",
-			Type: "FeeConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "DAGStore",
-			Type: "lotus_config.DAGStoreConfig",
+			Name: "Retrievals",
+			Type: "RetrievalConfig",
 
 			Comment: ``,
 		},
@@ -160,6 +192,38 @@ your node if metadata log is disabled`,
 			Type: "string",
 
 			Comment: `From address for eth_ state call`,
+		},
+	},
+	"DealPublishConfig": []DocField{
+		{
+			Name: "ManualDealPublish",
+			Type: "bool",
+
+			Comment: `When set to true, the user is responsible for publishing deals manually.
+The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+ignored, and deals will remain in the pending state until manually published.`,
+		},
+		{
+			Name: "PublishMsgPeriod",
+			Type: "Duration",
+
+			Comment: `When a deal is ready to publish, the amount of time to wait for more
+deals to be ready to publish before publishing them all as a batch`,
+		},
+		{
+			Name: "MaxDealsPerPublishMsg",
+			Type: "uint64",
+
+			Comment: `The maximum number of deals to include in a single PublishStorageDeals
+message`,
+		},
+		{
+			Name: "MaxPublishDealsFee",
+			Type: "types.FIL",
+
+			Comment: `The maximum collateral that the provider will put up against a deal,
+as a multiplier of the minimum collateral bound
+The maximum fee to pay when sending the PublishStorageDeals message`,
 		},
 	},
 	"DealmakingConfig": []DocField{
@@ -268,51 +332,11 @@ Set this value to 0 to indicate there is no limit per host.`,
 			Comment: `The amount of time to keep deal proposal logs for before cleaning them up.`,
 		},
 		{
-			Name: "RetrievalLogDuration",
-			Type: "Duration",
-
-			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
-Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
-logs db is leveraged for pruning stalled retrievals.`,
-		},
-		{
-			Name: "StalledRetrievalTimeout",
-			Type: "Duration",
-
-			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
-		},
-		{
 			Name: "Filter",
 			Type: "string",
 
 			Comment: `A command used for fine-grained evaluation of storage deals
 see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalFilter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalPricing",
-			Type: "*lotus_config.RetrievalPricing",
-
-			Comment: ``,
-		},
-		{
-			Name: "BlockstoreCacheMaxShards",
-			Type: "int",
-
-			Comment: `The maximum number of shards cached by the Dagstore for retrieval
-Lower this limit if boostd memory is too high during retrievals`,
-		},
-		{
-			Name: "BlockstoreCacheExpiry",
-			Type: "Duration",
-
-			Comment: `How long a blockstore shard should be cached before expiring without use`,
 		},
 		{
 			Name: "IsUnsealedCacheExpiry",
@@ -341,70 +365,6 @@ Please note that this only works for v1.2.0 deals and not legacy deals`,
 boost process`,
 		},
 		{
-			Name: "HTTPRetrievalMultiaddr",
-			Type: "string",
-
-			Comment: `The public multi-address for retrieving deals with booster-http.
-Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
-		},
-		{
-			Name: "HttpTransferMaxConcurrentDownloads",
-			Type: "uint64",
-
-			Comment: `The maximum number of concurrent storage deal HTTP downloads.
-Note that this is a soft maximum; if some downloads stall,
-more downloads are allowed to start.`,
-		},
-		{
-			Name: "HttpTransferStallCheckPeriod",
-			Type: "Duration",
-
-			Comment: `The period between checking if downloads have stalled.`,
-		},
-		{
-			Name: "HttpTransferStallTimeout",
-			Type: "Duration",
-
-			Comment: `The time that can elapse before a download is considered stalled (and
-another concurrent download is allowed to start).`,
-		},
-		{
-			Name: "BitswapPeerID",
-			Type: "string",
-
-			Comment: `The libp2p peer id used by booster-bitswap.
-Run 'booster-bitswap init' to get the peer id.
-When BitswapPeerID is not empty boostd will:
-- listen on bitswap protocols on boostd's own peer id and proxy
-requests to booster-bitswap
-- advertise boostd's peer id in bitswap records to the content indexer
-(bitswap clients connect to boostd, which proxies the requests to
-booster-bitswap)
-- list bitswap as an available transport on the retrieval transport protocol`,
-		},
-		{
-			Name: "BitswapPublicAddresses",
-			Type: "[]string",
-
-			Comment: `Public multiaddresses for booster-bitswap.
-If empty
-- booster-bitswap is assumed to be running privately
-- boostd acts as a proxy: it listens on bitswap protocols on boostd's own
-peer id and forwards them to booster-bitswap
-If public addresses are set
-- boostd announces the booster-bitswap peer id to the indexer as an
-extended provider
-- clients make connections directly to the booster-bitswap process
-(boostd does not act as a proxy)`,
-		},
-		{
-			Name: "BitswapPrivKeyFile",
-			Type: "string",
-
-			Comment: `If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
-a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
-		},
-		{
 			Name: "DealLogDurationDays",
 			Type: "int",
 
@@ -427,44 +387,6 @@ Any value less than 0 will result in use of default`,
 accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
-		{
-			Name: "EnableLegacyStorageDeals",
-			Type: "bool",
-
-			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
-them disabled. These will be completely deprecated soon.`,
-		},
-		{
-			Name: "ManualDealPublish",
-			Type: "bool",
-
-			Comment: `When set to true, the user is responsible for publishing deals manually.
-The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
-ignored, and deals will remain in the pending state until manually published.`,
-		},
-		{
-			Name: "GraphsyncStorageAccessApiInfo",
-			Type: "[]string",
-
-			Comment: `The connect strings for the RPC APIs of each miner that boost can read
-sector data from when serving graphsync retrievals.
-If this parameter is not set, boost will serve data from the endpoint
-configured in SectorIndexApiInfo.`,
-		},
-	},
-	"FeeConfig": []DocField{
-		{
-			Name: "MaxPublishDealsFee",
-			Type: "types.FIL",
-
-			Comment: `The maximum fee to pay when sending the PublishStorageDeals message`,
-		},
-		{
-			Name: "MaxMarketBalanceAddFee",
-			Type: "types.FIL",
-
-			Comment: `The maximum fee to pay when sending the AddBalance message (used by legacy markets)`,
-		},
 	},
 	"GraphqlConfig": []DocField{
 		{
@@ -480,7 +402,75 @@ configured in SectorIndexApiInfo.`,
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
+	"GraphsyncRetrievalConfig": []DocField{
+		{
+			Name: "SimultaneousTransfersForRetrieval",
+			Type: "uint64",
+
+			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
+		},
+		{
+			Name: "RetrievalLogDuration",
+			Type: "Duration",
+
+			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
+Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+logs db is leveraged for pruning stalled retrievals.`,
+		},
+		{
+			Name: "StalledRetrievalTimeout",
+			Type: "Duration",
+
+			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
+		},
+		{
+			Name: "GraphsyncStorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from when serving graphsync retrievals.
+If this parameter is not set, boost will serve data from the endpoint
+configured in SectorIndexApiInfo.`,
+		},
+		{
+			Name: "RetrievalFilter",
+			Type: "string",
+
+			Comment: `A command used for fine-grained evaluation of retrieval deals
+see https://boost.filecoin.io/configuration/deal-filters for more details`,
+		},
+	},
+	"HTTPRetrievalConfig": []DocField{
+		{
+			Name: "HTTPRetrievalMultiaddr",
+			Type: "string",
+
+			Comment: `The public multi-address for retrieving deals with booster-http.
+Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
+		},
+	},
 	"HttpDownloadConfig": []DocField{
+		{
+			Name: "HttpTransferMaxConcurrentDownloads",
+			Type: "uint64",
+
+			Comment: `The maximum number of concurrent storage deal HTTP downloads.
+Note that this is a soft maximum; if some downloads stall,
+more downloads are allowed to start.`,
+		},
+		{
+			Name: "HttpTransferStallCheckPeriod",
+			Type: "Duration",
+
+			Comment: `The period between checking if downloads have stalled.`,
+		},
+		{
+			Name: "HttpTransferStallTimeout",
+			Type: "Duration",
+
+			Comment: `The time that can elapse before a download is considered stalled (and
+another concurrent download is allowed to start).`,
+		},
 		{
 			Name: "NChunks",
 			Type: "int",
@@ -672,6 +662,14 @@ Set this value to "" if the local index directory data service is embedded.`,
 
 			Comment: `PieceDoctor runs a continuous background process to check each piece in LID for retrievability`,
 		},
+		{
+			Name: "LidCleanupInterval",
+			Type: "Duration",
+
+			Comment: `Interval at which LID clean up job should rerun. The cleanup entails removing indices and metadata
+for the expired/slashed deals. Disabled if set to '0s'. Please DO NOT set a value lower than 6 hours
+as this task consumes considerable resources and time`,
+		},
 	},
 	"LocalIndexDirectoryLeveldbConfig": []DocField{
 		{
@@ -701,105 +699,6 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
 	},
-	"LotusDealmakingConfig": []DocField{
-		{
-			Name: "PieceCidBlocklist",
-			Type: "[]cid.Cid",
-
-			Comment: `A list of Data CIDs to reject when making deals`,
-		},
-		{
-			Name: "ExpectedSealDuration",
-			Type: "Duration",
-
-			Comment: `Maximum expected amount of time getting the deal into a sealed sector will take
-This includes the time the deal will need to get transferred and published
-before being assigned to a sector`,
-		},
-		{
-			Name: "MaxDealStartDelay",
-			Type: "Duration",
-
-			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
-		},
-		{
-			Name: "PublishMsgPeriod",
-			Type: "Duration",
-
-			Comment: `When a deal is ready to publish, the amount of time to wait for more
-deals to be ready to publish before publishing them all as a batch`,
-		},
-		{
-			Name: "MaxDealsPerPublishMsg",
-			Type: "uint64",
-
-			Comment: `The maximum number of deals to include in a single PublishStorageDeals
-message`,
-		},
-		{
-			Name: "MaxProviderCollateralMultiplier",
-			Type: "uint64",
-
-			Comment: `The maximum collateral that the provider will put up against a deal,
-as a multiplier of the minimum collateral bound`,
-		},
-		{
-			Name: "MaxStagingDealsBytes",
-			Type: "int64",
-
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
-		},
-		{
-			Name: "SimultaneousTransfersForStorage",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForStoragePerClient",
-			Type: "uint64",
-
-			Comment: `The maximum number of simultaneous data transfers from any single client
-for storage deals.
-Unset by default (0), and values higher than SimultaneousTransfersForStorage
-will have no effect; i.e. the total number of simultaneous data transfers
-across all storage clients is bound by SimultaneousTransfersForStorage
-regardless of this number.`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
-		},
-		{
-			Name: "StartEpochSealingBuffer",
-			Type: "uint64",
-
-			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
-		},
-		{
-			Name: "Filter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of storage deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalFilter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://boost.filecoin.io/configuration/deal-filters for more details`,
-		},
-		{
-			Name: "RetrievalPricing",
-			Type: "*lotus_config.RetrievalPricing",
-
-			Comment: ``,
-		},
-	},
 	"MonitoringConfig": []DocField{
 		{
 			Name: "MpoolAlertEpochs",
@@ -807,6 +706,26 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 
 			Comment: `The number of epochs after which alert is generated for a local pending
 message in lotus mpool`,
+		},
+	},
+	"RetrievalConfig": []DocField{
+		{
+			Name: "Graphsync",
+			Type: "GraphsyncRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Bitswap",
+			Type: "BitswapRetrievalConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "HTTP",
+			Type: "HTTPRetrievalConfig",
+
+			Comment: ``,
 		},
 	},
 	"StorageConfig": []DocField{
@@ -900,6 +819,22 @@ Must be a control or worker address of the miner.`,
 			Comment: ``,
 		},
 	},
+	"lotus_config.ApisConfig": []DocField{
+		{
+			Name: "ChainApiInfo",
+			Type: "[]string",
+
+			Comment: `ChainApiInfo is the API endpoint for the Lotus daemon.`,
+		},
+		{
+			Name: "StorageRPCSecret",
+			Type: "string",
+
+			Comment: `RPC Secret for the storage subsystem.
+If integrating with lotus-miner this must match the value from
+cat ~/.lotusminer/keystore/MF2XI2BNNJ3XILLQOJUXMYLUMU | jq -r .PrivateKey`,
+		},
+	},
 	"lotus_config.Backup": []DocField{
 		{
 			Name: "DisableMetadataLog",
@@ -937,54 +872,6 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.Client": []DocField{
-		{
-			Name: "UseIpfs",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsOnlineMode",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsMAddr",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "IpfsUseForRetrieval",
-			Type: "bool",
-
-			Comment: ``,
-		},
-		{
-			Name: "SimultaneousTransfersForStorage",
-			Type: "uint64",
-
-			Comment: `The maximum number of simultaneous data transfers between the client
-and storage providers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of simultaneous data transfers between the client
-and storage providers for retrieval deals`,
-		},
-		{
-			Name: "OffChainRetrieval",
-			Type: "bool",
-
-			Comment: `Require that retrievals perform no on-chain operations. Paid retrievals
-without existing payment channels with available funds will fail instead
-of automatically performing on-chain operations.`,
-		},
-	},
 	"lotus_config.Common": []DocField{
 		{
 			Name: "API",
@@ -1017,206 +904,65 @@ of automatically performing on-chain operations.`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.DAGStoreConfig": []DocField{
-		{
-			Name: "RootDir",
-			Type: "string",
-
-			Comment: `Path to the dagstore root directory. This directory contains three
-subdirectories, which can be symlinked to alternative locations if
-need be:
-- ./transients: caches unsealed deals that have been fetched from the
-storage subsystem for serving retrievals.
-- ./indices: stores shard indices.
-- ./datastore: holds the KV store tracking the state of every shard
-known to the DAG store.
-Default value: <LOTUS_MARKETS_PATH>/dagstore (split deployment) or
-<LOTUS_MINER_PATH>/dagstore (monolith deployment)`,
-		},
-		{
-			Name: "MaxConcurrentIndex",
-			Type: "int",
-
-			Comment: `The maximum amount of indexing jobs that can run simultaneously.
-0 means unlimited.
-Default value: 5.`,
-		},
-		{
-			Name: "MaxConcurrentReadyFetches",
-			Type: "int",
-
-			Comment: `The maximum amount of unsealed deals that can be fetched simultaneously
-from the storage subsystem. 0 means unlimited.
-Default value: 0 (unlimited).`,
-		},
-		{
-			Name: "MaxConcurrentUnseals",
-			Type: "int",
-
-			Comment: `The maximum amount of unseals that can be processed simultaneously
-from the storage subsystem. 0 means unlimited.
-Default value: 0 (unlimited).`,
-		},
-		{
-			Name: "MaxConcurrencyStorageCalls",
-			Type: "int",
-
-			Comment: `The maximum number of simultaneous inflight API calls to the storage
-subsystem.
-Default value: 100.`,
-		},
-		{
-			Name: "GCInterval",
-			Type: "Duration",
-
-			Comment: `The time between calls to periodic dagstore GC, in time.Duration string
-representation, e.g. 1m, 5m, 1h.
-Default value: 1 minute.`,
-		},
-	},
 	"lotus_config.DealmakingConfig": []DocField{
-		{
-			Name: "ConsiderOnlineStorageDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept online deals`,
-		},
-		{
-			Name: "ConsiderOfflineStorageDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept offline deals`,
-		},
-		{
-			Name: "ConsiderOnlineRetrievalDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept retrieval deals`,
-		},
-		{
-			Name: "ConsiderOfflineRetrievalDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept offline retrieval deals`,
-		},
-		{
-			Name: "ConsiderVerifiedStorageDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept verified deals`,
-		},
-		{
-			Name: "ConsiderUnverifiedStorageDeals",
-			Type: "bool",
-
-			Comment: `When enabled, the miner can accept unverified deals`,
-		},
-		{
-			Name: "PieceCidBlocklist",
-			Type: "[]cid.Cid",
-
-			Comment: `A list of Data CIDs to reject when making deals`,
-		},
-		{
-			Name: "ExpectedSealDuration",
-			Type: "Duration",
-
-			Comment: `Maximum expected amount of time getting the deal into a sealed sector will take
-This includes the time the deal will need to get transferred and published
-before being assigned to a sector`,
-		},
-		{
-			Name: "MaxDealStartDelay",
-			Type: "Duration",
-
-			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
-		},
-		{
-			Name: "PublishMsgPeriod",
-			Type: "Duration",
-
-			Comment: `When a deal is ready to publish, the amount of time to wait for more
-deals to be ready to publish before publishing them all as a batch`,
-		},
-		{
-			Name: "MaxDealsPerPublishMsg",
-			Type: "uint64",
-
-			Comment: `The maximum number of deals to include in a single PublishStorageDeals
-message`,
-		},
-		{
-			Name: "MaxProviderCollateralMultiplier",
-			Type: "uint64",
-
-			Comment: `The maximum collateral that the provider will put up against a deal,
-as a multiplier of the minimum collateral bound`,
-		},
-		{
-			Name: "MaxStagingDealsBytes",
-			Type: "int64",
-
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
-		},
-		{
-			Name: "SimultaneousTransfersForStorage",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForStoragePerClient",
-			Type: "uint64",
-
-			Comment: `The maximum number of simultaneous data transfers from any single client
-for storage deals.
-Unset by default (0), and values higher than SimultaneousTransfersForStorage
-will have no effect; i.e. the total number of simultaneous data transfers
-across all storage clients is bound by SimultaneousTransfersForStorage
-regardless of this number.`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
-		},
 		{
 			Name: "StartEpochSealingBuffer",
 			Type: "uint64",
 
 			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
 		},
-		{
-			Name: "Filter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of storage deals
-see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
-		},
-		{
-			Name: "RetrievalFilter",
-			Type: "string",
-
-			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
-		},
-		{
-			Name: "RetrievalPricing",
-			Type: "*RetrievalPricing",
-
-			Comment: ``,
-		},
 	},
-	"lotus_config.Events": []DocField{
+	"lotus_config.DeprecatedEvents": []DocField{
 		{
 			Name: "DisableRealTimeFilterAPI",
 			Type: "bool",
 
-			Comment: `EnableEthRPC enables APIs that
-DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
-The API is enabled when EnableEthRPC is true, but can be disabled selectively with this flag.`,
+			Comment: `DisableRealTimeFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableRealTimeFilterAPI instead.`,
+		},
+		{
+			Name: "DisableHistoricFilterAPI",
+			Type: "bool",
+
+			Comment: `DisableHistoricFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableHistoricFilterAPI instead.`,
+		},
+		{
+			Name: "FilterTTL",
+			Type: "Duration",
+
+			Comment: `FilterTTL is DEPRECATED and will be removed in a future release. Use Events.FilterTTL instead.`,
+		},
+		{
+			Name: "MaxFilters",
+			Type: "int",
+
+			Comment: `MaxFilters is DEPRECATED and will be removed in a future release. Use Events.MaxFilters instead.`,
+		},
+		{
+			Name: "MaxFilterResults",
+			Type: "int",
+
+			Comment: `MaxFilterResults is DEPRECATED and will be removed in a future release. Use Events.MaxFilterResults instead.`,
+		},
+		{
+			Name: "MaxFilterHeightRange",
+			Type: "uint64",
+
+			Comment: `MaxFilterHeightRange is DEPRECATED and will be removed in a future release. Use Events.MaxFilterHeightRange instead.`,
+		},
+		{
+			Name: "DatabasePath",
+			Type: "string",
+
+			Comment: `DatabasePath is DEPRECATED and will be removed in a future release. Use Events.DatabasePath instead.`,
+		},
+	},
+	"lotus_config.EventsConfig": []DocField{
+		{
+			Name: "DisableRealTimeFilterAPI",
+			Type: "bool",
+
+			Comment: `DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
+The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
 		},
 		{
 			Name: "DisableHistoricFilterAPI",
@@ -1224,7 +970,16 @@ The API is enabled when EnableEthRPC is true, but can be disabled selectively wi
 
 			Comment: `DisableHistoricFilterAPI will disable the HistoricFilterAPI that can create and query filters for actor events
 that occurred in the past. HistoricFilterAPI maintains a queryable index of events.
-The API is enabled when EnableEthRPC is true, but can be disabled selectively with this flag.`,
+The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
+		},
+		{
+			Name: "EnableActorEventsAPI",
+			Type: "bool",
+
+			Comment: `EnableActorEventsAPI enables the Actor events API that enables clients to consume events
+emitted by (smart contracts + built-in Actors).
+This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be
+disabled by setting their respective Disable* options.`,
 		},
 		{
 			Name: "FilterTTL",
@@ -1316,18 +1071,12 @@ Set to 0 to keep all mappings`,
 		},
 		{
 			Name: "Events",
-			Type: "Events",
+			Type: "DeprecatedEvents",
 
 			Comment: ``,
 		},
 	},
 	"lotus_config.FullNode": []DocField{
-		{
-			Name: "Client",
-			Type: "Client",
-
-			Comment: ``,
-		},
 		{
 			Name: "Wallet",
 			Type: "Wallet",
@@ -1347,14 +1096,14 @@ Set to 0 to keep all mappings`,
 			Comment: ``,
 		},
 		{
-			Name: "Cluster",
-			Type: "UserRaftConfig",
+			Name: "Fevm",
+			Type: "FevmConfig",
 
 			Comment: ``,
 		},
 		{
-			Name: "Fevm",
-			Type: "FevmConfig",
+			Name: "Events",
+			Type: "EventsConfig",
 
 			Comment: ``,
 		},
@@ -1371,6 +1120,39 @@ Set to 0 to keep all mappings`,
 			Comment: ``,
 		},
 	},
+	"lotus_config.HarmonyDB": []DocField{
+		{
+			Name: "Hosts",
+			Type: "[]string",
+
+			Comment: `HOSTS is a list of hostnames to nodes running YugabyteDB
+in a cluster. Only 1 is required`,
+		},
+		{
+			Name: "Username",
+			Type: "string",
+
+			Comment: `The Yugabyte server's username with full credentials to operate on Lotus' Database. Blank for default.`,
+		},
+		{
+			Name: "Password",
+			Type: "string",
+
+			Comment: `The password for the related username. Blank for default.`,
+		},
+		{
+			Name: "Database",
+			Type: "string",
+
+			Comment: `The database (logical partition) within Yugabyte. Blank for default.`,
+		},
+		{
+			Name: "Port",
+			Type: "string",
+
+			Comment: `The port to find Yugabyte. Blank for default.`,
+		},
+	},
 	"lotus_config.IndexConfig": []DocField{
 		{
 			Name: "EnableMsgIndex",
@@ -1380,49 +1162,18 @@ Set to 0 to keep all mappings`,
 EnableMsgIndex enables indexing of messages on chain.`,
 		},
 	},
-	"lotus_config.IndexProviderConfig": []DocField{
+	"lotus_config.JournalConfig": []DocField{
 		{
-			Name: "Enable",
-			Type: "bool",
+			Name: "//Events",
+			Type: "of",
 
-			Comment: `Enable set whether to enable indexing announcement to the network and expose endpoints that
-allow indexer nodes to process announcements. Enabled by default.`,
+			Comment: ``,
 		},
 		{
-			Name: "EntriesCacheCapacity",
-			Type: "int",
-
-			Comment: `EntriesCacheCapacity sets the maximum capacity to use for caching the indexing advertisement
-entries. Defaults to 1024 if not specified. The cache is evicted using LRU policy. The
-maximum storage used by the cache is a factor of EntriesCacheCapacity, EntriesChunkSize and
-the length of multihashes being advertised. For example, advertising 128-bit long multihashes
-with the default EntriesCacheCapacity, and EntriesChunkSize means the cache size can grow to
-256MiB when full.`,
-		},
-		{
-			Name: "EntriesChunkSize",
-			Type: "int",
-
-			Comment: `EntriesChunkSize sets the maximum number of multihashes to include in a single entries chunk.
-Defaults to 16384 if not specified. Note that chunks are chained together for indexing
-advertisements that include more multihashes than the configured EntriesChunkSize.`,
-		},
-		{
-			Name: "TopicName",
+			Name: "DisabledEvents",
 			Type: "string",
 
-			Comment: `TopicName sets the topic name on which the changes to the advertised content are announced.
-If not explicitly specified, the topic name is automatically inferred from the network name
-in following format: '/indexer/ingest/<network-name>'
-Defaults to empty, which implies the topic name is inferred from network name.`,
-		},
-		{
-			Name: "PurgeCacheOnStart",
-			Type: "bool",
-
-			Comment: `PurgeCacheOnStart sets whether to clear any cached entries chunks when the provider engine
-starts. By default, the cache is rehydrated from previously cached entries stored in
-datastore if any is present.`,
+			Comment: ``,
 		},
 	},
 	"lotus_config.Libp2p": []DocField{
@@ -1591,6 +1342,12 @@ over the worker address if this flag is set.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "MaximizeWindowPoStFeeCap",
+			Type: "bool",
+
+			Comment: ``,
+		},
 	},
 	"lotus_config.MinerSubsystemConfig": []DocField{
 		{
@@ -1612,10 +1369,12 @@ over the worker address if this flag is set.`,
 			Comment: ``,
 		},
 		{
-			Name: "EnableMarkets",
+			Name: "EnableSectorIndexDB",
 			Type: "bool",
 
-			Comment: ``,
+			Comment: `When enabled, the sector index will reside in an external database
+as opposed to the local KV store in the miner process
+This is useful to allow workers to bypass the lotus miner to access sector information`,
 		},
 		{
 			Name: "SealerApiInfo",
@@ -1628,6 +1387,31 @@ over the worker address if this flag is set.`,
 			Type: "string",
 
 			Comment: ``,
+		},
+		{
+			Name: "DisableWindowPoSt",
+			Type: "bool",
+
+			Comment: `When window post is enabled, the miner will automatically submit window post proofs
+for all sectors that are eligible for window post
+IF WINDOW POST IS DISABLED, THE MINER WILL NOT SUBMIT WINDOW POST PROOFS
+THIS WILL RESULT IN FAULTS AND PENALTIES IF NO OTHER MECHANISM IS RUNNING
+TO SUBMIT WINDOW POST PROOFS.
+Note: This option is entirely disabling the window post scheduler,
+not just the builtin PoSt computation like Proving.DisableBuiltinWindowPoSt.
+This option will stop lotus-miner from performing any actions related
+to window post, including scheduling, submitting proofs, and recovering
+sectors.`,
+		},
+		{
+			Name: "DisableWinningPoSt",
+			Type: "bool",
+
+			Comment: `When winning post is disabled, the miner process will NOT attempt to mine
+blocks. This should only be set when there's an external process mining
+blocks on behalf of the miner.
+When disabled and no external block producers are configured, all potential
+block rewards will be missed!`,
 		},
 	},
 	"lotus_config.ProvingConfig": []DocField{
@@ -1765,46 +1549,6 @@ This property is used only if ElasticSearchTracer propery is set.`,
 			Type: "string",
 
 			Comment: `Auth token that will be passed with logs to elasticsearch - used for weighted peers score.`,
-		},
-	},
-	"lotus_config.RetrievalPricing": []DocField{
-		{
-			Name: "Strategy",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "Default",
-			Type: "*RetrievalPricingDefault",
-
-			Comment: ``,
-		},
-		{
-			Name: "External",
-			Type: "*RetrievalPricingExternal",
-
-			Comment: ``,
-		},
-	},
-	"lotus_config.RetrievalPricingDefault": []DocField{
-		{
-			Name: "VerifiedDealsFreeTransfer",
-			Type: "bool",
-
-			Comment: `VerifiedDealsFreeTransfer configures zero fees for data transfer for a retrieval deal
-of a payloadCid that belongs to a verified storage deal.
-This parameter is ONLY applicable if the retrieval pricing policy strategy has been configured to "default".
-default value is true`,
-		},
-	},
-	"lotus_config.RetrievalPricingExternal": []DocField{
-		{
-			Name: "Path",
-			Type: "string",
-
-			Comment: `Path of the external script that will be run to price a retrieval deal.
-This parameter is ONLY applicable if the retrieval pricing policy strategy has been configured to "external".`,
 		},
 	},
 	"lotus_config.SealerConfig": []DocField{
@@ -2116,6 +1860,30 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 
 			Comment: `UseSyntheticPoRep, when set to true, will reduce the amount of cache data held on disk after the completion of PreCommit 2 to 11GiB.`,
 		},
+		{
+			Name: "RequireActivationSuccess",
+			Type: "bool",
+
+			Comment: `Whether to abort if any sector activation in a batch fails (newly sealed sectors, only with ProveCommitSectors3).`,
+		},
+		{
+			Name: "RequireActivationSuccessUpdate",
+			Type: "bool",
+
+			Comment: `Whether to abort if any piece activation notification returns a non-zero exit code (newly sealed sectors, only with ProveCommitSectors3).`,
+		},
+		{
+			Name: "RequireNotificationSuccess",
+			Type: "bool",
+
+			Comment: `Whether to abort if any sector activation in a batch fails (updating sectors, only with ProveReplicaUpdates3).`,
+		},
+		{
+			Name: "RequireNotificationSuccessUpdate",
+			Type: "bool",
+
+			Comment: `Whether to abort if any piece activation notification returns a non-zero exit code (updating sectors, only with ProveReplicaUpdates3).`,
+		},
 	},
 	"lotus_config.Splitstore": []DocField{
 		{
@@ -2123,7 +1891,7 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 			Type: "string",
 
 			Comment: `ColdStoreType specifies the type of the coldstore.
-It can be "messages" (default) to store only messages, "universal" to store all chain state or "discard" for discarding cold blocks.`,
+It can be "discard" (default) for discarding cold blocks, "messages" to store only messages or "universal" to store all chain state..`,
 		},
 		{
 			Name: "HotStoreType",
@@ -2198,12 +1966,6 @@ HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 			Comment: ``,
 		},
 		{
-			Name: "IndexProvider",
-			Type: "IndexProviderConfig",
-
-			Comment: ``,
-		},
-		{
 			Name: "Proving",
 			Type: "ProvingConfig",
 
@@ -2234,72 +1996,10 @@ HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 			Comment: ``,
 		},
 		{
-			Name: "DAGStore",
-			Type: "DAGStoreConfig",
+			Name: "HarmonyDB",
+			Type: "HarmonyDB",
 
 			Comment: ``,
-		},
-	},
-	"lotus_config.UserRaftConfig": []DocField{
-		{
-			Name: "ClusterModeEnabled",
-			Type: "bool",
-
-			Comment: `EXPERIMENTAL. config to enabled node cluster with raft consensus`,
-		},
-		{
-			Name: "DataFolder",
-			Type: "string",
-
-			Comment: `A folder to store Raft's data.`,
-		},
-		{
-			Name: "InitPeersetMultiAddr",
-			Type: "[]string",
-
-			Comment: `InitPeersetMultiAddr provides the list of initial cluster peers for new Raft
-peers (with no prior state). It is ignored when Raft was already
-initialized or when starting in staging mode.`,
-		},
-		{
-			Name: "WaitForLeaderTimeout",
-			Type: "Duration",
-
-			Comment: `LeaderTimeout specifies how long to wait for a leader before
-failing an operation.`,
-		},
-		{
-			Name: "NetworkTimeout",
-			Type: "Duration",
-
-			Comment: `NetworkTimeout specifies how long before a Raft network
-operation is timed out`,
-		},
-		{
-			Name: "CommitRetries",
-			Type: "int",
-
-			Comment: `CommitRetries specifies how many times we retry a failed commit until
-we give up.`,
-		},
-		{
-			Name: "CommitRetryDelay",
-			Type: "Duration",
-
-			Comment: `How long to wait between retries`,
-		},
-		{
-			Name: "BackupsRotate",
-			Type: "int",
-
-			Comment: `BackupsRotate specifies the maximum number of Raft's DataFolder
-copies that we keep as backups (renaming) after cleanup.`,
-		},
-		{
-			Name: "Tracing",
-			Type: "bool",
-
-			Comment: `Tracing enables propagation of contexts across binary boundaries.`,
 		},
 	},
 	"lotus_config.Wallet": []DocField{

@@ -3,15 +3,16 @@ package sectoraccessor
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
+	"github.com/filecoin-project/boost/lib/sa"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/jellydator/ttlcache/v2"
-	"sync"
-	"time"
 )
 
 // sync.Mutex uses 8 bytes of memory
@@ -20,7 +21,7 @@ const stripedLockSize = 16 * 1024
 
 // CachingSectorAccessor caches calls to isUnsealed
 type CachingSectorAccessor struct {
-	dagstore.SectorAccessor
+	sa.SectorAccessor
 	cache       *ttlcache.Cache
 	stripedLock [stripedLockSize]sync.Mutex
 }
@@ -56,10 +57,10 @@ func (c *CachingSectorAccessor) IsUnsealed(ctx context.Context, sectorID abi.Sec
 	return isUnsealed, err
 }
 
-type SectorAccessorConstructor func(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) dagstore.SectorAccessor
+type SectorAccessorConstructor func(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) sa.SectorAccessor
 
 func NewCachingSectorAccessor(maxCacheSize int, cacheExpire time.Duration) SectorAccessorConstructor {
-	return func(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) dagstore.SectorAccessor {
+	return func(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) sa.SectorAccessor {
 		sa := NewSectorAccessor(maddr, secb, pp, full)
 		cache := ttlcache.NewCache()
 		_ = cache.SetTTL(cacheExpire)

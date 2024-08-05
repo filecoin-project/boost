@@ -13,11 +13,12 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	saccessor "github.com/filecoin-project/boost/lib/sa"
+	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/dagstore/mount"
@@ -25,12 +26,11 @@ import (
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -44,7 +44,7 @@ import (
 
 var (
 	dr          *DisasterRecovery
-	sa          dagstore.SectorAccessor
+	sa          saccessor.SectorAccessor
 	fullnodeApi v1api.FullNode
 	minerApi    api.StorageMiner
 	pd          *piecedirectory.PieceDirectory
@@ -218,7 +218,12 @@ func action(cctx *cli.Context) error {
 		return err
 	}
 
-	sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, types.EmptyTSK)
+	head, err := fullnodeApi.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
+
+	sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, head.Key())
 	if err != nil {
 		return err
 	}
@@ -234,6 +239,11 @@ func action(cctx *cli.Context) error {
 
 		// ignore sector 0
 		if info.SectorNumber == abi.SectorNumber(0) {
+			continue
+		}
+
+		if info.Expiration < head.Height() {
+			logger.Infof("ignoring expired sector %d", info.SectorNumber)
 			continue
 		}
 
@@ -257,7 +267,7 @@ func action(cctx *cli.Context) error {
 			continue
 		}
 
-		ok, isUnsealed, err := processSector(ctx, info)
+		ok, isUnsealed, err := processSector(ctx, head.Key(), info)
 		if err != nil {
 			return err
 		}
@@ -536,6 +546,14 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	cdi := uint64(chainDealID)
 	sid := uint64(sectorid)
 
+	// Ensure the SectorStatus and PieceStatus maps are initialized
+	if dr.Sectors[sid] == nil {
+		dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
+	}
+	if dr.Sectors[sid].Deals == nil {
+		dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
+	}
+
 	dr.Sectors[sid].Deals[cdi] = &PieceStatus{
 		PieceCID:    piececid,
 		PieceSize:   piecesize,
@@ -543,10 +561,10 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		IsUnsealed:  false,
 	}
 
-	if dr.HaveBoostDealsAndPieceStore { // sanity check on piece store / piece info vs chain data and infered piece size / offset data
+	if dr.HaveBoostDealsAndPieceStore { // sanity check on piece store / piece info vs chain data and inferred piece size / offset data
 		pi, err := ps.GetPieceInfo(piececid)
 		if err != nil {
-			logger.Errorw("cant get piece info from piece store", "piececid", piececid, "sector", sid, "err", err)
+			logger.Errorw("can't get piece info from piece store", "piececid", piececid, "sector", sid, "err", err)
 		} else {
 			var found bool
 			for _, di := range pi.Deals {
@@ -580,7 +598,11 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func() {
+		if reader != nil {
+			reader.Close()
+		}
+	}()
 	if !isUnsealed {
 		return fmt.Errorf("sector %d is not unsealed", sid)
 	}
@@ -599,8 +621,8 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 			uuid, okBoost := dr.BoostDeals[chainDealID]
 
 			if !okLegacy && !okBoost {
-				logger.Errorw("cant find boost deal or legacy deal",
-					"piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+				logger.Errorw("can't find boost deal or legacy deal",
+					"piececid", piececid, "chain-deal-id", chainDealID)
 
 				shouldGenerateNewDeal = true
 			} else {
@@ -640,7 +662,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 
 		err = pd.AddDealForPiece(ctx, piececid, di)
 		if err != nil {
-			logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+			logger.Errorw("can't add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
 
 			return err
 		}
@@ -664,14 +686,14 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		_ = encoder
 
 		if !commp.PieceCID.Equals(piececid) {
-			return fmt.Errorf("calculated commp doesnt match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
+			return fmt.Errorf("calculated commp doesn't match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
 		}
 	}
 
 	return nil
 }
 
-func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
+func processSector(ctx context.Context, key types.TipSetKey, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
 	logger.Debugw("processing sector", "sector", info.SectorNumber, "deals", info.DealIDs)
 
 	sectorid := info.SectorNumber
@@ -679,7 +701,18 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 
 	var gotErr bool
 
-	defer func(start time.Time) {
+	// Ensure the SectorStatus map is initialized
+	if dr.Sectors[sid] == nil {
+		dr.Sectors[sid] = &SectorStatus{Deals: make(map[uint64]*PieceStatus)}
+	}
+	if dr.Sectors[sid].Deals == nil {
+		dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
+	}
+
+	// Start time for deferred function
+	start := time.Now()
+
+	defer func() {
 		took := time.Since(start)
 		dr.Sectors[sid].ProcessingTook = took
 		if gotErr {
@@ -687,18 +720,16 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		} else {
 			logger.Debugw("successfully processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
 		}
-	}(time.Now())
+	}()
 
 	err := dr.MarkSectorInProgress(sectorid)
 	if err != nil {
 		return false, false, err
 	}
 
-	dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
-
 	nextoffset := uint64(0)
 	for _, did := range info.DealIDs {
-		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, types.EmptyTSK)
+		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, key)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				logger.Warnw("deal present in sector, but not in market actor state, so probably expired", "sector", sectorid, "deal", did, "err", err)
@@ -727,6 +758,9 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
 		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
 		if err != nil {
+			if dr.Sectors[sid].Deals[uint64(did)] == nil {
+				dr.Sectors[sid].Deals[uint64(did)] = &PieceStatus{}
+			}
 			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
 			dr.PieceErrors++
 			gotErr = true

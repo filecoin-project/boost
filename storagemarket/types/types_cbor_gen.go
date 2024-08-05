@@ -33,7 +33,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Miner (address.Address) (struct)
-	if len("Miner") > cbg.MaxLength {
+	if len("Miner") > 8192 {
 		return xerrors.Errorf("Value in field \"Miner\" was too long")
 	}
 
@@ -49,7 +49,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Price (big.Int) (struct)
-	if len("Price") > cbg.MaxLength {
+	if len("Price") > 8192 {
 		return xerrors.Errorf("Value in field \"Price\" was too long")
 	}
 
@@ -65,7 +65,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.MaxPieceSize (abi.PaddedPieceSize) (uint64)
-	if len("MaxPieceSize") > cbg.MaxLength {
+	if len("MaxPieceSize") > 8192 {
 		return xerrors.Errorf("Value in field \"MaxPieceSize\" was too long")
 	}
 
@@ -81,7 +81,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.MinPieceSize (abi.PaddedPieceSize) (uint64)
-	if len("MinPieceSize") > cbg.MaxLength {
+	if len("MinPieceSize") > 8192 {
 		return xerrors.Errorf("Value in field \"MinPieceSize\" was too long")
 	}
 
@@ -97,7 +97,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.VerifiedPrice (big.Int) (struct)
-	if len("VerifiedPrice") > cbg.MaxLength {
+	if len("VerifiedPrice") > 8192 {
 		return xerrors.Errorf("Value in field \"VerifiedPrice\" was too long")
 	}
 
@@ -143,7 +143,7 @@ func (t *StorageAsk) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -234,7 +234,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealUUID (uuid.UUID) (array)
-	if len("DealUUID") > cbg.MaxLength {
+	if len("DealUUID") > 8192 {
 		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
 	}
 
@@ -245,7 +245,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+	if len(t.DealUUID) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
 	}
 
@@ -258,7 +258,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Transfer (types.Transfer) (struct)
-	if len("Transfer") > cbg.MaxLength {
+	if len("Transfer") > 8192 {
 		return xerrors.Errorf("Value in field \"Transfer\" was too long")
 	}
 
@@ -274,7 +274,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.IsOffline (bool) (bool)
-	if len("IsOffline") > cbg.MaxLength {
+	if len("IsOffline") > 8192 {
 		return xerrors.Errorf("Value in field \"IsOffline\" was too long")
 	}
 
@@ -290,7 +290,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealDataRoot (cid.Cid) (struct)
-	if len("DealDataRoot") > cbg.MaxLength {
+	if len("DealDataRoot") > 8192 {
 		return xerrors.Errorf("Value in field \"DealDataRoot\" was too long")
 	}
 
@@ -306,7 +306,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.ClientDealProposal (market.ClientDealProposal) (struct)
-	if len("ClientDealProposal") > cbg.MaxLength {
+	if len("ClientDealProposal") > 8192 {
 		return xerrors.Errorf("Value in field \"ClientDealProposal\" was too long")
 	}
 
@@ -352,7 +352,7 @@ func (t *DealParamsV120) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -369,19 +369,17 @@ func (t *DealParamsV120) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -458,7 +456,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealUUID (uuid.UUID) (array)
-	if len("DealUUID") > cbg.MaxLength {
+	if len("DealUUID") > 8192 {
 		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
 	}
 
@@ -469,7 +467,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+	if len(t.DealUUID) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
 	}
 
@@ -482,7 +480,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Transfer (types.Transfer) (struct)
-	if len("Transfer") > cbg.MaxLength {
+	if len("Transfer") > 8192 {
 		return xerrors.Errorf("Value in field \"Transfer\" was too long")
 	}
 
@@ -498,7 +496,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.IsOffline (bool) (bool)
-	if len("IsOffline") > cbg.MaxLength {
+	if len("IsOffline") > 8192 {
 		return xerrors.Errorf("Value in field \"IsOffline\" was too long")
 	}
 
@@ -514,7 +512,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealDataRoot (cid.Cid) (struct)
-	if len("DealDataRoot") > cbg.MaxLength {
+	if len("DealDataRoot") > 8192 {
 		return xerrors.Errorf("Value in field \"DealDataRoot\" was too long")
 	}
 
@@ -530,7 +528,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.SkipIPNIAnnounce (bool) (bool)
-	if len("SkipIPNIAnnounce") > cbg.MaxLength {
+	if len("SkipIPNIAnnounce") > 8192 {
 		return xerrors.Errorf("Value in field \"SkipIPNIAnnounce\" was too long")
 	}
 
@@ -546,7 +544,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.ClientDealProposal (market.ClientDealProposal) (struct)
-	if len("ClientDealProposal") > cbg.MaxLength {
+	if len("ClientDealProposal") > 8192 {
 		return xerrors.Errorf("Value in field \"ClientDealProposal\" was too long")
 	}
 
@@ -562,7 +560,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.RemoveUnsealedCopy (bool) (bool)
-	if len("RemoveUnsealedCopy") > cbg.MaxLength {
+	if len("RemoveUnsealedCopy") > 8192 {
 		return xerrors.Errorf("Value in field \"RemoveUnsealedCopy\" was too long")
 	}
 
@@ -608,7 +606,7 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -625,19 +623,17 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -750,7 +746,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealUUID (uuid.UUID) (array)
-	if len("DealUUID") > cbg.MaxLength {
+	if len("DealUUID") > 8192 {
 		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
 	}
 
@@ -761,7 +757,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+	if len(t.DealUUID) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
 	}
 
@@ -774,7 +770,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.EndEpoch (abi.ChainEpoch) (int64)
-	if len("EndEpoch") > cbg.MaxLength {
+	if len("EndEpoch") > 8192 {
 		return xerrors.Errorf("Value in field \"EndEpoch\" was too long")
 	}
 
@@ -796,7 +792,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.FilePath (string) (string)
-	if len("FilePath") > cbg.MaxLength {
+	if len("FilePath") > 8192 {
 		return xerrors.Errorf("Value in field \"FilePath\" was too long")
 	}
 
@@ -807,7 +803,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.FilePath) > cbg.MaxLength {
+	if len(t.FilePath) > 8192 {
 		return xerrors.Errorf("Value in field t.FilePath was too long")
 	}
 
@@ -819,7 +815,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.PieceCid (cid.Cid) (struct)
-	if len("PieceCid") > cbg.MaxLength {
+	if len("PieceCid") > 8192 {
 		return xerrors.Errorf("Value in field \"PieceCid\" was too long")
 	}
 
@@ -835,7 +831,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.ClientAddr (address.Address) (struct)
-	if len("ClientAddr") > cbg.MaxLength {
+	if len("ClientAddr") > 8192 {
 		return xerrors.Errorf("Value in field \"ClientAddr\" was too long")
 	}
 
@@ -851,7 +847,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.StartEpoch (abi.ChainEpoch) (int64)
-	if len("StartEpoch") > cbg.MaxLength {
+	if len("StartEpoch") > 8192 {
 		return xerrors.Errorf("Value in field \"StartEpoch\" was too long")
 	}
 
@@ -873,7 +869,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.AllocationID (verifreg.AllocationId) (uint64)
-	if len("AllocationID") > cbg.MaxLength {
+	if len("AllocationID") > 8192 {
 		return xerrors.Errorf("Value in field \"AllocationID\" was too long")
 	}
 
@@ -889,7 +885,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.SkipIPNIAnnounce (bool) (bool)
-	if len("SkipIPNIAnnounce") > cbg.MaxLength {
+	if len("SkipIPNIAnnounce") > 8192 {
 		return xerrors.Errorf("Value in field \"SkipIPNIAnnounce\" was too long")
 	}
 
@@ -905,7 +901,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DeleteAfterImport (bool) (bool)
-	if len("DeleteAfterImport") > cbg.MaxLength {
+	if len("DeleteAfterImport") > 8192 {
 		return xerrors.Errorf("Value in field \"DeleteAfterImport\" was too long")
 	}
 
@@ -921,7 +917,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.RemoveUnsealedCopy (bool) (bool)
-	if len("RemoveUnsealedCopy") > cbg.MaxLength {
+	if len("RemoveUnsealedCopy") > 8192 {
 		return xerrors.Errorf("Value in field \"RemoveUnsealedCopy\" was too long")
 	}
 
@@ -967,7 +963,7 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -984,19 +980,17 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -1004,10 +998,10 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 		case "EndEpoch":
 			{
 				maj, extra, err := cr.ReadHeader()
-				var extraI int64
 				if err != nil {
 					return err
 				}
+				var extraI int64
 				switch maj {
 				case cbg.MajUnsignedInt:
 					extraI = int64(extra)
@@ -1030,7 +1024,7 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 		case "FilePath":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -1064,10 +1058,10 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 		case "StartEpoch":
 			{
 				maj, extra, err := cr.ReadHeader()
-				var extraI int64
 				if err != nil {
 					return err
 				}
+				var extraI int64
 				switch maj {
 				case cbg.MajUnsignedInt:
 					extraI = int64(extra)
@@ -1177,7 +1171,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Size (uint64) (uint64)
-	if len("Size") > cbg.MaxLength {
+	if len("Size") > 8192 {
 		return xerrors.Errorf("Value in field \"Size\" was too long")
 	}
 
@@ -1193,7 +1187,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Type (string) (string)
-	if len("Type") > cbg.MaxLength {
+	if len("Type") > 8192 {
 		return xerrors.Errorf("Value in field \"Type\" was too long")
 	}
 
@@ -1204,7 +1198,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Type) > cbg.MaxLength {
+	if len(t.Type) > 8192 {
 		return xerrors.Errorf("Value in field t.Type was too long")
 	}
 
@@ -1216,7 +1210,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Params ([]uint8) (slice)
-	if len("Params") > cbg.MaxLength {
+	if len("Params") > 8192 {
 		return xerrors.Errorf("Value in field \"Params\" was too long")
 	}
 
@@ -1227,7 +1221,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Params) > cbg.ByteArrayMaxLen {
+	if len(t.Params) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.Params was too long")
 	}
 
@@ -1235,12 +1229,12 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if _, err := cw.Write(t.Params[:]); err != nil {
+	if _, err := cw.Write(t.Params); err != nil {
 		return err
 	}
 
 	// t.ClientID (string) (string)
-	if len("ClientID") > cbg.MaxLength {
+	if len("ClientID") > 8192 {
 		return xerrors.Errorf("Value in field \"ClientID\" was too long")
 	}
 
@@ -1251,7 +1245,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.ClientID) > cbg.MaxLength {
+	if len(t.ClientID) > 8192 {
 		return xerrors.Errorf("Value in field t.ClientID was too long")
 	}
 
@@ -1293,7 +1287,7 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -1321,7 +1315,7 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) (err error) {
 		case "Type":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -1336,7 +1330,7 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.Params: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
@@ -1347,14 +1341,15 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) (err error) {
 				t.Params = make([]uint8, extra)
 			}
 
-			if _, err := io.ReadFull(cr, t.Params[:]); err != nil {
+			if _, err := io.ReadFull(cr, t.Params); err != nil {
 				return err
 			}
+
 			// t.ClientID (string) (string)
 		case "ClientID":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -1383,7 +1378,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Message (string) (string)
-	if len("Message") > cbg.MaxLength {
+	if len("Message") > 8192 {
 		return xerrors.Errorf("Value in field \"Message\" was too long")
 	}
 
@@ -1394,7 +1389,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Message) > cbg.MaxLength {
+	if len(t.Message) > 8192 {
 		return xerrors.Errorf("Value in field t.Message was too long")
 	}
 
@@ -1406,7 +1401,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Accepted (bool) (bool)
-	if len("Accepted") > cbg.MaxLength {
+	if len("Accepted") > 8192 {
 		return xerrors.Errorf("Value in field \"Accepted\" was too long")
 	}
 
@@ -1452,7 +1447,7 @@ func (t *DealResponse) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -1465,7 +1460,7 @@ func (t *DealResponse) UnmarshalCBOR(r io.Reader) (err error) {
 		case "Message":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -1512,7 +1507,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealUUID (uuid.UUID) (array)
-	if len("DealUUID") > cbg.MaxLength {
+	if len("DealUUID") > 8192 {
 		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
 	}
 
@@ -1523,7 +1518,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+	if len(t.DealUUID) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
 	}
 
@@ -1536,7 +1531,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Signature (crypto.Signature) (struct)
-	if len("Signature") > cbg.MaxLength {
+	if len("Signature") > 8192 {
 		return xerrors.Errorf("Value in field \"Signature\" was too long")
 	}
 
@@ -1582,7 +1577,7 @@ func (t *DealStatusRequest) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -1599,19 +1594,17 @@ func (t *DealStatusRequest) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -1647,7 +1640,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Error (string) (string)
-	if len("Error") > cbg.MaxLength {
+	if len("Error") > 8192 {
 		return xerrors.Errorf("Value in field \"Error\" was too long")
 	}
 
@@ -1658,7 +1651,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Error) > cbg.MaxLength {
+	if len(t.Error) > 8192 {
 		return xerrors.Errorf("Value in field t.Error was too long")
 	}
 
@@ -1670,7 +1663,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealUUID (uuid.UUID) (array)
-	if len("DealUUID") > cbg.MaxLength {
+	if len("DealUUID") > 8192 {
 		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
 	}
 
@@ -1681,7 +1674,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+	if len(t.DealUUID) > 2097152 {
 		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
 	}
 
@@ -1694,7 +1687,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.IsOffline (bool) (bool)
-	if len("IsOffline") > cbg.MaxLength {
+	if len("IsOffline") > 8192 {
 		return xerrors.Errorf("Value in field \"IsOffline\" was too long")
 	}
 
@@ -1710,7 +1703,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.DealStatus (types.DealStatus) (struct)
-	if len("DealStatus") > cbg.MaxLength {
+	if len("DealStatus") > 8192 {
 		return xerrors.Errorf("Value in field \"DealStatus\" was too long")
 	}
 
@@ -1726,7 +1719,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.TransferSize (uint64) (uint64)
-	if len("TransferSize") > cbg.MaxLength {
+	if len("TransferSize") > 8192 {
 		return xerrors.Errorf("Value in field \"TransferSize\" was too long")
 	}
 
@@ -1742,7 +1735,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.NBytesReceived (uint64) (uint64)
-	if len("NBytesReceived") > cbg.MaxLength {
+	if len("NBytesReceived") > 8192 {
 		return xerrors.Errorf("Value in field \"NBytesReceived\" was too long")
 	}
 
@@ -1789,7 +1782,7 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -1802,7 +1795,7 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) (err error) {
 		case "Error":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -1817,19 +1810,17 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) (err error) {
 				return err
 			}
 
-			if extra > cbg.ByteArrayMaxLen {
+			if extra > 2097152 {
 				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
 			}
 			if maj != cbg.MajByteString {
 				return fmt.Errorf("expected byte array")
 			}
-
 			if extra != 16 {
 				return fmt.Errorf("expected array to have 16 elements")
 			}
 
 			t.DealUUID = [16]uint8{}
-
 			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
 				return err
 			}
@@ -1923,7 +1914,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Error (string) (string)
-	if len("Error") > cbg.MaxLength {
+	if len("Error") > 8192 {
 		return xerrors.Errorf("Value in field \"Error\" was too long")
 	}
 
@@ -1934,7 +1925,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Error) > cbg.MaxLength {
+	if len(t.Error) > 8192 {
 		return xerrors.Errorf("Value in field t.Error was too long")
 	}
 
@@ -1946,7 +1937,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Status (string) (string)
-	if len("Status") > cbg.MaxLength {
+	if len("Status") > 8192 {
 		return xerrors.Errorf("Value in field \"Status\" was too long")
 	}
 
@@ -1957,7 +1948,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.Status) > cbg.MaxLength {
+	if len(t.Status) > 8192 {
 		return xerrors.Errorf("Value in field t.Status was too long")
 	}
 
@@ -1969,7 +1960,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Proposal (market.DealProposal) (struct)
-	if len("Proposal") > cbg.MaxLength {
+	if len("Proposal") > 8192 {
 		return xerrors.Errorf("Value in field \"Proposal\" was too long")
 	}
 
@@ -1985,7 +1976,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.PublishCid (cid.Cid) (struct)
-	if len("PublishCid") > cbg.MaxLength {
+	if len("PublishCid") > 8192 {
 		return xerrors.Errorf("Value in field \"PublishCid\" was too long")
 	}
 
@@ -2007,7 +1998,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.ChainDealID (abi.DealID) (uint64)
-	if len("ChainDealID") > cbg.MaxLength {
+	if len("ChainDealID") > 8192 {
 		return xerrors.Errorf("Value in field \"ChainDealID\" was too long")
 	}
 
@@ -2023,7 +2014,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.SealingStatus (string) (string)
-	if len("SealingStatus") > cbg.MaxLength {
+	if len("SealingStatus") > 8192 {
 		return xerrors.Errorf("Value in field \"SealingStatus\" was too long")
 	}
 
@@ -2034,7 +2025,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if len(t.SealingStatus) > cbg.MaxLength {
+	if len(t.SealingStatus) > 8192 {
 		return xerrors.Errorf("Value in field t.SealingStatus was too long")
 	}
 
@@ -2046,7 +2037,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.SignedProposalCid (cid.Cid) (struct)
-	if len("SignedProposalCid") > cbg.MaxLength {
+	if len("SignedProposalCid") > 8192 {
 		return xerrors.Errorf("Value in field \"SignedProposalCid\" was too long")
 	}
 
@@ -2093,7 +2084,7 @@ func (t *DealStatus) UnmarshalCBOR(r io.Reader) (err error) {
 	for i := uint64(0); i < n; i++ {
 
 		{
-			sval, err := cbg.ReadString(cr)
+			sval, err := cbg.ReadStringWithMax(cr, 8192)
 			if err != nil {
 				return err
 			}
@@ -2106,7 +2097,7 @@ func (t *DealStatus) UnmarshalCBOR(r io.Reader) (err error) {
 		case "Error":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -2117,7 +2108,7 @@ func (t *DealStatus) UnmarshalCBOR(r io.Reader) (err error) {
 		case "Status":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}
@@ -2176,7 +2167,7 @@ func (t *DealStatus) UnmarshalCBOR(r io.Reader) (err error) {
 		case "SealingStatus":
 
 			{
-				sval, err := cbg.ReadString(cr)
+				sval, err := cbg.ReadStringWithMax(cr, 8192)
 				if err != nil {
 					return err
 				}

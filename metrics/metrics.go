@@ -87,6 +87,19 @@ var (
 	GraphsyncRequestBytesSentPaidCount          = stats.Int64("graphsync/request_bytes_sent_paid_count", "Counter of Graphsync paid bytes sent", stats.UnitBytes)
 	GraphsyncRequestBytesSentUnpaidCount        = stats.Int64("graphsync/request_bytes_sent_unpaid_count", "Counter of Graphsync unpaid bytes sent", stats.UnitBytes)
 	GraphsyncRequestNetworkErrorCount           = stats.Int64("graphsync/request_network_error_count", "Counter of Graphsync network errors", stats.UnitDimensionless)
+	GraphsyncReceivingPeersCount                = stats.Int64("graphsync/receiving_peers", "number of peers we are receiving graphsync data from", stats.UnitDimensionless)
+	GraphsyncReceivingActiveCount               = stats.Int64("graphsync/receiving_active", "number of active receiving graphsync transfers", stats.UnitDimensionless)
+	GraphsyncReceivingCountCount                = stats.Int64("graphsync/receiving_pending", "number of pending receiving graphsync transfers", stats.UnitDimensionless)
+	GraphsyncReceivingTotalMemoryAllocated      = stats.Int64("graphsync/receiving_total_allocated", "amount of block memory allocated for receiving graphsync data", stats.UnitBytes)
+	GraphsyncReceivingTotalPendingAllocations   = stats.Int64("graphsync/receiving_pending_allocations", "amount of block memory on hold being received pending allocation", stats.UnitBytes)
+	GraphsyncReceivingPeersPending              = stats.Int64("graphsync/receiving_peers_pending", "number of peers we can't receive more data from cause of pending allocations", stats.UnitDimensionless)
+
+	GraphsyncSendingPeersCount              = stats.Int64("graphsync/sending_peers", "number of peers we are sending graphsync data to", stats.UnitDimensionless)
+	GraphsyncSendingActiveCount             = stats.Int64("graphsync/sending_active", "number of active sending graphsync transfers", stats.UnitDimensionless)
+	GraphsyncSendingCountCount              = stats.Int64("graphsync/sending_pending", "number of pending sending graphsync transfers", stats.UnitDimensionless)
+	GraphsyncSendingTotalMemoryAllocated    = stats.Int64("graphsync/sending_total_allocated", "amount of block memory allocated for sending graphsync data", stats.UnitBytes)
+	GraphsyncSendingTotalPendingAllocations = stats.Int64("graphsync/sending_pending_allocations", "amount of block memory on hold from sending pending allocation", stats.UnitBytes)
+	GraphsyncSendingPeersPending            = stats.Int64("graphsync/sending_peers_pending", "number of peers we can't send more data to cause of pending allocations", stats.UnitDimensionless)
 )
 
 var (
@@ -304,6 +317,54 @@ var (
 		Measure:     GraphsyncRequestNetworkErrorCount,
 		Aggregation: view.Count(),
 	}
+	GraphsyncReceivingPeersCountView = &view.View{
+		Measure:     GraphsyncReceivingPeersCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncReceivingActiveCountView = &view.View{
+		Measure:     GraphsyncReceivingActiveCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncReceivingCountCountView = &view.View{
+		Measure:     GraphsyncReceivingCountCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncReceivingTotalMemoryAllocatedView = &view.View{
+		Measure:     GraphsyncReceivingTotalMemoryAllocated,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncReceivingTotalPendingAllocationsView = &view.View{
+		Measure:     GraphsyncReceivingTotalPendingAllocations,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncReceivingPeersPendingView = &view.View{
+		Measure:     GraphsyncReceivingPeersPending,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingPeersCountView = &view.View{
+		Measure:     GraphsyncSendingPeersCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingActiveCountView = &view.View{
+		Measure:     GraphsyncSendingActiveCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingCountCountView = &view.View{
+		Measure:     GraphsyncSendingCountCount,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingTotalMemoryAllocatedView = &view.View{
+		Measure:     GraphsyncSendingTotalMemoryAllocated,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingTotalPendingAllocationsView = &view.View{
+		Measure:     GraphsyncSendingTotalPendingAllocations,
+		Aggregation: view.LastValue(),
+	}
+	GraphsyncSendingPeersPendingView = &view.View{
+		Measure:     GraphsyncSendingPeersPending,
+		Aggregation: view.LastValue(),
+	}
 )
 
 // DefaultViews is an array of OpenCensus views for metric gathering purposes
@@ -360,6 +421,18 @@ var DefaultViews = func() []*view.View {
 		GraphsyncRequestPaidBytesSentCountView,
 		GraphsyncRequestUnpaidBytesSentCountView,
 		GraphsyncRequestNetworkErrorCountView,
+		GraphsyncReceivingPeersCountView,
+		GraphsyncReceivingActiveCountView,
+		GraphsyncReceivingCountCountView,
+		GraphsyncReceivingTotalMemoryAllocatedView,
+		GraphsyncReceivingTotalPendingAllocationsView,
+		GraphsyncReceivingPeersPendingView,
+		GraphsyncSendingPeersCountView,
+		GraphsyncSendingActiveCountView,
+		GraphsyncSendingCountCountView,
+		GraphsyncSendingTotalMemoryAllocatedView,
+		GraphsyncSendingTotalPendingAllocationsView,
+		GraphsyncSendingPeersPendingView,
 		lotusmetrics.DagStorePRBytesDiscardedView,
 		lotusmetrics.DagStorePRBytesRequestedView,
 		lotusmetrics.DagStorePRDiscardCountView,

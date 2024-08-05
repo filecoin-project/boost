@@ -5,24 +5,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ipfs/go-cid"
-	textselector "github.com/ipld/go-ipld-selector-text-lite"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_full.go -package=mocks . FullNode
@@ -61,55 +54,6 @@ type MinerSectors struct {
 	Active uint64
 	// Sectors with failed proofs.
 	Faulty uint64
-}
-
-type ImportRes struct {
-	Root     cid.Cid
-	ImportID imports.ID
-}
-
-type Import struct {
-	Key imports.ID
-	Err string
-
-	Root *cid.Cid
-
-	// Source is the provenance of the import, e.g. "import", "unknown", else.
-	// Currently useless but may be used in the future.
-	Source string
-
-	// FilePath is the path of the original file. It is important that the file
-	// is retained at this path, because it will be referenced during
-	// the transfer (when we do the UnixFS chunking, we don't duplicate the
-	// leaves, but rather point to chunks of the original data through
-	// positional references).
-	FilePath string
-
-	// CARPath is the path of the CAR file containing the DAG for this import.
-	CARPath string
-}
-
-type DealInfo struct {
-	ProposalCid cid.Cid
-	State       storagemarket.StorageDealStatus
-	Message     string // more information about deal state, particularly errors
-	DealStages  *storagemarket.DealStages
-	Provider    address.Address
-
-	DataRef  *storagemarket.DataRef
-	PieceCID cid.Cid
-	Size     uint64
-
-	PricePerEpoch types.BigInt
-	Duration      uint64
-
-	DealID abi.DealID
-
-	CreationTime time.Time
-	Verified     bool
-
-	TransferChannelID *datatransfer.ChannelID
-	DataTransfer      *DataTransferChannel
 }
 
 type MsgLookup struct {
@@ -222,37 +166,6 @@ type MinerPower struct {
 	HasMinPower bool
 }
 
-type QueryOffer struct {
-	Err string
-
-	Root  cid.Cid
-	Piece *cid.Cid
-
-	Size                    uint64
-	MinPrice                types.BigInt
-	UnsealPrice             types.BigInt
-	PaymentInterval         uint64
-	PaymentIntervalIncrease uint64
-	Miner                   address.Address
-	MinerPeer               retrievalmarket.RetrievalPeer
-}
-
-func (o *QueryOffer) Order(client address.Address) RetrievalOrder {
-	return RetrievalOrder{
-		Root:                    o.Root,
-		Piece:                   o.Piece,
-		Size:                    o.Size,
-		Total:                   o.MinPrice,
-		UnsealPrice:             o.UnsealPrice,
-		PaymentInterval:         o.PaymentInterval,
-		PaymentIntervalIncrease: o.PaymentIntervalIncrease,
-		Client:                  client,
-
-		Miner:     o.Miner,
-		MinerPeer: &o.MinerPeer,
-	}
-}
-
 type MarketBalance struct {
 	Escrow big.Int
 	Locked big.Int
@@ -260,26 +173,46 @@ type MarketBalance struct {
 
 type MarketDeal struct {
 	Proposal market.DealProposal
-	State    market.DealState
+	State    MarketDealState
 }
 
-type RetrievalOrder struct {
-	// TODO: make this less unixfs specific
-	Root                  cid.Cid
-	Piece                 *cid.Cid
-	DatamodelPathSelector *textselector.Expression
-	Size                  uint64
-
-	FromLocalCAR string // if specified, get data from a local CARv2 file.
-	// TODO: support offset
-	Total                   types.BigInt
-	UnsealPrice             types.BigInt
-	PaymentInterval         uint64
-	PaymentIntervalIncrease uint64
-	Client                  address.Address
-	Miner                   address.Address
-	MinerPeer               *retrievalmarket.RetrievalPeer
+type MarketDealState struct {
+	SectorStartEpoch abi.ChainEpoch // -1 if not yet included in proven sector
+	LastUpdatedEpoch abi.ChainEpoch // -1 if deal state never updated
+	SlashEpoch       abi.ChainEpoch // -1 if deal never slashed
 }
+
+//func MakeDealState(mds market.DealState) MarketDealState {
+//	return MarketDealState{
+//		SectorStartEpoch: mds.SectorStartEpoch(),
+//		LastUpdatedEpoch: mds.LastUpdatedEpoch(),
+//		SlashEpoch:       mds.SlashEpoch(),
+//	}
+//}
+//
+//type mstate struct {
+//	s MarketDealState
+//}
+//
+//func (m mstate) SectorStartEpoch() abi.ChainEpoch {
+//	return m.s.SectorStartEpoch
+//}
+//
+//func (m mstate) LastUpdatedEpoch() abi.ChainEpoch {
+//	return m.s.LastUpdatedEpoch
+//}
+//
+//func (m mstate) SlashEpoch() abi.ChainEpoch {
+//	return m.s.SlashEpoch
+//}
+//
+//func (m mstate) Equals(o market.DealState) bool {
+//	return market.DealStatesEqual(m, o)
+//}
+//
+//func (m MarketDealState) Iface() market.DealState {
+//	return mstate{m}
+//}
 
 type InvocResult struct {
 	MsgCid         cid.Cid

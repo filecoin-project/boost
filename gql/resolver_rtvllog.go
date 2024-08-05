@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/graph-gophers/graphql-go"
@@ -211,6 +212,6 @@ func (r *resolver) RetrievalLogsCount(ctx context.Context, args struct{ IsIndexe
 	count, err := r.retDB.Count(ctx, isIndexer)
 	return &retStateCount{
 		Count:  int32(count),
-		Period: gqltypes.Uint64(r.cfg.Dealmaking.RetrievalLogDuration),
+		Period: gqltypes.Uint64(r.cfg.Retrievals.Graphsync.RetrievalLogDuration),
 	}, err
 }

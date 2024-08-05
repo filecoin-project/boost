@@ -102,7 +102,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 		for iter.Scan(&maddrStr) {
 			pmaddr, err := address.NewFromString(maddrStr)
 			if err != nil {
-				return fmt.Errorf("getting miners for pieces: parsing miner adddress '%s': %w", maddrStr, err)
+				return fmt.Errorf("getting miners for pieces: parsing miner address '%s': %w", maddrStr, err)
 			}
 
 			newPieceWithMaddrLk.Lock()
@@ -526,4 +526,31 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 
 	failureMetrics = false
 	return count, nil
+}
+
+func (s *Store) UntrackPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
+	ctx, span := tracing.Tracer.Start(ctx, "store.untrack_piece")
+	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
+	defer span.End()
+	ctx, _ = tag.New(ctx, tag.Upsert(metrics.Endpoint, "yb.untrack_piece"))
+	stop := metrics.Timer(ctx, metrics.APIRequestDuration)
+	defer stop()
+	failureMetrics := true
+	defer func() {
+		if failureMetrics {
+			stats.Record(s.ctx, metrics.FailureUntrackPieceCount.M(1))
+		} else {
+			stats.Record(s.ctx, metrics.SuccessUntrackPieceCount.M(1))
+		}
+	}()
+
+	qry := `DELETE FROM PieceTracker WHERE MinerAddr = $1 AND PieceCid = $2`
+	_, err := s.db.Exec(ctx, qry, maddr.String(), pieceCid.String())
+	if err != nil {
+		return fmt.Errorf("untracking piece %s %s: %w", maddr, pieceCid, err)
+	}
+
+	failureMetrics = false
+	return nil
+
 }

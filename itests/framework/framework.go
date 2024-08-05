@@ -1,45 +1,53 @@
 package framework
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
+	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
+	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
+	rc "github.com/filecoin-project/boost/retrievalmarket/client"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/storedask"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	types2 "github.com/filecoin-project/boost/transport/types"
+	transporttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	lotus_gfm_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
+	verifregtypes13 "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	minertypes "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	miner9types "github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
@@ -52,6 +60,9 @@ import (
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
+	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/files"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	dstest "github.com/ipfs/boxo/ipld/merkledag/test"
@@ -59,28 +70,38 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
 	ipldcbor "github.com/ipfs/go-ipld-cbor"
 	ipldformat "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
+	carv2 "github.com/ipld/go-car/v2"
+	storagecar "github.com/ipld/go-car/v2/storage"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagjson"
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipld/go-ipld-prime/traversal/selector"
+	"github.com/ipld/go-ipld-prime/linking"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	trustless "github.com/ipld/go-trustless-utils"
+	"github.com/ipld/go-trustless-utils/traversal"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/term"
 )
 
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
 	Ensemble                  *kit.Ensemble
-	EnableLegacy              bool
 	MaxStagingBytes           int64
 	ProvisionalWalletBalances int64
+	StartEpochSealingBuffer   uint64
 }
 
 type TestFramework struct {
@@ -100,12 +121,6 @@ type TestFramework struct {
 
 type FrameworkOpts func(pc *TestFrameworkConfig)
 
-func EnableLegacyDeals(enable bool) FrameworkOpts {
-	return func(tmc *TestFrameworkConfig) {
-		tmc.EnableLegacy = enable
-	}
-}
-
 func SetMaxStagingBytes(max int64) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.MaxStagingBytes = max
@@ -118,16 +133,30 @@ func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	}
 }
 
+func WithMaxStagingDealsBytes(e int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MaxStagingBytes = e
+	}
+}
+
 func SetProvisionalWalletBalances(balance int64) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.ProvisionalWalletBalances = balance
 	}
 }
 
+func WithStartEpochSealingBuffer(e uint64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.StartEpochSealingBuffer = e
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
+	//bal, err := chaintypes.ParseFIL("1000fil")
+	//require.NoError(t, err)
 	fmc := &TestFrameworkConfig{
 		// default provisional balance
-		ProvisionalWalletBalances: 1e18,
+		ProvisionalWalletBalances: 9e18,
 	}
 	for _, opt := range opts {
 		opt(fmc)
@@ -164,8 +193,10 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.MaxSealingSectors = 1
 					sc.MaxSealingSectorsForDeals = 3
 					sc.AlwaysKeepUnsealedCopy = true
-					sc.WaitDealsDelay = time.Hour
-					sc.AggregateCommits = false
+					sc.WaitDealsDelay = time.Second
+					//sc.AggregateCommits = false
+					sc.CommitBatchWait = 2 * time.Second
+					sc.StartEpochSealingBuffer = 30
 
 					return sc, nil
 				}, nil
@@ -235,7 +266,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		Log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
 	}()
@@ -250,7 +281,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
 	}()
@@ -259,7 +290,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
 
 		amt := abi.NewTokenAmount(f.config.ProvisionalWalletBalances)
-		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
+		_ = SendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
 		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
 	}()
@@ -337,21 +368,18 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Wallets.DealCollateral = dealCollatAddr.String()
-	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
-	cfg.LotusDealmaking.PublishMsgPeriod = lotus_config.Duration(0)
-	val, err := ltypes.ParseFIL("0.1 FIL")
+	cfg.Dealpublish.MaxDealsPerPublishMsg = 1
+	cfg.Dealpublish.PublishMsgPeriod = config.Duration(0)
+	val, err := chaintypes.ParseFIL("0.1 FIL")
 	if err != nil {
 		return err
 	}
-	cfg.LotusFees.MaxPublishDealsFee = val
+	cfg.Dealpublish.MaxPublishDealsFee = val
 
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
-	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
+	cfg.HttpDownload.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
-	if f.config.EnableLegacy {
-		cfg.Dealmaking.EnableLegacyStorageDeals = true
-	}
 
 	for _, o := range opts {
 		o(cfg)
@@ -361,6 +389,12 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingBytes
 	} else {
 		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+	}
+
+	cfg.Dealmaking.StartEpochSealingBuffer = 50
+
+	if f.config.StartEpochSealingBuffer > 0 {
+		cfg.Dealmaking.StartEpochSealingBuffer = f.config.StartEpochSealingBuffer
 	}
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
@@ -449,22 +483,22 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	// Set boost libp2p address on chain
 	Log.Debugw("setting peer id on chain", "peer id", boostAddrs.ID)
-	params, err := actors.SerializeParams(&minertypes.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
+	params, err := actors.SerializeParams(&miner9types.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
 	if err != nil {
 		return err
 	}
 
-	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ltypes.EmptyTSK)
+	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, chaintypes.EmptyTSK)
 	if err != nil {
 		return err
 	}
 
-	msg := &ltypes.Message{
+	msg := &chaintypes.Message{
 		To:     minerAddr,
 		From:   minerInfo.Owner,
 		Method: builtin.MethodsMiner.ChangePeerID,
 		Params: params,
-		Value:  ltypes.NewInt(0),
+		Value:  chaintypes.NewInt(0),
 	}
 
 	signed, err := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
@@ -600,7 +634,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	if err != nil {
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
-	startEpoch := head.Height() + abi.ChainEpoch(2000)
+	startEpoch := head.Height() + abi.ChainEpoch(1000)
 	l, err := market.NewLabelFromString(rootCid.String())
 	if err != nil {
 		return nil, err
@@ -629,7 +663,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	Log.Debugf("Provider balance requirement for deal: %d attoFil", proposal.ProviderBalanceRequirement())
 
 	// Save the path to the CAR file as a transfer parameter
-	transferParams := &types2.HttpRequest{URL: url}
+	transferParams := &transporttypes.HttpRequest{URL: url}
 	transferParamsJSON, err := json.Marshal(transferParams)
 	if err != nil {
 		return nil, err
@@ -683,19 +717,7 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 	}, nil
 }
 
-func (f *TestFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
-	return lapi.StartDealParams{
-		Data:              &lotus_gfm_storagemarket.DataRef{TransferType: gfm_storagemarket.TTGraphsync},
-		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
-		MinBlocksDuration: uint64(lbuild.MinDealDuration),
-		Miner:             f.MinerAddr,
-		Wallet:            f.DefaultWallet,
-		DealStartEpoch:    35000,
-		FastRetrieval:     true,
-	}
-}
-
-func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
+func SendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
 	senderAddr, err := sender.WalletDefaultAddress(ctx)
 	if err != nil {
 		return err
@@ -722,7 +744,7 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 		return err
 	}
 
-	cwp := &minertypes.ChangeWorkerAddressParams{
+	cwp := &miner9types.ChangeWorkerAddressParams{
 		NewWorker:       mi.Worker,
 		NewControlAddrs: []address.Address{psdAddr},
 	}
@@ -753,41 +775,6 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 func (f *TestFramework) WaitMsg(mcid cid.Cid) error {
 	_, err := f.FullNode.StateWaitMsg(f.ctx, mcid, 1, 1e10, true)
 	return err
-}
-
-func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error {
-	for {
-		di, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
-		if err != nil {
-			return err
-		}
-
-		switch di.State {
-		case gfm_storagemarket.StorageDealAwaitingPreCommit, gfm_storagemarket.StorageDealSealing:
-		case gfm_storagemarket.StorageDealProposalRejected:
-			return errors.New("deal rejected")
-		case gfm_storagemarket.StorageDealFailing:
-			return errors.New("deal failed")
-		case gfm_storagemarket.StorageDealError:
-			return fmt.Errorf("deal errored: %s", di.Message)
-		case gfm_storagemarket.StorageDealActive:
-			return nil
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Cid, root cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
-	// perform retrieval.
-	info, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
-	require.NoError(t, err)
-
-	offers, err := f.FullNode.ClientFindData(ctx, root, &info.PieceCID)
-	require.NoError(t, err)
-	require.NotEmpty(t, offers, "no offers")
-
-	return f.retrieve(ctx, t, offers[0], extractCar, selectorNode)
 }
 
 func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
@@ -825,79 +812,318 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	return tmpFile
 }
 
-func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
-	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, f.MinerAddr, root, pieceCid)
+func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, request trustless.Request, extractCar bool) string {
+	tempdir := t.TempDir()
+
+	var out string
+	retPath := path.Join(tempdir, "retrievals")
+	require.NoError(t, os.Mkdir(retPath, 0755))
+
+	clientPath := path.Join(tempdir, "client")
+	require.NoError(t, os.Mkdir(clientPath, 0755))
+
+	clientNode, err := clinode.Setup(clientPath)
 	require.NoError(t, err)
 
-	return f.retrieve(ctx, t, offer, extractCar, selectorNode)
+	addr, err := clientNode.Wallet.GetDefault()
+	require.NoError(t, err)
+
+	bstoreDatastore, err := flatfs.CreateOrOpen(path.Join(tempdir, "blockstore"), flatfs.NextToLast(3), false)
+	bstore := blockstore.NewBlockstore(bstoreDatastore, blockstore.NoPrefix())
+	require.NoError(t, err)
+
+	ds, err := levelds.NewDatastore(path.Join(clientPath, "dstore"), nil)
+	require.NoError(t, err)
+
+	// Create the retrieval client
+	fc, err := rc.NewClient(clientNode.Host, f.FullNode, clientNode.Wallet, addr, bstore, ds, clientPath)
+	require.NoError(t, err)
+
+	baddrs, err := f.Boost.NetAddrsListen(ctx)
+	require.NoError(t, err)
+
+	// Query the remote to find out the retrieval parameters
+	query, err := RetrievalQuery(ctx, t, clientNode, &baddrs, request.Root)
+	require.NoError(t, err)
+
+	// Create a matching proposal for the query
+	proposal, err := rc.RetrievalProposalForAsk(query, request.Root, request.Selector())
+	require.NoError(t, err)
+
+	// Let's see the selector we're working with
+	encoded, err := ipld.Encode(request.Selector(), dagjson.Encode)
+	require.NoError(t, err)
+	t.Logf("Retrieving with selector: %s", string(encoded))
+
+	// Retrieve the data
+	_, err = fc.RetrieveContentWithProgressCallback(
+		ctx,
+		f.MinerAddr,
+		proposal,
+		func(bytesReceived_ uint64) {
+			printProgress(bytesReceived_, t)
+		},
+	)
+	require.NoError(t, err)
+
+	// Validate the data
+
+	dservOffline := dag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
+	lsys := utils.CreateLinkSystem(dservOffline)
+
+	if !extractCar {
+		// If the caller wants a CAR, we create it and then when we run our check traversal over the DAG
+		// each load will trigger a write to the CAR
+		file, err := os.CreateTemp(retPath, "*"+request.Root.String()+".car")
+		require.NoError(t, err)
+		out = file.Name()
+		storage, err := storagecar.NewWritable(file, []cid.Cid{request.Root}, carv2.WriteAsCarV1(true))
+		require.NoError(t, err)
+		sro := lsys.StorageReadOpener
+		lsys.StorageReadOpener = func(lc linking.LinkContext, l datamodel.Link) (io.Reader, error) {
+			r, err := sro(lc, l)
+			if err != nil {
+				return nil, err
+			}
+			buf, err := io.ReadAll(r)
+			if err != nil {
+				return nil, err
+			}
+			if err := storage.Put(lc.Ctx, l.(cidlink.Link).Cid.KeyString(), buf); err != nil {
+				return nil, err
+			}
+			return bytes.NewReader(buf), nil
+		}
+	}
+
+	// Check that we got what we expected by executing the same selector over our
+	// retrieved DAG
+	_, err = traversal.Config{
+		Root:     request.Root,
+		Selector: request.Selector(),
+	}.Traverse(ctx, lsys, nil)
+	require.NoError(t, err)
+
+	if extractCar {
+		// Caller doesn't want the raw blocks, so extract the file as UnixFS and
+		// assume that we've fetched the right blocks to be able to do this.
+		dnode, err := dservOffline.Get(ctx, request.Root)
+		require.NoError(t, err)
+		ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
+		require.NoError(t, err)
+		file, err := os.CreateTemp(retPath, "*"+request.Root.String())
+		require.NoError(t, err)
+		err = file.Close()
+		require.NoError(t, err)
+		err = os.Remove(file.Name())
+		require.NoError(t, err)
+		err = files.WriteTo(ufsFile, file.Name())
+		require.NoError(t, err)
+		out = file.Name()
+	}
+
+	return out
 }
 
-func (f *TestFramework) retrieve(ctx context.Context, t *testing.T, offer lapi.QueryOffer, extractCar bool, selectorNode datamodel.Node) string {
-	p := path.Join(t.TempDir(), "ret-car-"+t.Name())
-	err := os.MkdirAll(path.Dir(p), 0755)
-	require.NoError(t, err)
-	carFile, err := os.Create(p)
-	require.NoError(t, err)
+type RetrievalInfo struct {
+	PayloadCID   cid.Cid
+	ID           legacyretrievaltypes.DealID
+	PieceCID     *cid.Cid
+	PricePerByte abi.TokenAmount
+	UnsealPrice  abi.TokenAmount
 
-	defer carFile.Close() //nolint:errcheck
+	Status        legacyretrievaltypes.DealStatus
+	Message       string // more information about deal state, particularly errors
+	Provider      peer.ID
+	BytesReceived uint64
+	BytesPaidFor  uint64
+	TotalPaid     abi.TokenAmount
 
-	caddr, err := f.FullNode.WalletDefaultAddress(ctx)
-	require.NoError(t, err)
+	TransferChannelID *datatransfer.ChannelID
+	DataTransfer      *DataTransferChannel
 
-	updatesCtx, cancel := context.WithCancel(ctx)
-	updates, err := f.FullNode.ClientGetRetrievalUpdates(updatesCtx)
-	require.NoError(t, err)
+	// optional event if part of ClientGetRetrievalUpdates
+	Event *legacyretrievaltypes.ClientEvent
+}
 
-	order := offer.Order(caddr)
-	if selectorNode != nil {
-		_, err := selector.CompileSelector(selectorNode)
-		require.NoError(t, err)
-		jsonSelector, err := ipld.Encode(selectorNode, dagjson.Encode)
-		require.NoError(t, err)
-		sel := lapi.Selector(jsonSelector)
-		order.DataSelector = &sel
-	}
+type RestrievalRes struct {
+	DealID legacyretrievaltypes.DealID
+}
 
-	retrievalRes, err := f.FullNode.ClientRetrieve(ctx, order)
-	require.NoError(t, err)
-consumeEvents:
-	for {
-		var evt lapi.RetrievalInfo
-		select {
-		case <-updatesCtx.Done():
-			t.Fatal("Retrieval Timed Out")
-		case evt = <-updates:
-			if evt.ID != retrievalRes.DealID {
-				continue
-			}
+type DataTransferChannel struct {
+	TransferID  datatransfer.TransferID
+	Status      datatransfer.Status
+	BaseCID     cid.Cid
+	IsInitiator bool
+	IsSender    bool
+	Voucher     string
+	Message     string
+	OtherPeer   peer.ID
+	Transferred uint64
+	Stages      *datatransfer.ChannelStages
+}
+
+func printProgress(bytesReceived uint64, t *testing.T) {
+	str := fmt.Sprintf("%v (%v)", bytesReceived, humanize.IBytes(bytesReceived))
+
+	termWidth, _, err := term.GetSize(int(os.Stdin.Fd()))
+	strLen := len(str)
+	if err == nil {
+
+		if strLen < termWidth {
+			// If the string is shorter than the terminal width, pad right side
+			// with spaces to remove old text
+			str = strings.Join([]string{str, strings.Repeat(" ", termWidth-strLen)}, "")
+		} else if strLen > termWidth {
+			// If the string doesn't fit in the terminal, cut it down to a size
+			// that fits
+			str = str[:termWidth]
 		}
-		switch evt.Status {
-		case lotus_gfm_retrievalmarket.DealStatusCompleted:
-			break consumeEvents
-		case lotus_gfm_retrievalmarket.DealStatusRejected:
-			t.Fatalf("Retrieval Proposal Rejected: %s", evt.Message)
-		case
-			lotus_gfm_retrievalmarket.DealStatusDealNotFound,
-			lotus_gfm_retrievalmarket.DealStatusErrored:
-			t.Fatalf("Retrieval Error: %s", evt.Message)
-		}
-	}
-	cancel()
-
-	require.NoError(t, f.FullNode.ClientExport(ctx,
-		lapi.ExportRef{
-			Root:   offer.Root,
-			DealID: retrievalRes.DealID,
-		},
-		lapi.FileRef{
-			Path:  carFile.Name(),
-			IsCAR: true,
-		}))
-
-	ret := carFile.Name()
-	if extractCar {
-		ret = f.ExtractFileFromCAR(ctx, t, carFile)
 	}
 
-	return ret
+	t.Logf("%s\r", str)
+}
+
+func RetrievalQuery(ctx context.Context, t *testing.T, client *clinode.Node, peerAddr *peer.AddrInfo, pcid cid.Cid) (*legacyretrievaltypes.QueryResponse, error) {
+	client.Host.Peerstore().AddAddrs(peerAddr.ID, peerAddr.Addrs, peerstore.TempAddrTTL)
+	s, err := client.Host.NewStream(ctx, peerAddr.ID, rc.RetrievalQueryProtocol)
+	require.NoError(t, err)
+
+	client.Host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
+	defer func() {
+		client.Host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
+		s.Close()
+	}()
+
+	// We have connected
+
+	q := &legacyretrievaltypes.Query{
+		PayloadCID: pcid,
+	}
+
+	var resp legacyretrievaltypes.QueryResponse
+	dline, ok := ctx.Deadline()
+	if ok {
+		_ = s.SetDeadline(dline)
+		defer func() { _ = s.SetDeadline(time.Time{}) }()
+	}
+
+	err = cborutil.WriteCborRPC(s, q)
+	require.NoError(t, err)
+
+	err = cborutil.ReadCborRPC(s, &resp)
+	require.NoError(t, err)
+
+	return &resp, nil
+}
+
+type DatacapParams struct {
+	RootKey     *key.Key
+	VerifierKey *key.Key
+	Opts        []kit.EnsembleOpt
+}
+
+func BuildDatacapParams() (*DatacapParams, error) {
+	rootKey, err := key.GenerateKey(chaintypes.KTSecp256k1)
+	if err != nil {
+		return nil, err
+	}
+
+	verifierKey, err := key.GenerateKey(chaintypes.KTSecp256k1)
+	if err != nil {
+		return nil, err
+	}
+
+	bal, err := chaintypes.ParseFIL("100fil")
+	if err != nil {
+		return nil, err
+	}
+
+	eOpts := []kit.EnsembleOpt{
+		kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())),
+		// assign some balance to the verifier so they can send an AddClient message.
+		kit.Account(verifierKey, abi.NewTokenAmount(bal.Int64())),
+	}
+
+	return &DatacapParams{
+		RootKey:     rootKey,
+		VerifierKey: verifierKey,
+		Opts:        eOpts,
+	}, nil
+}
+
+func (f *TestFramework) AddClientDataCap(t *testing.T, ctx context.Context, rootKey *key.Key, verifierKey *key.Key) error {
+	// get VRH
+	vrh, err := f.FullNode.StateVerifiedRegistryRootKey(ctx, chaintypes.TipSetKey{})
+	fmt.Println(vrh.String())
+	require.NoError(t, err)
+
+	// import the root key to Lotus to send message
+	rootAddr, err := f.FullNode.WalletImport(ctx, &rootKey.KeyInfo)
+	require.NoError(t, err)
+
+	// import the verifiers' keys to Lotus to send message
+	verifier1Addr, err := f.FullNode.WalletImport(ctx, &verifierKey.KeyInfo)
+	require.NoError(t, err)
+
+	// make the verifier1Addr a datacap verifiers
+
+	mkVerifier(ctx, t, f.FullNode.FullNode.(*lapi.FullNodeStruct), rootAddr, verifier1Addr)
+
+	// assign datacap to a client
+	initialDatacap := big.NewInt(10000000)
+
+	params, err := actors.SerializeParams(&verifregtypes13.AddVerifiedClientParams{Address: f.ClientAddr, Allowance: initialDatacap})
+	require.NoError(t, err)
+
+	msg := &chaintypes.Message{
+		From:   verifier1Addr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifiedClient,
+		Params: params,
+		Value:  big.Zero(),
+	}
+
+	sm, err := f.FullNode.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err)
+
+	res, err := f.FullNode.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, res.Receipt.ExitCode)
+
+	// check datacap balance
+	dcap, err := f.FullNode.StateVerifiedClientStatus(ctx, f.ClientAddr, chaintypes.EmptyTSK)
+	if err != nil {
+		return err
+	}
+	if !dcap.Equals(initialDatacap) {
+		return fmt.Errorf("verified client datacap is %s but expected %d", dcap, initialDatacap)
+	}
+
+	return nil
+}
+
+func mkVerifier(ctx context.Context, t *testing.T, api *lapi.FullNodeStruct, rootAddr address.Address, addr address.Address) {
+	allowance := big.NewInt(100000000000)
+	params, aerr := actors.SerializeParams(&verifreg9types.AddVerifierParams{Address: addr, Allowance: allowance})
+	require.NoError(t, aerr)
+
+	msg := &chaintypes.Message{
+		From:   rootAddr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifier,
+		Params: params,
+		Value:  big.Zero(),
+	}
+
+	sm, err := api.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err, "AddVerifier failed")
+
+	res, err := api.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, res.Receipt.ExitCode)
+
+	verifierAllowance, err := api.StateVerifierStatus(ctx, addr, chaintypes.EmptyTSK)
+	require.NoError(t, err)
+	require.Equal(t, allowance, *verifierAllowance)
 }

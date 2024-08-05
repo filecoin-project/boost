@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/shared"
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
-	gfm_migration "github.com/filecoin-project/boost-gfm/storagemarket/migrations"
-	gfm_network "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/markets/shared"
+	"github.com/filecoin-project/boost/safe"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	mig "github.com/filecoin-project/boost/storagemarket/types/legacytypes/migrations"
+	gfm_network "github.com/filecoin-project/boost/storagemarket/types/legacytypes/network"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -165,23 +166,21 @@ func NewDealClient(h host.Host, addr address.Address, walletApi api.Wallet, opti
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
-	ctx               context.Context
-	host              host.Host
-	prov              *storagemarket.Provider
-	fullNode          v1api.FullNode
-	plDB              *db.ProposalLogsDB
-	spApi             sealingpipeline.API
-	enableLegacyDeals bool
+	ctx      context.Context
+	host     host.Host
+	prov     *storagemarket.Provider
+	fullNode v1api.FullNode
+	plDB     *db.ProposalLogsDB
+	spApi    sealingpipeline.API
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API, enableLegacyDeals bool) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) *DealProvider {
 	p := &DealProvider{
-		host:              h,
-		prov:              prov,
-		fullNode:          fullNodeApi,
-		plDB:              plDB,
-		spApi:             spApi,
-		enableLegacyDeals: enableLegacyDeals,
+		host:     h,
+		prov:     prov,
+		fullNode: fullNodeApi,
+		plDB:     plDB,
+		spApi:    spApi,
 	}
 	return p
 }
@@ -199,23 +198,30 @@ func (p *DealProvider) Start(ctx context.Context) {
 	// set to false, which maintains the previous behaviour:
 	// - SkipIPNIAnnounce=false:    announce deal to IPNI
 	// - RemoveUnsealedCopy=false:  keep unsealed copy of deal data
-	p.host.SetStreamHandler(DealProtocolv121ID, p.handleNewDealStream)
-	p.host.SetStreamHandler(DealProtocolv120ID, p.handleNewDealStream)
+	p.host.SetStreamHandler(DealProtocolv121ID, safe.Handle(p.handleNewDealStream))
+	p.host.SetStreamHandler(DealProtocolv120ID, safe.Handle(p.handleNewDealStream))
 
-	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
+	p.host.SetStreamHandler(DealStatusV12ProtocolID, safe.Handle(p.handleNewDealStatusStream))
 
 	// Handle legacy deal stream here and reject all legacy deals
-	if !p.enableLegacyDeals {
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, p.handleLegacyDealStream)
-	}
+	p.host.SetStreamHandler(legacytypes.DealProtocolID101, safe.Handle(p.handleLegacyDealStream))
+	p.host.SetStreamHandler(legacytypes.DealProtocolID110, safe.Handle(p.handleLegacyDealStream))
+	p.host.SetStreamHandler(legacytypes.DealProtocolID111, safe.Handle(p.handleLegacyDealStream))
+
+	// Handle Query Ask
+	p.host.SetStreamHandler(legacytypes.AskProtocolID, safe.Handle(p.handleNewAskStream))
+	p.host.SetStreamHandler(legacytypes.OldAskProtocolID, safe.Handle(p.handleOldAskStream))
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolv121ID)
 	p.host.RemoveStreamHandler(DealProtocolv120ID)
 	p.host.RemoveStreamHandler(DealStatusV12ProtocolID)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID101)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID110)
+	p.host.RemoveStreamHandler(legacytypes.DealProtocolID111)
+	p.host.RemoveStreamHandler(legacytypes.AskProtocolID)
+	p.host.RemoveStreamHandler(legacytypes.OldAskProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -416,13 +422,13 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 
 	rejMsg := fmt.Sprintf("deal proposals made over the legacy %s protocol are deprecated"+
 		" - please use the %s deal proposal protocol", s.Protocol(), DealProtocolv121ID)
-	const rejState = gfm_storagemarket.StorageDealProposalRejected
+	const rejState = 2
 	var signedResponse typegen.CBORMarshaler
 
 	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
 	switch s.Protocol() {
-	case gfm_storagemarket.DealProtocolID101:
-		var prop gfm_migration.Proposal0
+	case legacytypes.DealProtocolID101:
+		var prop mig.Proposal0
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
 		if err != nil {
@@ -436,17 +442,17 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 			return
 		}
 
-		resp := gfm_migration.Response0{State: rejState, Message: rejMsg, Proposal: pcid}
+		resp := mig.Response0{State: rejState, Message: rejMsg, Proposal: pcid}
 		sig, err := p.signLegacyResponse(&resp)
 		if err != nil {
 			reqLog.Errorf("getting signed response: %s", err)
 			return
 		}
 
-		signedResponse = &gfm_migration.SignedResponse0{Response: resp, Signature: sig}
+		signedResponse = &mig.SignedResponse0{Response: resp, Signature: sig}
 
-	case gfm_storagemarket.DealProtocolID110:
-		var prop gfm_migration.Proposal1
+	case legacytypes.DealProtocolID110:
+		var prop mig.Proposal1
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
 		if err != nil {
@@ -469,7 +475,7 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 
 		signedResponse = &gfm_network.SignedResponse{Response: resp, Signature: sig}
 
-	case gfm_storagemarket.DealProtocolID111:
+	case legacytypes.DealProtocolID111:
 		var prop gfm_network.Proposal
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
@@ -531,4 +537,102 @@ func (p *DealProvider) signLegacyResponse(resp typegen.CBORMarshaler) (*crypto.S
 	}
 
 	return localSignature, err
+}
+
+func (p *DealProvider) handleNewAskStream(s network.Stream) {
+	start := time.Now()
+	reqLog := log.With("client-peer", s.Conn().RemotePeer())
+	reqLog.Debugw("new queryAsk request")
+
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
+		reqLog.Debugw("handled queryAsk request", "duration", time.Since(start).String())
+	}()
+
+	// Read the deal status request from the stream
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	var req gfm_network.AskRequest
+	err := req.UnmarshalCBOR(s)
+	_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+	if err != nil {
+		reqLog.Warnw("reading queryAsk request from stream", "err", err)
+		return
+	}
+
+	var resp gfm_network.AskResponse
+
+	if req.Miner.String() == p.prov.Address.String() {
+		resp.Ask = p.prov.GetAsk()
+	} else {
+		reqLog.Warnw("storage provider for address %s receive ask for miner with address %s", p.prov.Address, req.Miner)
+	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		reqLog.Errorw("failed to write queryAsk response", "err", err)
+	}
+}
+
+func (p *DealProvider) handleOldAskStream(s network.Stream) {
+	start := time.Now()
+	reqLog := log.With("client-peer", s.Conn().RemotePeer())
+	reqLog.Debugw("new queryAsk request")
+
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
+		reqLog.Debugw("handled queryAsk request", "duration", time.Since(start).String())
+	}()
+
+	// Read the deal status request from the stream
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	var req mig.AskRequest0
+	err := req.UnmarshalCBOR(s)
+	_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+	if err != nil {
+		reqLog.Warnw("reading queryAsk request from stream", "err", err)
+		return
+	}
+
+	var resp mig.AskResponse0
+
+	if req.Miner.String() == p.prov.Address.String() {
+		ask := p.prov.GetAsk()
+
+		newAsk := ask.Ask
+		resp.Ask.Ask = &mig.StorageAsk0{
+			Price:         newAsk.Price,
+			VerifiedPrice: newAsk.VerifiedPrice,
+			MinPieceSize:  newAsk.MinPieceSize,
+			MaxPieceSize:  newAsk.MaxPieceSize,
+			Miner:         newAsk.Miner,
+			Timestamp:     newAsk.Timestamp,
+			Expiry:        newAsk.Expiry,
+			SeqNo:         newAsk.SeqNo,
+		}
+		oldSig, err := p.signLegacyResponse(&resp)
+		if err != nil {
+			reqLog.Errorf("getting signed response: %s", err)
+		}
+
+		resp.Ask.Signature = oldSig
+	} else {
+		reqLog.Warnw("storage provider for address %s receive ask for miner with address %s", p.prov.Address, req.Miner)
+	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		reqLog.Errorw("failed to write queryAsk response", "err", err)
+	}
 }

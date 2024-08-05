@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -13,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
@@ -122,6 +124,18 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	// Check if piece belongs to an active sector
 	md, err := d.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
+		// If piece is not found then it should be unflagged and removed from future tracking
+		if strings.Contains(err.Error(), "not found") {
+			serr := d.store.UnflagPiece(ctx, pieceCid, d.maddr)
+			if serr != nil {
+				return fmt.Errorf("failed to unflag the missing piece %s: %w", pieceCid.String(), serr)
+			}
+			serr = d.store.UntrackPiece(ctx, pieceCid, d.maddr)
+			if serr != nil {
+				return fmt.Errorf("failed to delete piece from tracker table %s: %w", pieceCid.String(), serr)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
 	}
 
