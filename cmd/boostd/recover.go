@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-commp-utils/writer"
+	"github.com/filecoin-project/go-commp-utils/v2/writer"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"

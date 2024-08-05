@@ -3,5 +3,4 @@ go 1.22
 use (
  .
  extern/boostd-data
- extern/filecoin-ffi
 )

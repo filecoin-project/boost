@@ -12,7 +12,7 @@ import (
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-commp-utils/writer"
+	"github.com/filecoin-project/go-commp-utils/v2/writer"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"

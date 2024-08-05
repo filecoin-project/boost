@@ -23,53 +23,8 @@ else
 	@echo "Node.js version $(shell node -v) is supported."
 endif
 
-# git modules that need to be loaded
-MODULES:=
-
-CLEAN:=
-BINS:=
-
-ldflags=-X=github.com/filecoin-project/boost/build.CurrentCommit=+git.$(subst -,.,$(shell git describe --always --match=NeVeRmAtCh --dirty 2>/dev/null || git rev-parse --short HEAD 2>/dev/null))
-ifneq ($(strip $(LDFLAGS)),)
-	ldflags+=-extldflags=$(LDFLAGS)
-endif
-
-GOFLAGS+=-ldflags="$(ldflags)"
-
-
-## FFI
-
-FFI_PATH:=extern/filecoin-ffi/
-FFI_DEPS:=.install-filcrypto
-FFI_DEPS:=$(addprefix $(FFI_PATH),$(FFI_DEPS))
-
-$(FFI_DEPS): build/.filecoin-install ;
-
-build/.filecoin-install: $(FFI_PATH)
-	$(MAKE) -C $(FFI_PATH) $(FFI_DEPS:$(FFI_PATH)%=%)
-	@touch $@
-
-MODULES+=$(FFI_PATH)
-BUILD_DEPS+=build/.filecoin-install
-CLEAN+=build/.filecoin-install
-
-ffi-version-check:
-	@[[ "$$(awk '/const Version/{print $$5}' extern/filecoin-ffi/version.go)" -eq 3 ]] || (echo "FFI version mismatch, update submodules"; exit 1)
-BUILD_DEPS+=ffi-version-check
-
-.PHONY: ffi-version-check
-
-$(MODULES): build/.update-modules ;
-# dummy file that marks the last time modules were updated
-build/.update-modules:
-	git submodule update --init --recursive
-	touch $@
-
-# end git modules
 
 ## MAIN BINARIES
-
-CLEAN+=build/.update-modules
 
 debug: GOFLAGS+=-tags=debug
 debug: build-go
@@ -170,7 +125,6 @@ buildall: $(BINS)
 
 clean:
 	rm -rf $(CLEAN) $(BINS)
-	-$(MAKE) -C $(FFI_PATH) clean
 .PHONY: clean
 
 dist-clean:
@@ -218,7 +172,6 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 ## DOCKER IMAGES
 docker_user?=filecoin
 lotus_version?=v1.27.0
-ffi_from_source?=0
 build_lotus?=0
 build_boost?=1
 boost_version?=v2.3.0-rc2
@@ -246,7 +199,7 @@ else
 	lotus_build_cmd=info/lotus-all-in-one
 endif
 docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
-	--build-arg FFI_BUILD_FROM_SOURCE=$(ffi_from_source) $(docker_args)
+	$(docker_args)
 ### lotus-all-in-one docker image build
 info/lotus-all-in-one:
 	@echo Docker build info: $(lotus_info_msg)
@@ -288,7 +241,7 @@ retag/booster-bitswap:
 .PHONY: retag/booster-bitswap
 
 # boost-client main
-docker/mainnet/boost-client: build/.update-modules
+docker/mainnet/boost-client:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-main:main --build-arg BUILD_VERSION=dev \
 		-f docker/boost-client/Dockerfile.source --target boost-main .
@@ -298,7 +251,7 @@ docker/mainnet/boost-client: build/.update-modules
 docker/%:
 	cd docker/devnet/$* && DOCKER_BUILDKIT=1 $(docker_build_cmd) -t $(docker_user)/$*-dev:dev \
 		--build-arg BUILD_VERSION=dev .
-docker/boost: build/.update-modules
+docker/boost:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target boost-dev .

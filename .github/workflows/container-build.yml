@@ -19,13 +19,10 @@ jobs:
       LOTUS_VERSION: 'v1.27.0'
       LOTUS_SOURCE_IMAGE: 'ghcr.io/filecoin-shipyard/lotus-containers:lotus'
       NETWORK_NAME: 'devnet'
-      FFI_BUILD_FROM_SOURCE: '0'
       DOCKER_BUILDKIT: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Update Boost modules
-        run: make build/.update-modules
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -48,7 +45,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             LOTUS_TEST_IMAGE=${{ env.LOTUS_SOURCE_IMAGE }}-${{ env.LOTUS_VERSION }}-${{ env.NETWORK_NAME }}
-            FFI_BUILD_FROM_SOURCE=${{ env.FFI_BUILD_FROM_SOURCE }}
       - name: Build booster-http-dev
         uses: ./.github/actions/container-builder
         with:
@@ -58,7 +54,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             LOTUS_TEST_IMAGE=${{ env.LOTUS_SOURCE_IMAGE }}-${{ env.LOTUS_VERSION }}-${{ env.NETWORK_NAME }}
-            FFI_BUILD_FROM_SOURCE=${{ env.FFI_BUILD_FROM_SOURCE }}
       - name: Build booster-bitswap-dev
         uses: ./.github/actions/container-builder
         with:
@@ -68,4 +63,3 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             LOTUS_TEST_IMAGE=${{ env.LOTUS_SOURCE_IMAGE }}-${{ env.LOTUS_VERSION }}-${{ env.NETWORK_NAME }}
-            FFI_BUILD_FROM_SOURCE=${{ env.FFI_BUILD_FROM_SOURCE }}

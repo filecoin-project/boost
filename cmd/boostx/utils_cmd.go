@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-commp-utils/writer"
+	"github.com/filecoin-project/go-commp-utils/v2/writer"
 	"github.com/filecoin-project/go-state-types/abi"
 	markettypes "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/chain/actors"
