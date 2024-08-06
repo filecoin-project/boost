@@ -47,6 +47,20 @@ for i in {1..10}; do systemctl enable github-actions-runner$i.service; done
 
 8. Verify that new runners are visible in the repo.
 
+## Set up docker image creator
+1. Make the script executable
+```shell
+cd github-runner
+chmod +x create-runner-image.sh
+```
+2. Create a cron job to update the image every day
+```shell
+crontab -e
+```
+
+```shell
+0 0 * * * /root/github-runner/create-runner-image.sh
+```
 
 ## Github Token
 Creating GitHub personal access token (PAT) for using by self-hosted runner make sure the following scopes are selected:
