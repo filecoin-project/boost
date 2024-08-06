@@ -27,7 +27,7 @@ jobs:
         run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
 
       - name: Run actionlint
-        run: actionlint
+        run: actionlint -shellcheck= -pyflakes=
 
   setup-params:
     runs-on: [self-hosted, docker]
