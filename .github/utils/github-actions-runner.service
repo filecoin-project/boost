@@ -1,0 +1,18 @@
+[Unit]
+Description=Ephemeral GitHub Actions Runner Container
+After=docker.service
+Requires=docker.service
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop github-runnerNUM
+ExecStartPre=-/usr/bin/docker rm github-runnerNUM
+#ExecStartPre=-/usr/bin/docker pull curio/github-runner:latest
+ExecStart=/usr/bin/docker run --rm \
+                              --env-file /etc/curio-github-actions-runner.env \
+                              -e RUNNER_NAME=docker-runnerNUM \
+                              -v /var/run/docker.sock:/var/run/docker.sock \
+                              --name github-runnerNUM \
+                              curio/github-runner:latest
+[Install]
+WantedBy=multi-user.target
