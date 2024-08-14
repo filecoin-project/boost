@@ -104,6 +104,14 @@ var yugabyteCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
+			Name:  "username",
+			Usage: "yugabyte username to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
+			Name:  "password",
+			Usage: "yugabyte password to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
 			Name:     "connect-string",
 			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
@@ -125,6 +133,8 @@ var yugabyteCmd = &cli.Command{
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
 			Hosts:             cctx.StringSlice("hosts"),
+			Username:          cctx.String("username"),
+			Password:          cctx.String("password"),
 			ConnectString:     cctx.String("connect-string"),
 			CQLTimeout:        cctx.Int("CQLTimeout"),
 			InsertConcurrency: cctx.Int("insert-concurrency"),
@@ -225,6 +235,14 @@ var yugabyteMigrateCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
+			Name:  "username",
+			Usage: "yugabyte username to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
+			Name:  "password",
+			Usage: "yugabyte password to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
 			Name:     "connect-string",
 			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
@@ -252,6 +270,8 @@ var yugabyteMigrateCmd = &cli.Command{
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
 			Hosts:             cctx.StringSlice("hosts"),
+			Username:          cctx.String("username"),
+			Password:          cctx.String("password"),
 			ConnectString:     cctx.String("connect-string"),
 			CQLTimeout:        cctx.Int("CQLTimeout"),
 			InsertConcurrency: cctx.Int("insert-concurrency"),
@@ -287,6 +307,14 @@ var yugabyteAddIndexCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
+			Name:  "username",
+			Usage: "yugabyte username to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
+			Name:  "password",
+			Usage: "yugabyte password to connect to over cassandra interface eg 'cassandra'",
+		},
+		&cli.StringFlag{
 			Name:     "connect-string",
 			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
@@ -314,6 +342,8 @@ var yugabyteAddIndexCmd = &cli.Command{
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
 			Hosts:             cctx.StringSlice("hosts"),
+			Username:          cctx.String("username"),
+			Password:          cctx.String("password"),
 			ConnectString:     cctx.String("connect-string"),
 			CQLTimeout:        cctx.Int("CQLTimeout"),
 			InsertConcurrency: cctx.Int("insert-concurrency"),

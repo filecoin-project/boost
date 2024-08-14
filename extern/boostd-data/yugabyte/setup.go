@@ -20,8 +20,7 @@ func (s *Store) CreateKeyspace(ctx context.Context) error {
 	// Create a new session using the default keyspace, then use that to create
 	// the new keyspace
 	log.Infow("creating cassandra keyspace " + s.cluster.Keyspace)
-	cluster := gocql.NewCluster(s.settings.Hosts...)
-	cluster.Timeout = time.Duration(s.settings.CQLTimeout) * time.Second
+	cluster := NewCluster(s.settings)
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("creating yugabyte cluster: %w", err)
@@ -89,4 +88,16 @@ func (s *Store) execCQL(ctx context.Context, query string) error {
 func (s *Store) execSQL(ctx context.Context, query string) error {
 	_, err := s.db.Exec(ctx, query)
 	return err
+}
+
+func NewCluster(settings DBSettings) *gocql.ClusterConfig {
+	cluster := gocql.NewCluster(settings.Hosts...)
+	cluster.Timeout = time.Duration(settings.CQLTimeout) * time.Second
+	if settings.Username != "" {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: settings.Username,
+			Password: settings.Password,
+		}
+	}
+	return cluster
 }
