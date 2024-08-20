@@ -85,6 +85,11 @@ var directDealAllocate = &cli.Command{
 			Usage: "number of block confirmations to wait for",
 			Value: int(build.MessageConfidence),
 		},
+		&cli.BoolFlag{
+			Name:    "assume-yes",
+			Usage:   "automatic yes to prompts; assume 'yes' as answer to all prompts and run non-interactively",
+			Aliases: []string{"y", "yes"},
+		},
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
