@@ -30,7 +30,6 @@ import (
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/filecoin-project/lotus/storage/pipeline/piece"
@@ -684,8 +683,8 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	}, nil
 }
 
-func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo lapi.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-	sectorNum, offset, err := pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	info, err := pieceAdder.SectorAddPieceToAny(ctx, pieceSize, pieceData, sdInfo)
 	curTime := build.Clock.Now()
 	for err != nil && build.Clock.Since(curTime) < addPieceRetryTimeout {
 		// Check if the error was because there are too many sectors sealing
@@ -697,10 +696,10 @@ func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, piece
 		// There are too many sectors sealing, back off for a while then try again
 		select {
 		case <-build.Clock.After(addPieceRetryWait):
-			sectorNum, offset, err = pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+			info, err = pieceAdder.SectorAddPieceToAny(ctx, pieceSize, pieceData, sdInfo)
 		case <-ctx.Done():
 			return 0, 0, fmt.Errorf("shutdown while adding piece")
 		}
 	}
-	return sectorNum, offset, err
+	return info.Sector, info.Offset, err
 }

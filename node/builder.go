@@ -63,7 +63,6 @@ import (
 	"github.com/filecoin-project/lotus/storage/ctladdr"
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
-	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
@@ -461,9 +460,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Sector API
-		Override(new(sectorblocks.SectorBuilder), From(new(lotus_modules.MinerStorageService))),
-
-		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
+		Override(new(smtypes.PieceAdder), From(new(lotus_modules.MinerStorageService))),
 
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
