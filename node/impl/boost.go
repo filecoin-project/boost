@@ -231,3 +231,7 @@ func (sm *BoostAPI) PdCleanup(ctx context.Context) error {
 func (sm *BoostAPI) MarketGetAsk(ctx context.Context) (*legacytypes.SignedStorageAsk, error) {
 	return sm.StorageProvider.GetAsk(), nil
 }
+
+func (sm *BoostAPI) BoostGetDirectDeal(ctx context.Context, dealID uuid.UUID) (*types.DirectDeal, error) {
+	return sm.DirectDealsProvider.GetDeal(ctx, dealID)
+}

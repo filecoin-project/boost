@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -779,4 +780,12 @@ func (ddp *DirectDealsProvider) trackCurioSealing(sectorNum abi.SectorNumber) *d
 			}
 		}
 	}
+}
+
+func (ddp *DirectDealsProvider) GetDeal(ctx context.Context, dealUuid uuid.UUID) (*types.DirectDeal, error) {
+	deal, err := ddp.directDealsDB.ByID(ctx, dealUuid)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("getting direct deal %s: %w", dealUuid, ErrDealNotFound)
+	}
+	return deal, nil
 }

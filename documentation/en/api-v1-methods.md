@@ -13,6 +13,7 @@
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
+  * [BoostGetDirectDeal](#boostgetdirectdeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceDeal](#boostindexerannouncedeal)
   * [BoostIndexerAnnounceDealRemoved](#boostindexerannouncedealremoved)
@@ -370,6 +371,45 @@ Response:
 {
   "Accepted": true,
   "Reason": "string value"
+}
+```
+
+### BoostGetDirectDeal
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "07070707-0707-0707-0707-070707070707"
+]
+```
+
+Response:
+```json
+{
+  "ID": "07070707-0707-0707-0707-070707070707",
+  "CreatedAt": "0001-01-01T00:00:00Z",
+  "PieceCID": null,
+  "PieceSize": 1032,
+  "Client": "f01234",
+  "Provider": "f01234",
+  "AllocationID": 0,
+  "CleanupData": true,
+  "InboundFilePath": "string value",
+  "InboundFileSize": 9,
+  "SectorID": 9,
+  "Offset": 1032,
+  "Length": 1032,
+  "Checkpoint": 1,
+  "CheckpointAt": "0001-01-01T00:00:00Z",
+  "StartEpoch": 10101,
+  "EndEpoch": 10101,
+  "Err": "string value",
+  "Retry": "auto",
+  "KeepUnsealedCopy": true,
+  "AnnounceToIPNI": true
 }
 ```
 

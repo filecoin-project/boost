@@ -39,6 +39,7 @@ type Boost interface {
 	BoostIndexerAnnounceDeal(ctx context.Context, deal *smtypes.ProviderDealState) (cid.Cid, error)                                             //perm:admin
 	BoostIndexerAnnounceLegacyDeal(ctx context.Context, proposalCid cid.Cid) (cid.Cid, error)                                                   //perm:admin
 	BoostDirectDeal(ctx context.Context, params smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error)                                   //perm:admin
+	BoostGetDirectDeal(ctx context.Context, dealID uuid.UUID) (*smtypes.DirectDeal, error)                                                      //perm:admin
 	MarketGetAsk(ctx context.Context) (*legacytypes.SignedStorageAsk, error)                                                                    //perm:read
 
 	// MethodGroup: Blockstore
