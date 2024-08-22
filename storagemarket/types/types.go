@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -156,7 +157,7 @@ type DealResponse struct {
 }
 
 type PieceAdder interface {
-	SectorAddPieceToAny(ctx context.Context, size abi.UnpaddedPieceSize, r storiface.Data, d piece.PieceDealInfo) (api.SectorOffset, error)
+	SectorAddPieceToAny(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d piece.PieceDealInfo) (api.SectorOffset, error)
 }
 
 type CommpCalculator interface {
