@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
@@ -18,7 +19,6 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/golang/mock/gomock"
@@ -138,7 +138,7 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 		}, nil
 	}).AnyTimes()
 
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return mb.sectorId, mb.offset, nil
 	}).AnyTimes()
 
@@ -293,7 +293,7 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 	}
 
 	var readBytes []byte
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockAddPiece[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -330,7 +330,7 @@ func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
 		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return abi.SectorNumber(0), abi.PaddedPieceSize(0), err
 	})
 }
