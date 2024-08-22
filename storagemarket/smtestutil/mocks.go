@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
@@ -18,7 +19,6 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/golang/mock/gomock"
@@ -138,7 +138,7 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 		}, nil
 	}).AnyTimes()
 
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return mb.sectorId, mb.offset, nil
 	}).AnyTimes()
 
@@ -281,11 +281,11 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 	}
 	mb.stub.lk.Unlock()
 
-	sdInfo := lapi.PieceDealInfo{
+	sdInfo := piece.PieceDealInfo{
 		DealID:       mb.dealId,
 		DealProposal: &mb.dp.ClientDealProposal.Proposal,
 		PublishCid:   &mb.finalPublishCid,
-		DealSchedule: lapi.DealSchedule{
+		DealSchedule: piece.DealSchedule{
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
@@ -293,25 +293,25 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 	}
 
 	var readBytes []byte
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (lapi.SectorOffset, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockAddPiece[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
 		if ch != nil {
 			select {
 			case <-ctx.Done():
-				return abi.SectorNumber(0), abi.PaddedPieceSize(0), ctx.Err()
+				return lapi.SectorOffset{Sector: abi.SectorNumber(0), Offset: abi.PaddedPieceSize(0)}, ctx.Err()
 			case <-ch:
 			}
 
 		}
 		if ctx.Err() != nil {
-			return abi.SectorNumber(0), abi.PaddedPieceSize(0), ctx.Err()
+			return lapi.SectorOffset{Sector: abi.SectorNumber(0), Offset: abi.PaddedPieceSize(0)}, ctx.Err()
 		}
 
 		var err error
 		readBytes, err = io.ReadAll(r)
-		return mb.sectorId, mb.offset, err
+		return lapi.SectorOffset{Sector: mb.sectorId, Offset: mb.offset}, err
 	})
 
 	mb.rb = &readBytes
@@ -319,19 +319,19 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
-	sdInfo := lapi.PieceDealInfo{
+	sdInfo := piece.PieceDealInfo{
 		DealID:       mb.dealId,
 		DealProposal: &mb.dp.ClientDealProposal.Proposal,
 		PublishCid:   &mb.finalPublishCid,
-		DealSchedule: lapi.DealSchedule{
+		DealSchedule: piece.DealSchedule{
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
 		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
-		return abi.SectorNumber(0), abi.PaddedPieceSize(0), err
+	mb.stub.MockPieceAdder.EXPECT().SectorAddPieceToAny(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ piece.PieceDealInfo) (lapi.SectorOffset, error) {
+		return lapi.SectorOffset{Sector: abi.SectorNumber(0), Offset: abi.PaddedPieceSize(0)}, err
 	})
 }
 

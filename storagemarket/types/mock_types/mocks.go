@@ -12,6 +12,7 @@ import (
 	types "github.com/filecoin-project/boost/storagemarket/types"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
+	api "github.com/filecoin-project/lotus/api"
 	piece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
@@ -40,20 +41,19 @@ func (m *MockPieceAdder) EXPECT() *MockPieceAdderMockRecorder {
 	return m.recorder
 }
 
-// AddPiece mocks base method.
-func (m *MockPieceAdder) AddPiece(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+// SectorAddPieceToAny mocks base method.
+func (m *MockPieceAdder) SectorAddPieceToAny(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 piece.PieceDealInfo) (api.SectorOffset, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddPiece", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(abi.SectorNumber)
-	ret1, _ := ret[1].(abi.PaddedPieceSize)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "SectorAddPieceToAny", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(api.SectorOffset)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// AddPiece indicates an expected call of AddPiece.
-func (mr *MockPieceAdderMockRecorder) AddPiece(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+// SectorAddPieceToAny indicates an expected call of SectorAddPieceToAny.
+func (mr *MockPieceAdderMockRecorder) SectorAddPieceToAny(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPiece", reflect.TypeOf((*MockPieceAdder)(nil).AddPiece), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SectorAddPieceToAny", reflect.TypeOf((*MockPieceAdder)(nil).SectorAddPieceToAny), arg0, arg1, arg2, arg3)
 }
 
 // MockCommpCalculator is a mock of CommpCalculator interface.
