@@ -206,12 +206,6 @@ type IndexProviderConfig struct {
 	Announce IndexProviderAnnounceConfig
 
 	HttpPublisher IndexProviderHttpPublisherConfig
-
-	// Set this to true to use the legacy data-transfer/graphsync publisher.
-	// This should only be used as a temporary fall-back if publishing ipnisync
-	// over libp2p or HTTP is not working, and publishing over
-	// data-transfer/graphsync was previously working.
-	DataTransferPublisher bool
 }
 
 type IndexProviderAnnounceConfig struct {
