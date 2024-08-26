@@ -950,8 +950,6 @@ github.com/ipni/go-libipni v0.6.11 h1:i+a+OCVgtKd0FMg8L9PrNpJgq//MYTxsl7YlyCHKAJ
 github.com/ipni/go-libipni v0.6.11/go.mod h1:hHkfaG5zP8M8RQX8C84gTUre5KODHGPxEbI8E2SgCNw=
 github.com/ipni/index-provider v0.15.5 h1:LgbUPCJusSMtKn85IM1S38d7Da+2Op4eJO+q+yv3gjI=
 github.com/ipni/index-provider v0.15.5/go.mod h1:k6I0F+rApi66NDcCY9ltZu4YghzXLCTzn3kDBBds8Ec=
-github.com/ipni/ipni-cli v0.2.2 h1:AARd2bCnzEVc8mw3NLsyr24su1fIEM7OpkYgCLwI3KI=
-github.com/ipni/ipni-cli v0.2.2/go.mod h1:XRMmnpbPrn+pMSYmsOc2wxV/vo4nKxq0cZiia4IrB2M=
 github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52 h1:QG4CGBqCeuBo6aZlGAamSkxWdgWfZGeE49eUOWJPA4c=
 github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52/go.mod h1:fdg+/X9Gg4AsAIzWpEHwnqd+QY3b7lajxyjE1m4hkq4=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
@@ -1428,8 +1426,6 @@ github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJ
 github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
-github.com/montanaflynn/stats v0.7.0 h1:r3y12KyNxj/Sb/iOE46ws+3mS1+MZca1wlHQFPsY/JU=
-github.com/montanaflynn/stats v0.7.0/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/mr-tron/base58 v1.1.0/go.mod h1:xcD2VGqlgYjBdcBLw+TuYLr8afG+Hj8g2eTVqeSzSU8=
 github.com/mr-tron/base58 v1.1.1/go.mod h1:xcD2VGqlgYjBdcBLw+TuYLr8afG+Hj8g2eTVqeSzSU8=
 github.com/mr-tron/base58 v1.1.2/go.mod h1:BinMc/sQntlIE1frQmRFPUoPA1Zkr8VRgBdjWI2mNwc=

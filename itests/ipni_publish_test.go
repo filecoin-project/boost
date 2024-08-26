@@ -1,22 +1,73 @@
 package itests
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	boost_build "github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/ipni/ipni-cli/pkg/adpub"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/linking"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipni/go-libipni/dagsync"
+	"github.com/ipni/go-libipni/ingest/schema"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
+
+type ClientStore struct {
+	datastore.Batching
+	ipld.LinkSystem
+}
+
+func newClientStore() *ClientStore {
+	store := dssync.MutexWrap(datastore.NewMapDatastore())
+	lsys := cidlink.DefaultLinkSystem()
+	lsys.StorageReadOpener = func(lctx ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
+		c := lnk.(cidlink.Link).Cid
+		val, err := store.Get(lctx.Ctx, datastore.NewKey(c.String()))
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewBuffer(val), nil
+	}
+	lsys.StorageWriteOpener = func(lctx ipld.LinkContext) (io.Writer, ipld.BlockWriteCommitter, error) {
+		buf := bytes.NewBuffer(nil)
+		return buf, func(lnk ipld.Link) error {
+			c := lnk.(cidlink.Link).Cid
+			return store.Put(lctx.Ctx, datastore.NewKey(c.String()), buf.Bytes())
+		}, nil
+	}
+	return &ClientStore{
+		Batching:   store,
+		LinkSystem: lsys,
+	}
+}
+
+func getAdvertisement(ctx context.Context, t *testing.T, sub *dagsync.Subscriber, store *ClientStore, publisher peer.AddrInfo, adCid cid.Cid) (cid.Cid, schema.Advertisement) {
+	adCid, err := sub.SyncAdChain(ctx, publisher, dagsync.WithHeadAdCid(adCid), dagsync.ScopedDepthLimit(1))
+	require.NoError(t, err)
+	val, err := store.Batching.Get(ctx, datastore.NewKey(adCid.String()))
+	require.NoError(t, err)
+	ad, err := schema.BytesToAdvertisement(adCid, val)
+	require.NoError(t, err)
+	_, err = ad.VerifySignature()
+	require.NoError(t, err)
+	return adCid, ad
+}
 
 func TestIPNIPublish(t *testing.T) {
 	ctx := context.Background()
@@ -34,18 +85,21 @@ func TestIPNIPublish(t *testing.T) {
 	addrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
 
-	ntwkName, err := f.FullNode.StateNetworkName(ctx)
-	require.NoError(t, err)
-
-	topicName := boost_build.IndexerIngestTopic(dtypes.NetworkName(ntwkName))
-
 	// Create new ipni-cli client
-	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName(topicName), adpub.WithEntriesDepthLimit(100000))
+	p2pHost, err := libp2p.New()
 	require.NoError(t, err)
+	defer p2pHost.Close()
+	p2pHost.Peerstore().AddAddrs(addrs.ID, addrs.Addrs, time.Hour)
+	store := newClientStore()
+	sub, err := dagsync.NewSubscriber(p2pHost, store.LinkSystem)
+	require.NoError(t, err)
+	//ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName(topicName), adpub.WithEntriesDepthLimit(100000))
+	//require.NoError(t, err)
 
 	// Get head when boost starts
-	headAtStart, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
-	require.NoError(t, err)
+	headAtStartCid, _ := getAdvertisement(ctx, t, sub, store, addrs, cid.Undef)
+	//headAtStart, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
+	//require.NoError(t, err)
 
 	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
 	require.NoError(t, err)
@@ -83,27 +137,73 @@ func TestIPNIPublish(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get current head after the deal
-	headAfterDeal, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
+	_, headAfterDeal := getAdvertisement(ctx, t, sub, store, addrs, cid.Undef)
 	require.NoError(t, err)
+
+	//headAfterDeal, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
+	//require.NoError(t, err)
 
 	// Verify new advertisement is added to the chain and previous head is linked
-	require.Equal(t, headAtStart.ID, headAfterDeal.PreviousID)
+	require.Equal(t, headAtStartCid, headAfterDeal.PreviousCid())
+	//require.Equal(t, headAtStart.ID, headAfterDeal.PreviousID)
 
 	// Confirm this ad is not a remove type
-	require.False(t, headAfterDeal.IsRemove)
+	require.False(t, headAfterDeal.IsRm)
 
 	// Check that advertisement has entries
-	require.True(t, headAfterDeal.HasEntries())
+	require.NotNil(t, headAfterDeal.Entries)
+	entriesCid := headAfterDeal.Entries.(cidlink.Link).Cid
+	require.NotEqual(t, cid.Undef, entriesCid)
+	//require.True(t, headAfterDeal.HasEntries())
 
 	// Sync the entries chain
-	err = ipniClient.SyncEntriesWithRetry(ctx, headAfterDeal.Entries.Root())
+	err = sub.SyncEntries(ctx, addrs, entriesCid)
 	require.NoError(t, err)
+	//err = ipniClient.SyncEntriesWithRetry(ctx, headAfterDeal.Entries.Root())
+	//require.NoError(t, err)
 
 	// Get all multihashes - indexer retrieval
-	mhs, err := headAfterDeal.Entries.Drain()
-	require.NoError(t, err)
+	next := entriesCid
+	var count int
+	var foundRoot bool
+	for next != schema.NoEntries.Cid && next != cid.Undef {
+		var mhs []multihash.Multihash
+		next, mhs, err = store.getEntriesChunk(ctx, next)
+		require.NoError(t, err)
+		count += len(mhs)
+		if !foundRoot {
+			rootMh := rootCid.Hash()
+			for _, mh := range mhs {
+				if bytes.Equal(rootMh, mh) {
+					foundRoot = true
+					break
+				}
+			}
+		}
+	}
+	//mhs, err := headAfterDeal.Entries.Drain()
+	//require.NoError(t, err)
 
-	require.Greater(t, len(mhs), 0)
+	require.Greater(t, count, 0)
+	require.True(t, foundRoot, "root cid not found")
+}
 
-	require.Contains(t, mhs, rootCid.Hash())
+func (s *ClientStore) getEntriesChunk(ctx context.Context, target cid.Cid) (cid.Cid, []multihash.Multihash, error) {
+	n, err := s.LinkSystem.Load(linking.LinkContext{Ctx: ctx}, cidlink.Link{Cid: target}, schema.EntryChunkPrototype)
+	if err != nil {
+		return cid.Undef, nil, err
+	}
+
+	chunk, err := schema.UnwrapEntryChunk(n)
+	if err != nil {
+		return cid.Undef, nil, err
+	}
+	var next cid.Cid
+	if chunk.Next == nil {
+		next = cid.Undef
+	} else {
+		next = chunk.Next.(cidlink.Link).Cid
+	}
+
+	return next, chunk.Entries, nil
 }

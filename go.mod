@@ -309,7 +309,6 @@ require (
 	github.com/ipld/go-trustless-utils v0.4.1
 	github.com/ipld/ipld/specs v0.0.0-20231012031213-54d3b21deda4
 	github.com/ipni/go-libipni v0.6.11
-	github.com/ipni/ipni-cli v0.2.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/schollz/progressbar/v3 v3.14.1
 )
@@ -321,6 +320,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
+	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc8 // indirect
 	github.com/filecoin-project/go-f3 v0.0.7 // indirect
 	github.com/gammazero/channelqueue v0.2.2 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
@@ -348,7 +348,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/ginkgo/v2 v2.20.0 // indirect
 	github.com/pion/datachannel v1.5.8 // indirect
