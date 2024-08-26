@@ -85,7 +85,7 @@ func TestIPNIPublish(t *testing.T) {
 	addrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
 
-	// Create new ipni-cli client
+	// Create new ipni subscriber.
 	p2pHost, err := libp2p.New()
 	require.NoError(t, err)
 	defer p2pHost.Close()
@@ -93,13 +93,9 @@ func TestIPNIPublish(t *testing.T) {
 	store := newClientStore()
 	sub, err := dagsync.NewSubscriber(p2pHost, store.LinkSystem)
 	require.NoError(t, err)
-	//ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName(topicName), adpub.WithEntriesDepthLimit(100000))
-	//require.NoError(t, err)
 
 	// Get head when boost starts
 	headAtStartCid, _ := getAdvertisement(ctx, t, sub, store, addrs, cid.Undef)
-	//headAtStart, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
-	//require.NoError(t, err)
 
 	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
 	require.NoError(t, err)
@@ -140,12 +136,8 @@ func TestIPNIPublish(t *testing.T) {
 	_, headAfterDeal := getAdvertisement(ctx, t, sub, store, addrs, cid.Undef)
 	require.NoError(t, err)
 
-	//headAfterDeal, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
-	//require.NoError(t, err)
-
 	// Verify new advertisement is added to the chain and previous head is linked
 	require.Equal(t, headAtStartCid, headAfterDeal.PreviousCid())
-	//require.Equal(t, headAtStart.ID, headAfterDeal.PreviousID)
 
 	// Confirm this ad is not a remove type
 	require.False(t, headAfterDeal.IsRm)
@@ -154,13 +146,10 @@ func TestIPNIPublish(t *testing.T) {
 	require.NotNil(t, headAfterDeal.Entries)
 	entriesCid := headAfterDeal.Entries.(cidlink.Link).Cid
 	require.NotEqual(t, cid.Undef, entriesCid)
-	//require.True(t, headAfterDeal.HasEntries())
 
 	// Sync the entries chain
 	err = sub.SyncEntries(ctx, addrs, entriesCid)
 	require.NoError(t, err)
-	//err = ipniClient.SyncEntriesWithRetry(ctx, headAfterDeal.Entries.Root())
-	//require.NoError(t, err)
 
 	// Get all multihashes - indexer retrieval
 	next := entriesCid
@@ -181,8 +170,6 @@ func TestIPNIPublish(t *testing.T) {
 			}
 		}
 	}
-	//mhs, err := headAfterDeal.Entries.Drain()
-	//require.NoError(t, err)
 
 	require.Greater(t, count, 0)
 	require.True(t, foundRoot, "root cid not found")
