@@ -173,6 +173,7 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
 	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
 	fmt.Println("basefee:     ", types.FIL(basefee))
+	fmt.Println("noice:       ", smsg.Message.Nonce)
 	fmt.Println()
 	if !cctx.Bool("assume-yes") {
 		validate := func(input string) error {
@@ -215,7 +216,7 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 		err = fmt.Errorf("mpool push: failed to push message: %w", err)
 		return
 	}
-
+	fmt.Println("sent message: ", cid)
 	sent = true
 	return
 }
