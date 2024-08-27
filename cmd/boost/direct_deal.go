@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ipfs/go-datastore"
+	ds_sync "github.com/ipfs/go-datastore/sync"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
@@ -266,8 +269,9 @@ var directDealAllocate = &cli.Command{
 
 		var mcids []cid.Cid
 
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
 		for _, msg := range msgs {
-			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
+			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, ds, msg)
 			if err != nil {
 				return err
 			}
@@ -639,9 +643,9 @@ If the client id different then claim can be extended up to maximum 5 years from
 		}
 
 		var mcids []cid.Cid
-
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
 		for _, msg := range msgs {
-			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
+			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, ds, msg)
 			if err != nil {
 				return err
 			}

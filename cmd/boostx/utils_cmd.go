@@ -91,7 +91,7 @@ var marketAddCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, msg)
+		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, nil, msg)
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ var marketWithdrawCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, msg)
+		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, nil, msg)
 		if err != nil {
 			return err
 		}

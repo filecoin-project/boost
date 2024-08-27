@@ -78,6 +78,10 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, infos []PieceInfo
 		arequest := &verifreg9.AllocationRequests{
 			Allocations: batch,
 		}
+		bDataCap := big.NewInt(0)
+		for _, bd := range batch {
+			bDataCap.Add(big.NewInt(int64(bd.Size)).Int, bDataCap.Int)
+		}
 
 		receiverParams, err := actors.SerializeParams(arequest)
 		if err != nil {
@@ -86,7 +90,7 @@ func CreateAllocationMsg(ctx context.Context, api api.Gateway, infos []PieceInfo
 
 		transferParams, err := actors.SerializeParams(&datacap.TransferParams{
 			To:           builtin.VerifiedRegistryActorAddr,
-			Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+			Amount:       big.Mul(bDataCap, builtin.TokenPrecision),
 			OperatorData: receiverParams,
 		})
 

@@ -134,8 +134,10 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	return deals, err
 }
 
-func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
-	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, ds *ds_sync.MutexDatastore, msg *types.Message) (cid cid.Cid, sent bool, err error) {
+	if ds == nil {
+		ds = ds_sync.MutexWrap(datastore.NewMapDatastore())
+	}
 	vmessagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
 
 	head, err := api.ChainHead(ctx)
@@ -173,6 +175,7 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
 	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
 	fmt.Println("basefee:     ", types.FIL(basefee))
+	fmt.Println("nonce:       ", smsg.Message.Nonce)
 	fmt.Println()
 	if !cctx.Bool("assume-yes") {
 		validate := func(input string) error {
@@ -215,7 +218,7 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 		err = fmt.Errorf("mpool push: failed to push message: %w", err)
 		return
 	}
-
+	fmt.Println("sent message: ", cid)
 	sent = true
 	return
 }
