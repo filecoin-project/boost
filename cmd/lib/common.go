@@ -175,7 +175,7 @@ func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
 	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
 	fmt.Println("basefee:     ", types.FIL(basefee))
-	fmt.Println("noice:       ", smsg.Message.Nonce)
+	fmt.Println("nonce:       ", smsg.Message.Nonce)
 	fmt.Println()
 	if !cctx.Bool("assume-yes") {
 		validate := func(input string) error {
