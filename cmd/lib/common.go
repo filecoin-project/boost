@@ -134,8 +134,7 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	return deals, err
 }
 
-func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
-	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+func SignAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, ds *ds_sync.MutexDatastore, msg *types.Message) (cid cid.Cid, sent bool, err error) {
 	vmessagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
 
 	head, err := api.ChainHead(ctx)

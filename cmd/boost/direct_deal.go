@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/ipfs/go-datastore"
+	ds_sync "github.com/ipfs/go-datastore/sync"
 	"os"
 	"strconv"
 	"strings"
@@ -266,8 +268,9 @@ var directDealAllocate = &cli.Command{
 
 		var mcids []cid.Cid
 
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
 		for _, msg := range msgs {
-			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
+			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, ds, msg)
 			if err != nil {
 				return err
 			}
@@ -639,9 +642,9 @@ If the client id different then claim can be extended up to maximum 5 years from
 		}
 
 		var mcids []cid.Cid
-
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
 		for _, msg := range msgs {
-			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
+			mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, ds, msg)
 			if err != nil {
 				return err
 			}
