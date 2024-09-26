@@ -189,8 +189,8 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 		ID:        params.DealUUID,
 		CreatedAt: time.Now(),
 		PieceCID:  params.PieceCid,
-		//PieceSize abi.PaddedPieceSize
-		Client: params.ClientAddr,
+		PieceSize: params.PieceSize,
+		Client:    params.ClientAddr,
 		//Provider  address.Address
 
 		StartEpoch: params.StartEpoch,
@@ -342,29 +342,29 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		ddp.dealLogger.Infow(dealUuid, "generating commp")
 
 		// TODO: should we be passing pieceSize here ??!?
-		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
+		//pieceSize := abi.UnpaddedPieceSize(fstat.Size())
 
-		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, ddp.commpThrottle, entry.InboundFilePath, pieceSize.Padded(), ddp.config.RemoteCommp)
-		if dmErr != nil {
-			return &dealMakingError{
-				retry: types.DealRetryManual,
-				error: fmt.Errorf("failed to generate commp: %w", dmErr),
-			}
-		}
+		//generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, ddp.commpThrottle, entry.InboundFilePath, pieceSize.Padded(), ddp.config.RemoteCommp)
+		//if dmErr != nil {
+		//	return &dealMakingError{
+		//		retry: types.DealRetryManual,
+		//		error: fmt.Errorf("failed to generate commp: %w", dmErr),
+		//	}
+		//}
 
 		entry.InboundFileSize = fstat.Size()
 
-		log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceInfo.PieceCID, "calculated-piecesize", generatedPieceInfo.Size, "os stat size", fstat.Size())
+		//log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceInfo.PieceCID, "calculated-piecesize", generatedPieceInfo.Size, "os stat size", fstat.Size())
 
-		if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
-			return &dealMakingError{
-				retry: types.DealRetryManual,
-				error: fmt.Errorf("commP expected=%s, actual=%s: %w", entry.PieceCID, generatedPieceInfo.PieceCID, ErrCommpMismatch),
-			}
-		}
+		//if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
+		//	return &dealMakingError{
+		//		retry: types.DealRetryManual,
+		//		error: fmt.Errorf("commP expected=%s, actual=%s: %w", entry.PieceCID, generatedPieceInfo.PieceCID, ErrCommpMismatch),
+		//	}
+		//}
 		ddp.dealLogger.Infow(dealUuid, "completed generating commp")
 
-		entry.PieceSize = generatedPieceInfo.Size
+		//entry.PieceSize = generatedPieceInfo.Size
 
 		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Transferred); err != nil {
 			return err

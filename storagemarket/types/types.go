@@ -91,6 +91,7 @@ type DirectDealParams struct {
 	DealUUID           uuid.UUID
 	AllocationID       verifreg.AllocationId
 	PieceCid           cid.Cid
+	PieceSize          abi.PaddedPieceSize
 	ClientAddr         address.Address
 	StartEpoch         abi.ChainEpoch
 	EndEpoch           abi.ChainEpoch

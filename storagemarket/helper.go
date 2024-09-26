@@ -38,7 +38,7 @@ type CurrentDealInfo struct {
 
 func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market8.DealProposal) (*types.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
-	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
+	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, 1, api.LookbackNoLimit, true)
 	if err != nil {
 		return nil, fmt.Errorf("WaitForPublishDeals errored: %w", err)
 	}

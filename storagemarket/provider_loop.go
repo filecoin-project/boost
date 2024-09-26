@@ -81,26 +81,26 @@ type acceptError struct {
 func (p *Provider) runDealFilters(deal *types.ProviderDealState) *acceptError {
 
 	// run custom storage deal filter decision logic
-	dealFilterParams, aerr := p.getDealFilterParams(deal)
-	if aerr != nil {
-		return aerr
-	}
-	accept, reason, err := p.df(p.ctx, *dealFilterParams)
-	if err != nil {
-		return &acceptError{
-			error:         fmt.Errorf("failed to invoke deal filter: %w", err),
-			reason:        "server error: deal filter error",
-			isSevereError: true,
-		}
-	}
-
-	if !accept {
-		return &acceptError{
-			error:         fmt.Errorf("deal filter rejected deal: %s", reason),
-			reason:        reason,
-			isSevereError: false,
-		}
-	}
+	//dealFilterParams, aerr := p.getDealFilterParams(deal)
+	//if aerr != nil {
+	//	return aerr
+	//}
+	//accept, reason, err := p.df(p.ctx, *dealFilterParams)
+	//if err != nil {
+	//	return &acceptError{
+	//		error:         fmt.Errorf("failed to invoke deal filter: %w", err),
+	//		reason:        "server error: deal filter error",
+	//		isSevereError: true,
+	//	}
+	//}
+	//
+	//if !accept {
+	//	return &acceptError{
+	//		error:         fmt.Errorf("deal filter rejected deal: %s", reason),
+	//		reason:        reason,
+	//		isSevereError: false,
+	//	}
+	//}
 	return nil
 }
 

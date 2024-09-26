@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -21,7 +22,7 @@ import (
 var importDirectDataCmd = &cli.Command{
 	Name:      "import-direct",
 	Usage:     "Import data for direct onboarding flow with Boost",
-	ArgsUsage: "<piececid> <file>",
+	ArgsUsage: "<piececid> <pieceSize> <file>",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "delete-after-import",
@@ -54,14 +55,15 @@ var importDirectDataCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if cctx.Args().Len() < 2 {
-			return fmt.Errorf("must specify piececid and file path")
+		if cctx.Args().Len() < 3 {
+			return fmt.Errorf("must specify piececid, pieceSize and file path")
 		}
 
 		ctx := cctx.Context
 
 		piececidStr := cctx.Args().Get(0)
-		path := cctx.Args().Get(1)
+		psizeStr := cctx.Args().Get(1)
+		path := cctx.Args().Get(2)
 
 		fullpath, err := homedir.Expand(path)
 		if err != nil {
@@ -82,6 +84,13 @@ var importDirectDataCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("could not parse piececid: %w", err)
 		}
+
+		size, err := strconv.ParseInt(psizeStr, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		pieceSize := abi.PaddedPieceSize(size)
 
 		napi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -131,6 +140,7 @@ var importDirectDataCmd = &cli.Command{
 			DealUUID:           uuid.New(),
 			AllocationID:       verifreg.AllocationId(allocationId),
 			PieceCid:           piececid,
+			PieceSize:          pieceSize,
 			ClientAddr:         clientAddr,
 			StartEpoch:         startEpoch,
 			EndEpoch:           endEpoch,

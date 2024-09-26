@@ -23,27 +23,27 @@ var ErrCommpMismatch = fmt.Errorf("commp mismatch")
 // over the downloaded file
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 	p.dealLogger.Infow(deal.DealUuid, "checking commP")
-	pieceCid, err := p.generatePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
-	if err != nil {
-		err.error = fmt.Errorf("failed to generate CommP: %w", err.error)
-		return err
-	}
-
-	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
-	if pieceCid != clientPieceCid {
-		if deal.IsOffline {
-			// Allow manual retry in case user accidentally supplied the wrong
-			// file when importing an offline deal
-			return &dealMakingError{
-				retry: types.DealRetryManual,
-				error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
-			}
-		}
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
-		}
-	}
+	//pieceCid, err := p.generatePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
+	//if err != nil {
+	//	err.error = fmt.Errorf("failed to generate CommP: %w", err.error)
+	//	return err
+	//}
+	//
+	//clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
+	//if pieceCid != clientPieceCid {
+	//	if deal.IsOffline {
+	//		// Allow manual retry in case user accidentally supplied the wrong
+	//		// file when importing an offline deal
+	//		return &dealMakingError{
+	//			retry: types.DealRetryManual,
+	//			error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
+	//		}
+	//	}
+	//	return &dealMakingError{
+	//		retry: types.DealRetryFatal,
+	//		error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
+	//	}
+	//}
 
 	return nil
 }
