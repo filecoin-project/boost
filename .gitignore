@@ -8,6 +8,7 @@
 /booster-bitswap
 /docgen-md
 /docgen-openrpc
+/migrate-curio
 extern/filecoin-ffi/rust/target
 extern/boostd-data/boostd-data
 **/*.a
