@@ -95,13 +95,15 @@ var statsCmd = &cli.Command{
 
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
-		var boostNodes, marketsNodes, venusNodes, noProtocolsNodes, indexerNodes int
+		var boostNodes, marketsNodes, venusNodes, noProtocolsNodes, indexerNodes, curioNodes int
 		boostRawBytePower := big.NewInt(0)
 		boostQualityAdjPower := big.NewInt(0)
 		venusRawBytePower := big.NewInt(0)
 		venusQualityAdjPower := big.NewInt(0)
 		agentVersions := make(map[string]int)
 		transportProtos := make(map[string]int)
+		curioRawBytePower := big.NewInt(0)
+		curioQualityAdjPower := big.NewInt(0)
 
 		throttle = make(chan struct{}, cctx.Int("sp-query-concurrency"))
 		for i, maddr := range withMinPower {
@@ -171,7 +173,11 @@ var statsCmd = &cli.Command{
 					lk.Lock()
 					var out string
 					out += "Provider " + maddr.String()
-					if strings.Contains(agentVersion, "venus") || strings.Contains(agentVersion, "droplet") {
+					if strings.Contains(agentVersion, "curio") {
+						curioNodes++
+						curioQualityAdjPower = big.Add(curioQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
+						curioRawBytePower = big.Add(curioRawBytePower, minerToMinerPower[maddr].RawBytePower)
+					} else if strings.Contains(agentVersion, "venus") || strings.Contains(agentVersion, "droplet") {
 						out += " is running venus"
 
 						venusNodes++
@@ -232,6 +238,9 @@ var statsCmd = &cli.Command{
 		fmt.Println("Total Boost nodes:", boostNodes)
 		fmt.Println("Total Boost raw power:", boostRawBytePower)
 		fmt.Println("Total Boost quality adj power:", boostQualityAdjPower)
+		fmt.Println("Total Curio nodes:", curioNodes)
+		fmt.Println("Total Curio raw power:", curioRawBytePower)
+		fmt.Println("Total Curio quality adj power:", curioQualityAdjPower)
 		fmt.Println("Total Venus nodes:", venusNodes)
 		fmt.Println("Total Venus raw power:", venusRawBytePower)
 		fmt.Println("Total Venus quality adj power:", venusQualityAdjPower)
