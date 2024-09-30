@@ -2,21 +2,14 @@ package testutils
 
 import (
 	"github.com/ipfs/go-cid"
-	blocksutil "github.com/ipfs/go-ipfs-blocksutil"
+	"github.com/ipfs/go-test/random"
 )
-
-var blockGenerator = blocksutil.NewBlockGenerator()
 
 // GenerateCids produces n content identifiers.
 func GenerateCids(n int) []cid.Cid {
-	cids := make([]cid.Cid, 0, n)
-	for i := 0; i < n; i++ {
-		c := blockGenerator.Next().Cid()
-		cids = append(cids, c)
-	}
-	return cids
+	return random.Cids(n)
 }
 
 func GenerateCid() cid.Cid {
-	return GenerateCids(1)[0]
+	return random.Cids(1)[0]
 }

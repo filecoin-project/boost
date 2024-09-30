@@ -140,8 +140,6 @@ func DefaultBoost() *Boost {
 				Port:           3104,
 				WithLibp2p:     false,
 			},
-
-			DataTransferPublisher: false,
 		},
 		HttpDownload: HttpDownloadConfig{
 			HttpTransferMaxConcurrentDownloads: 20,
