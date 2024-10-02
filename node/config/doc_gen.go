@@ -147,6 +147,12 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 
 			Comment: ``,
 		},
+		{
+			Name: "CurioMigration",
+			Type: "CurioMigration",
+
+			Comment: ``,
+		},
 	},
 	"Common": []DocField{
 		{
@@ -192,6 +198,14 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Type: "string",
 
 			Comment: `From address for eth_ state call`,
+		},
+	},
+	"CurioMigration": []DocField{
+		{
+			Name: "Enable",
+			Type: "bool",
+
+			Comment: `Enable limits the Boost functionality to prepare for the migration`,
 		},
 	},
 	"DealPublishConfig": []DocField{

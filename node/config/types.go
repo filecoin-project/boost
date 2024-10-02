@@ -51,6 +51,7 @@ type Boost struct {
 	HttpDownload        HttpDownloadConfig
 	Retrievals          RetrievalConfig
 	IndexProvider       IndexProviderConfig
+	CurioMigration      CurioMigration
 }
 
 type WalletsConfig struct {
@@ -398,4 +399,9 @@ type DealPublishConfig struct {
 	// as a multiplier of the minimum collateral bound
 	// The maximum fee to pay when sending the PublishStorageDeals message
 	MaxPublishDealsFee types.FIL
+}
+
+type CurioMigration struct {
+	// Enable limits the Boost functionality to prepare for the migration
+	Enable bool
 }

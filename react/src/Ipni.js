@@ -6,6 +6,7 @@ import {
     IpniProviderInfoQuery,
     IpniLatestAdQuery,
     IpniDistanceFromLatestAdQuery,
+    IpniRemovedAllAdsStatus,
 } from "./gql";
 import moment from "moment";
 import React, {useEffect, useState} from "react";
@@ -89,6 +90,7 @@ function ProviderIpniInfoRender(props){
             adcid: adCid
         }
     })
+    const publishedRemoveAll = useQuery(IpniRemovedAllAdsStatus)
     return <div className="ipni-prov-info">
         <h3>Provider Indexer Info</h3>
         <div className="subtitle">
@@ -111,13 +113,14 @@ function ProviderIpniInfoRender(props){
                     &nbsp;
                     <span className="aux">({moment(data.LastAdvertisementTime).fromNow()} ago)</span>
                     &nbsp;
-                    {distance.data ? <span className="aux">({distance.data.ipniDistanceFromLatestAd} behind)</span>: ''}
+                    {distance.data ?
+                        <span className="aux">({distance.data.ipniDistanceFromLatestAd} behind)</span> : ''}
                 </td>
             </tr>
             <tr>
                 <th>Latest Advertisement on Boost</th>
                 <td>
-                    {lad ? <Link to={'/ipni/ad/'+lad}>{lad}</Link>: ''}
+                    {lad ? <Link to={'/ipni/ad/' + lad}>{lad}</Link> : ''}
                 </td>
             </tr>
             <tr>
@@ -126,6 +129,12 @@ function ProviderIpniInfoRender(props){
                     {data.LastError ? data.LastError : 'Success'}
                     &nbsp;
                     <span className="aux">({moment(data.LastErrorTime).fromNow()} ago)</span>
+                </td>
+            </tr>
+            <tr>
+                <th>Published Removal Ads for Curio Migration</th>
+                <td>
+                    {publishedRemoveAll.data ? publishedRemoveAll.data: ''}
                 </td>
             </tr>
             </tbody>
@@ -137,7 +146,7 @@ function ProviderConfig({configJson}) {
     const cfg = JSON.parse(configJson)
     return <div>
         <h3>Index Provider Config</h3>
-        <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'} />
+        <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'}/>
     </div>
 }
 
