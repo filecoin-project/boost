@@ -135,6 +135,10 @@ func getAddressAllowanceOnContract(ctx context.Context, api api.Gateway, wallet 
 		return nil, err
 	}
 
+	if result.MsgRct.ExitCode.IsError() {
+		return nil, fmt.Errorf("Checking allowance failed with ExitCode %d", result.MsgRct.ExitCode)
+	}
+
 	// Decode return value (cbor -> evm ABI -> math/big Int -> filecoin big Int)
 	var decodedReturn abi.CborBytes
 	err = decodedReturn.UnmarshalCBOR(bytes.NewReader(result.MsgRct.Return))

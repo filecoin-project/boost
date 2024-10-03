@@ -95,7 +95,7 @@ var directDealAllocate = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "evm-client-contract",
-			Usage: "address of EVM contract to spend DataCap from",
+			Usage: "f4 address of EVM contract to spend DataCap from",
 		},
 	},
 	Before: before,
@@ -263,8 +263,11 @@ var directDealAllocate = &cli.Command{
 
 		var msgs []*types.Message
 		var allocationsAddr address.Address
-		evmContract := cctx.String("evm-client-contract")
-		if evmContract != "" {
+		if cctx.IsSet("evm-client-contract") {
+			evmContract := cctx.String("evm-client-contract")
+			if evmContract == "" {
+				return fmt.Errorf("evm-client-contract can't be empty")
+			}
 			evmContractAddr, err := address.NewFromString(evmContract)
 			if err != nil {
 				return err
@@ -307,7 +310,7 @@ var directDealAllocate = &cli.Command{
 			mcidStr = append(mcidStr, c.String())
 		}
 
-		log.Infow("submitted data cap allocation message[s]", "mcidStr", mcidStr)
+		log.Infow("submitted data cap allocation message[s]", "CID", mcidStr)
 		log.Info("waiting for message to be included in a block")
 
 		// wait for msgs to get mined into a block
