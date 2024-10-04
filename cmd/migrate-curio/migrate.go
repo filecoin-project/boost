@@ -33,6 +33,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	cbor "github.com/ipfs/go-ipld-cbor"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/net/context"
@@ -72,6 +73,21 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	lr, err := r.Lock(repo.Boost)
 	if err != nil {
 		return err
+	}
+
+	keyStore, err := lr.KeyStore()
+	if err != nil {
+		return fmt.Errorf("failed to open Boost keystore")
+	}
+
+	key, err := keyStore.Get("libp2p-host")
+	if err != nil {
+		return fmt.Errorf("failed to get key from keystore: %w", err)
+	}
+
+	pkey, err := crypto.UnmarshalPrivateKey(key.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal private key: %w", err)
 	}
 
 	mds, err := lr.Datastore(ctx, "/metadata")
@@ -160,6 +176,12 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	if err := migrateDDODeals(ctx, full, activeSectors, maddr, hdb, sqldb, mdb); err != nil {
 		return xerrors.Errorf("failed to migrate DDO deals: %w", err)
 	}
+
+	// Migrate libp2p key
+	if err := migrateKeys(ctx, maddr, pkey, hdb); err != nil {
+		return xerrors.Errorf("failed to migrate libp2p key: %w", err)
+	}
+
 	return nil
 }
 
@@ -551,6 +573,26 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 				return fmt.Errorf("deal: %s: failed to add DDO deal to pipeline for indexing and announcing: %w", deal.ID.String(), err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func migrateKeys(ctx context.Context, maddr address.Address, priv crypto.PrivKey, hdb *harmonydb.DB) error {
+
+	pkey, err := priv.Raw()
+	if err != nil {
+		return err
+	}
+
+	mid, err := address.IDFromAddress(maddr)
+	if err != nil {
+		return err
+	}
+
+	_, err = hdb.Exec(ctx, `INSERT INTO libp2p (sp_id, priv_key) VALUES ($1, $2) ON CONFLICT(sp_id) DO NOTHING`, mid, pkey)
+	if err != nil {
+		return fmt.Errorf("inserting private key into libp2p table: %w", err)
 	}
 
 	return nil
