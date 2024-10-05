@@ -44,7 +44,6 @@ type DDPConfig struct {
 	// Minimum start epoch buffer to give time for sealing of sector with deal
 	StartEpochSealingBuffer abi.ChainEpoch
 	Curio                   bool
-	CurioMigration          bool
 }
 
 type DirectDealsProvider struct {
@@ -198,9 +197,6 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 }
 
 func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
-	if ddp.config.CurioMigration {
-		return &api.ProviderDealRejectionInfo{Reason: "Boost is migrating to Curio"}, nil
-	}
 	piececid := params.PieceCid.String()
 	clientAddr := params.ClientAddr.String()
 	log.Infow("received direct data import", "piececid", piececid, "filepath", params.FilePath, "clientAddr", clientAddr, "allocationId", params.AllocationID)

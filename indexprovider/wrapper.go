@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -72,7 +71,6 @@ type Wrapper struct {
 	bitswapEnabled bool
 	httpEnabled    bool
 	stop           context.CancelFunc
-	removeAllAds   bool
 }
 
 func NewWrapper(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, directDealsDB *db.DirectDealsDB, dealsDB *db.DealsDB,
@@ -129,11 +127,7 @@ func (w *Wrapper) Start(_ context.Context) {
 
 	log.Info("starting index provider")
 
-	if w.cfg.CurioMigration.Enable {
-		go w.tryAnnounceRemoveAll(runCtx)
-	} else {
-		go w.checkForUpdates(runCtx)
-	}
+	go w.checkForUpdates(runCtx)
 }
 
 func (w *Wrapper) checkForUpdates(ctx context.Context) {
@@ -921,31 +915,4 @@ func (w *Wrapper) AnnounceRemoveAll(ctx context.Context) ([]cid.Cid, error) {
 
 	return newAds, nil
 
-}
-
-func (w *Wrapper) tryAnnounceRemoveAll(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
-
-	for {
-		select {
-		case <-ticker.C:
-			out, err := w.AnnounceRemoveAll(ctx)
-			if err != nil {
-				log.Errorw("error while announcing remove all", "err", err)
-				continue
-			}
-			if len(out) > 0 {
-				continue
-			}
-			log.Debugw("Cleaned up all the IPNI ads")
-			w.removeAllAds = true
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (w *Wrapper) RemoveAllStatus(ctx context.Context) bool {
-	return w.removeAllAds
 }

@@ -229,7 +229,3 @@ func (r *resolver) IpniDistanceFromLatestAd(ctx context.Context, args struct {
 
 	return count, nil
 }
-
-func (r *resolver) IpniRemovedAllAdsStatus(ctx context.Context) (bool, error) {
-	return r.idxProvWrapper.RemoveAllStatus(ctx), nil
-}

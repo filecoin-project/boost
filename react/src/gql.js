@@ -880,12 +880,6 @@ const IpniDistanceFromLatestAdQuery = gql`
     }
 `;
 
-const IpniRemovedAllAdsStatus = gql`
-    query AppIpniRemovedAllAdsStatusQuery{
-        ipniRemovedAllAdsStatus
-    }
-`;
-
 export {
     gqlClient,
     EpochQuery,
@@ -937,5 +931,4 @@ export {
     StorageAskQuery,
     PublishPendingDealsMutation,
     PiecePayloadCidsQuery,
-    IpniRemovedAllAdsStatus,
 }

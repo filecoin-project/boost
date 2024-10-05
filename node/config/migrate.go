@@ -15,7 +15,7 @@ var log = logging.Logger("cfg")
 
 // CurrentVersion is the config version expected by Boost.
 // We need to migrate the config file to this version.
-const CurrentVersion = 7
+const CurrentVersion = 6
 
 type migrateUpFn = func(cfgPath string) (string, error)
 
@@ -26,7 +26,6 @@ var migrations = []migrateUpFn{
 	v3Tov4, // index 3 => version 4
 	v4Tov5, // index 4 => version 5
 	v5Tov6, // index 5 => version 6
-	v6Tov7, // index 6 => version 7
 }
 
 // This struct is used to get the config file version

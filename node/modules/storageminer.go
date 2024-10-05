@@ -486,7 +486,6 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
 			StorageFilter:               cfg.Dealmaking.Filter,
 			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
-			CurioMigration:              cfg.CurioMigration.Enable,
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks), httptransport.AllowPrivateIPsOpt(cfg.HttpDownload.AllowPrivateIPs))

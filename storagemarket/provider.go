@@ -84,7 +84,6 @@ type Config struct {
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
 	Curio                       bool
-	CurioMigration              bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -251,9 +250,6 @@ func (p *Provider) GetAsk() *legacytypes.SignedStorageAsk {
 // an offline deal (the deal must already have been proposed by the client)
 func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (pi *api.ProviderDealRejectionInfo, err error) {
 	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath, "delete after import", delAfterImport)
-	if p.config.CurioMigration {
-		return &api.ProviderDealRejectionInfo{Reason: "Boost is migrating to Curio"}, nil
-	}
 
 	// db should already have a deal with this uuid as the deal proposal should have been made beforehand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
@@ -297,9 +293,6 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 // ExecuteDeal is called when the Storage Provider receives a deal proposal
 // from the network
 func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
-	if p.config.CurioMigration {
-		return &api.ProviderDealRejectionInfo{Reason: "Boost is migrating to Curio"}, nil
-	}
 	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteLibp2pDeal")
 	defer span.End()
 
