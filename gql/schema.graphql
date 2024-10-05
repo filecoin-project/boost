@@ -652,9 +652,6 @@ type RootQuery {
 
   """Get the latest IPNI advertisemen"""
   ipniDistanceFromLatestAd(LatestAdcid: String!, Adcid: String!): Int!
-
-  """Get the IPNI Remove All Status"""
-  ipniRemovedAllAdsStatus: Boolean!
 }
 
 type RootMutation {
