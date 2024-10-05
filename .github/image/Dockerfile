@@ -18,7 +18,7 @@ RUN git submodule update --init
 RUN go mod download
 
 # Download Go dependencies for Curio
-WORKDIR /app/boost
+WORKDIR /app/curio
 RUN git submodule update --init
 RUN go mod download
 
