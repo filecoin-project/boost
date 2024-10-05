@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -73,21 +74,6 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	lr, err := r.Lock(repo.Boost)
 	if err != nil {
 		return err
-	}
-
-	keyStore, err := lr.KeyStore()
-	if err != nil {
-		return fmt.Errorf("failed to open Boost keystore")
-	}
-
-	key, err := keyStore.Get("libp2p-host")
-	if err != nil {
-		return fmt.Errorf("failed to get key from keystore: %w", err)
-	}
-
-	pkey, err := crypto.UnmarshalPrivateKey(key.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal private key: %w", err)
 	}
 
 	mds, err := lr.Datastore(ctx, "/metadata")
@@ -178,7 +164,7 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	}
 
 	// Migrate libp2p key
-	if err := migrateKeys(ctx, maddr, pkey, hdb); err != nil {
+	if err := generateNewKeys(ctx, maddr, hdb); err != nil {
 		return xerrors.Errorf("failed to migrate libp2p key: %w", err)
 	}
 
@@ -578,16 +564,21 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 	return nil
 }
 
-func migrateKeys(ctx context.Context, maddr address.Address, priv crypto.PrivKey, hdb *harmonydb.DB) error {
-
-	pkey, err := priv.Raw()
-	if err != nil {
-		return err
-	}
+func generateNewKeys(ctx context.Context, maddr address.Address, hdb *harmonydb.DB) error {
 
 	mid, err := address.IDFromAddress(maddr)
 	if err != nil {
 		return err
+	}
+
+	pk, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return fmt.Errorf("generating private key: %w", err)
+	}
+
+	pkey, err := pk.Raw()
+	if err != nil {
+		return fmt.Errorf("converting private key: %w", err)
 	}
 
 	_, err = hdb.Exec(ctx, `INSERT INTO libp2p (sp_id, priv_key) VALUES ($1, $2) ON CONFLICT(sp_id) DO NOTHING`, mid, pkey)
