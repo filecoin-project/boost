@@ -23,7 +23,7 @@ RUN git submodule update --init
 RUN go mod download
 
 # Stage 2: Install Lotus binary
-FROM ghcr.io/filecoin-shipyard/lotus-containers:lotus-v1.28.1-devnet AS lotus-test
+FROM ghcr.io/filecoin-shipyard/lotus-containers:lotus-v1.30.0-rc1-devnet AS lotus-test
 
 # Stage 3: Build the final image
 FROM myoung34/github-runner AS curio-github-runner

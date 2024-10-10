@@ -178,7 +178,7 @@ dist-clean:
 	git submodule deinit --all -f
 .PHONY: dist-clean
 
-gen: cfgdoc-gen api-gen
+gen: cfgdoc-gen api-gen docsgen
 .PHONY: gen
 
 api-gen:
@@ -217,22 +217,9 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.27.0
+lotus_version?=v1.30.0-rc1
 ffi_from_source?=0
 build_lotus?=0
-build_boost?=1
-boost_version?=v2.3.0-rc2
-ifeq ($(build_boost),1)
-#v1: build boost images currently checked out branch
-	boost_build_cmd=docker/boost
-	booster_http_build_cmd=docker/booster-http
-	booster_bitswap_build_cmd=docker/booster-bitswap
-else
-# v2: pull images from the github repo
-	boost_build_cmd=pull/boost retag/boost
-	booster_http_build_cmd=pull/booster-http retag/booster-http
-	booster_bitswap_build_cmd=pull/booster-bitswap retag/booster-bitswap
-endif
 ifeq ($(build_lotus),1)
 # v1: building lotus image with provided lotus version
 	lotus_info_msg=!!! building lotus base image from github: branch/tag $(lotus_version) !!!
@@ -262,30 +249,6 @@ docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
 		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
-
-pull/boost:
-	docker pull ghcr.io/filecoin-project/boost:boost-dev-$(boost_version)
-.PHONY: pull/boost
-
-pull/booster-http:
-	docker pull ghcr.io/filecoin-project/boost:boost-http-dev-$(boost_version)
-.PHONY: pull/boost
-
-pull/booster-bitswap:
-	docker pull ghcr.io/filecoin-project/boost:boost-bitswap-dev-$(boost_version)
-.PHONY: pull/boost
-
-retag/boost:
-	docker tag ghcr.io/filecoin-project/boost:boost-dev-$(boost_version) $(docker_user)/boost-dev:dev
-.PHONY: retag/boost
-
-retag/booster-http:
-	docker tag ghcr.io/filecoin-project/boost:boost-http-dev-$(boost_version) $(docker_user)/booster-http-dev:dev
-.PHONY: retag/booster-http
-
-retag/booster-bitswap:
-	docker tag ghcr.io/filecoin-project/boost:boost-bitswap-dev-$(boost_version) $(docker_user)/booster-bitswap-dev:dev
-.PHONY: retag/booster-bitswap
 
 # boost-client main
 docker/mainnet/boost-client: build/.update-modules
@@ -318,19 +281,9 @@ docker/yugabytedb:
 		-f docker/Dockerfile.yugabyte .
 .PHONY: docker/booster-http
 .PHONY: docker/booster-bitswap
-docker/all: $(lotus_build_cmd) $(boost_build_cmd) $(booster_http_build_cmd) $(booster_bitswap_build_cmd) \
+docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner docker/yugabytedb
 .PHONY: docker/all
-
-### To allow devs to pull individual images. Require build_boost=0 and boost_version to be supplied
-docker/get-boost: $(boost_build_cmd)
-.PHONY: docker/get-boost
-
-docker/get-booster-http: $(booster_http_build_cmd)
-.PHONY: docker/get-booster-http
-
-docker/get-booster-bitswap: $(booster_bitswap_build_cmd)
-.PHONY: docker/get-booster-http
 
 test-lid:
 	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
