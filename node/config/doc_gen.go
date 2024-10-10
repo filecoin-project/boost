@@ -903,18 +903,6 @@ your node if metadata log is disabled`,
 
 			Comment: ``,
 		},
-		{
-			Name: "Libp2p",
-			Type: "Libp2p",
-
-			Comment: ``,
-		},
-		{
-			Name: "Pubsub",
-			Type: "Pubsub",
-
-			Comment: ``,
-		},
 	},
 	"lotus_config.DealmakingConfig": []DocField{
 		{
@@ -998,13 +986,17 @@ disabled by setting their respective Disable* options.`,
 			Type: "Duration",
 
 			Comment: `FilterTTL specifies the time to live for actor event filters. Filters that haven't been accessed longer than
-this time become eligible for automatic deletion.`,
+this time become eligible for automatic deletion. Filters consume resources, so if they are unused they
+should not be retained.`,
 		},
 		{
 			Name: "MaxFilters",
 			Type: "int",
 
-			Comment: `MaxFilters specifies the maximum number of filters that may exist at any one time.`,
+			Comment: `MaxFilters specifies the maximum number of filters that may exist at any one time.
+Multi-tenant environments may want to increase this value to serve a larger number of clients. If using
+lotus-gateway, this global limit can be coupled with --eth-max-filters-per-conn which limits the number
+of filters per connection.`,
 		},
 		{
 			Name: "MaxFilterResults",
@@ -1082,13 +1074,41 @@ This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, bu
 Set to 0 to keep all mappings`,
 		},
 		{
+			Name: "EthTraceFilterMaxResults",
+			Type: "uint64",
+
+			Comment: `EthTraceFilterMaxResults sets the maximum results returned per request by trace_filter`,
+		},
+		{
 			Name: "Events",
 			Type: "DeprecatedEvents",
 
 			Comment: ``,
 		},
+		{
+			Name: "EthBlkCacheSize",
+			Type: "int",
+
+			Comment: `EthBlkCacheSize specifies the size of the cache used for caching Ethereum blocks.
+This cache enhances the performance of the eth_getBlockByHash RPC call by minimizing the need to access chain state for
+recently requested blocks that are already cached.
+The default size of the cache is 500 blocks.
+Note: Setting this value to 0 disables the cache.`,
+		},
 	},
 	"lotus_config.FullNode": []DocField{
+		{
+			Name: "Libp2p",
+			Type: "Libp2p",
+
+			Comment: ``,
+		},
+		{
+			Name: "Pubsub",
+			Type: "Pubsub",
+
+			Comment: ``,
+		},
 		{
 			Name: "Wallet",
 			Type: "Wallet",
