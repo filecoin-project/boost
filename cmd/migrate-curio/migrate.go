@@ -118,9 +118,9 @@ func migrate(cctx *cli.Context, repoDir string) error {
 
 	_, err = mdb.Exec(`CREATE TABLE IF NOT EXISTS Deals (
 							ID TEXT UNIQUE,
-							DB BOOL,
-							LID BOOL,
-							Pipeline BOOL
+							DB BOOL NOT NULL DEFAULT FALSE,
+							LID BOOL NOT NULL DEFAULT FALSE,
+							Pipeline BOOL NOT NULL DEFAULT FALSE
 						);`)
 	if err != nil {
 		return fmt.Errorf("failed to create migration table: %w", err)
