@@ -576,12 +576,12 @@ func generateNewKeys(ctx context.Context, maddr address.Address, hdb *harmonydb.
 		return fmt.Errorf("generating private key: %w", err)
 	}
 
-	pkey, err := pk.Raw()
+	kbytes, err := crypto.MarshalPrivateKey(pk)
 	if err != nil {
-		return fmt.Errorf("converting private key: %w", err)
+		return fmt.Errorf("marshaling private key: %w", err)
 	}
 
-	_, err = hdb.Exec(ctx, `INSERT INTO libp2p (sp_id, priv_key) VALUES ($1, $2) ON CONFLICT(sp_id) DO NOTHING`, mid, pkey)
+	_, err = hdb.Exec(ctx, `INSERT INTO libp2p (sp_id, priv_key) VALUES ($1, $2) ON CONFLICT(sp_id) DO NOTHING`, mid, kbytes)
 	if err != nil {
 		return fmt.Errorf("inserting private key into libp2p table: %w", err)
 	}
