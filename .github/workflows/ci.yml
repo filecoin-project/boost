@@ -66,6 +66,7 @@ jobs:
     runs-on: [self-hosted, docker]
     needs: [setup-params]
     strategy:
+      fail-fast: false  # Continue running even if one test fails
       matrix:
         test-suite:
           - name: test-itest-dummydeal_offline
