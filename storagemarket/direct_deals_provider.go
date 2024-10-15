@@ -149,6 +149,22 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 
 	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
 
+	mid, err := address.IDFromAddress(ddp.Address)
+	if err != nil {
+		log.Warnw("failed to get miner ID from address", "err", err)
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   "server error: miner address to ID conversion",
+		}, nil
+	}
+
+	if allocation.Provider != abi.ActorID(mid) {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   fmt.Sprintf("allocation provider %s does not match miner address %s", allocation.Provider, ddp.Address),
+		}, nil
+	}
+
 	// If the TermMin is longer than initial sector duration, the deal will be dropped from the sector
 	if allocation.TermMin > miner13types.MaxSectorExpirationExtension-policy.SealRandomnessLookback {
 		return &api.ProviderDealRejectionInfo{
