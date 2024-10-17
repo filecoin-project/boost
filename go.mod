@@ -1,6 +1,6 @@
 module github.com/filecoin-project/boost
 
-go 1.22
+go 1.22.3
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
@@ -21,6 +21,7 @@ require (
 	github.com/fatih/color v1.16.0
 	github.com/filecoin-project/boost-graphsync v0.13.12
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
+	github.com/filecoin-project/curio v1.23.2-0.20241017101155-587dd6361137
 	github.com/filecoin-project/dagstore v0.7.0
 	github.com/filecoin-project/go-address v1.2.0
 	github.com/filecoin-project/go-bitfield v0.2.4
@@ -30,13 +31,13 @@ require (
 	github.com/filecoin-project/go-ds-versioning v0.1.2
 	github.com/filecoin-project/go-fil-commcid v0.2.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0
-	github.com/filecoin-project/go-jsonrpc v0.6.0
+	github.com/filecoin-project/go-jsonrpc v0.6.1-0.20240820160949-2cfe810e5d2f
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.15.0-rc1
 	github.com/filecoin-project/go-statemachine v1.0.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.30.0-rc2
+	github.com/filecoin-project/lotus v1.30.0-rc2.0.20241016173451-c07d2f73e436
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -107,6 +108,7 @@ require (
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor v0.0.0-20171005072247-63513f603b11
 	github.com/whyrusleeping/cbor-gen v0.1.2
+	github.com/yugabyte/pgx/v4 v4.14.5
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/trace v1.28.0
@@ -174,6 +176,7 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.4.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
+	github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20240802040721-2a04ffc8ffe8 // indirect
 	github.com/filecoin-project/go-commp-utils/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-crypto v0.1.0 // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc8 // indirect
@@ -266,7 +269,7 @@ require (
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/kilic/bls12-381 v0.1.0 // indirect
+	github.com/kilic/bls12-381 v0.1.1-0.20220929213557-ca162e8a70f4 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
@@ -347,7 +350,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/triplewz/poseidon v0.0.1 // indirect
+	github.com/triplewz/poseidon v0.0.2-0.20240407130934-5265fab9d889 // indirect
 	github.com/twmb/murmur3 v1.1.6 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
@@ -359,7 +362,6 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6 // indirect
-	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
 	github.com/yugabyte/pgx/v5 v5.5.3-yb-2 // indirect
 	github.com/zondax/hid v0.9.2 // indirect
 	github.com/zondax/ledger-filecoin-go v0.11.1 // indirect
@@ -390,5 +392,3 @@ require (
 	lukechampine.com/blake3 v1.3.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
-
-replace github.com/KarpelesLab/reflink => github.com/magik6k/reflink v1.0.2-patch1
