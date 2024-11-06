@@ -461,7 +461,7 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 				ON CONFLICT (signed_proposal_cid) DO NOTHING`,
 			deal.ProposalCid, mid, deal.Client.String(), sigByte, propJson, prop.PieceCID.String(),
 			prop.PieceSize, prop.VerifiedDeal, prop.StartEpoch, prop.EndEpoch, deal.PublishCid.String(),
-			deal.FastRetrieval, deal.CreationTime, deal.SectorNumber)
+			deal.DealID, deal.FastRetrieval, deal.CreationTime, deal.SectorNumber)
 
 		if err != nil {
 			return fmt.Errorf("deal: %s: failed to add the legacy deal to harmonyDB: %w", deal.ProposalCid.String(), err)
