@@ -302,8 +302,9 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 
 			if !b {
 				// Add LID details to pieceDeal in HarmonyDB
-				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-					deal.DealUuid.String(), prop.PieceCID.String(), true, mid, deal.SectorID, deal.Offset, prop.PieceSize, deal.NBytesReceived, false)
+				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+					deal.DealUuid.String(), prop.PieceCID.String(), true, mid, deal.SectorID, deal.Offset,
+					prop.PieceSize, deal.NBytesReceived, false, false, deal.ChainDealID)
 				if err != nil {
 					return false, fmt.Errorf("deal: %s: failed to update piece metadata and piece deal: %w", deal.DealUuid.String(), err)
 				}
