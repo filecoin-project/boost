@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"time"
 
@@ -262,7 +263,12 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 			return fmt.Errorf("deal: %s: failed to de-serialize transport params bytes '%s': %s", deal.DealUuid.String(), string(deal.Transfer.Params), err)
 		}
 
-		headers, err := json.Marshal(tInfo.Headers)
+		hdr := http.Header{}
+		for k, v := range tInfo.Headers {
+			hdr.Add(k, v)
+		}
+
+		headers, err := json.Marshal(hdr)
 		if err != nil {
 			return fmt.Errorf("deal: %s: failed to marshal headers: %s", deal.DealUuid.String(), err)
 		}
