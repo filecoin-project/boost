@@ -453,7 +453,7 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 
 		prop := deal.ClientDealProposal.Proposal
 
-		_, err = hdb.Exec(ctx, `INSERT INTO signed_proposal_cid (signed_proposal_cid, sp_id, client_peer_id,
+		_, err = hdb.Exec(ctx, `INSERT INTO market_legacy_deals (signed_proposal_cid, sp_id, client_peer_id,
                                 proposal_signature, proposal, piece_cid, 
                                 piece_size, verified, start_epoch, end_epoch, 
                                 publish_cid, chain_deal_id, fast_retrieval, created_at, sector_num) 
