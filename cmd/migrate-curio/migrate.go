@@ -330,7 +330,8 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 					var proof abi.RegisteredSealProof
 					err = tx.QueryRow(`SELECT reg_seal_proof FROM sectors_meta WHERE sp_id = $1 AND sector_num = $2`, mid, deal.SectorID).Scan(&proof)
 					if err != nil {
-						return false, fmt.Errorf("seal: %s: failed to get sector proof: %w", deal.DealUuid.String(), err)
+						llog.Errorw("failed to get sector proof", "error", err, "deal", deal.DealUuid.String(), "sector", deal.SectorID, "miner", mid)
+						return false, nil
 					}
 
 					// Add deal to mk12 pipeline in Curio for indexing and announcement
