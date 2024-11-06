@@ -458,7 +458,7 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
                                 piece_size, verified, start_epoch, end_epoch, 
                                 publish_cid, chain_deal_id, fast_retrieval, created_at, sector_num) 
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-				ON CONFLICT (signed_proposal_cid) DO NOTHING`,
+				ON CONFLICT (sp_id, piece_cid, signed_proposal_cid) DO NOTHING`,
 			deal.ProposalCid, mid, deal.Client.String(), sigByte, propJson, prop.PieceCID.String(),
 			prop.PieceSize, prop.VerifiedDeal, prop.StartEpoch, prop.EndEpoch, deal.PublishCid.String(),
 			deal.DealID, deal.FastRetrieval, deal.CreationTime.Time(), deal.SectorNumber)
