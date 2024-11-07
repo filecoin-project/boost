@@ -70,12 +70,32 @@ var cleanupYugabyteDBCmd = &cli.Command{
 			return fmt.Errorf("creating yugabyte cluster: %w", err)
 		}
 
-		query := `DROP KEYSPACE idx`
-		log.Debug(query)
-		err = session.Query(query).WithContext(cctx.Context).Exec()
-		if err != nil {
-			return err
+		keyspace := "idx"
+
+		// Step 1: Drop all indexes
+		var indexName string
+		indexesQuery := fmt.Sprintf("SELECT index_name FROM system_schema.indexes WHERE keyspace_name='%s';", keyspace)
+		iter := session.Query(indexesQuery).Iter()
+
+		for iter.Scan(&indexName) {
+			dropIndexQuery := fmt.Sprintf("DROP INDEX %s.%s;", keyspace, indexName)
+			fmt.Println("Executing:", dropIndexQuery)
+			if err := session.Query(dropIndexQuery).Exec(); err != nil {
+				return fmt.Errorf("failed to drop index %s: %w", indexName, err)
+			}
 		}
+		if err := iter.Close(); err != nil {
+			return fmt.Errorf("failed to iterate over indexes: %w", err)
+		}
+
+		// Step 2: Drop the keyspace
+		dropKeyspaceQuery := fmt.Sprintf("DROP KEYSPACE %s;", keyspace)
+		fmt.Println("Executing:", dropKeyspaceQuery)
+		if err := session.Query(dropKeyspaceQuery).Exec(); err != nil {
+			return fmt.Errorf("failed to drop keyspace: %w", err)
+		}
+
+		fmt.Println("Keyspace dropped successfully.")
 
 		// Create connection pool to postgres interface
 		db, err := pgxpool.Connect(cctx.Context, settings.ConnectString)
