@@ -72,7 +72,7 @@ var cleanupYugabyteDBCmd = &cli.Command{
 
 		keyspace := "idx"
 
-		// Step 1: Drop all indexes
+		// Drop all indexes
 		var indexName string
 		indexesQuery := fmt.Sprintf("SELECT index_name FROM system_schema.indexes WHERE keyspace_name='%s';", keyspace)
 		iter := session.Query(indexesQuery).Iter()
@@ -88,7 +88,28 @@ var cleanupYugabyteDBCmd = &cli.Command{
 			return fmt.Errorf("failed to iterate over indexes: %w", err)
 		}
 
-		// Step 2: Drop the keyspace
+		// Query to get all tables in the 'idx' keyspace
+		tableQuesry := fmt.Sprintf(`SELECT table_name FROM system_schema.tables WHERE keyspace_name='%s';`, keyspace)
+		iter = session.Query(tableQuesry).Iter()
+
+		var tableName string
+		for iter.Scan(&tableName) {
+			dropQuery := fmt.Sprintf("DROP TABLE idx.%s", tableName)
+			fmt.Println("Executing:", dropQuery)
+
+			err := session.Query(dropQuery).Exec()
+			if err != nil {
+				return fmt.Errorf("failed to drop table %s: %w", tableName, err)
+			}
+		}
+
+		if err := iter.Close(); err != nil {
+			return fmt.Errorf("error closing iterator: %v", err)
+		}
+
+		fmt.Println("All tables in keyspace 'idx' have been dropped.")
+
+		// Drop the keyspace
 		dropKeyspaceQuery := fmt.Sprintf("DROP KEYSPACE %s;", keyspace)
 		fmt.Println("Executing:", dropKeyspaceQuery)
 		if err := session.Query(dropKeyspaceQuery).Exec(); err != nil {
