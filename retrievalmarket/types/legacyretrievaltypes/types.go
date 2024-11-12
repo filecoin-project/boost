@@ -417,7 +417,7 @@ type Ask struct {
 	PaymentIntervalIncrease uint64
 }
 
-// ShortfallErorr is an error that indicates a short fall of funds
+// ShortfallError is an error that indicates a short fall of funds
 type ShortfallError struct {
 	shortfall abi.TokenAmount
 }
