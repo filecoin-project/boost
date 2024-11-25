@@ -275,6 +275,10 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 
 		// Cbor marshal the Deal Label manually as non-string label will result in "" with JSON marshal
 		label := prop.Label
+		propCid, err := prop.Cid()
+		if err != nil {
+			return fmt.Errorf("deal: %s: failed to calculate prop.Cid: %s", deal.DealUuid.String(), err)
+		}
 		buf := new(bytes.Buffer)
 		err = label.MarshalCBOR(buf)
 		if err != nil {
@@ -286,12 +290,12 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 			// Add deal to HarmonyDB
 			if !a {
 				_, err = tx.Exec(`INSERT INTO market_mk12_deals (uuid, sp_id, signed_proposal_cid, 
-                                proposal_signature, proposal, piece_cid, 
+                                proposal_signature, proposal, proposal_cid, piece_cid, 
                                 piece_size, offline, verified, start_epoch, end_epoch, 
                                 client_peer_id, fast_retrieval, announce_to_ipni, url, url_headers, chain_deal_id, publish_cid, created_at, label) 
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 				ON CONFLICT (uuid) DO NOTHING`,
-					deal.DealUuid.String(), mid, sProp.String(), sigByte, propJson, prop.PieceCID.String(),
+					deal.DealUuid.String(), mid, sProp.String(), sigByte, propJson, propCid, prop.PieceCID.String(),
 					prop.PieceSize, deal.IsOffline, prop.VerifiedDeal, prop.StartEpoch, prop.EndEpoch, deal.ClientPeerID.String(),
 					deal.FastRetrieval, deal.AnnounceToIPNI, tInfo.URL, headers, int64(deal.ChainDealID), deal.PublishCID.String(), deal.CreatedAt, buf.Bytes())
 
