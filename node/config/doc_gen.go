@@ -870,6 +870,35 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 	},
+	"lotus_config.ChainIndexerConfig": []DocField{
+		{
+			Name: "EnableIndexer",
+			Type: "bool",
+
+			Comment: `If EnableEthRPC or EnableActorEventsAPI are set to true, the ChainIndexer must be enabled using
+this option to avoid errors at startup.`,
+		},
+		{
+			Name: "GCRetentionEpochs",
+			Type: "int64",
+
+			Comment: `Default: 0 (GC disabled)`,
+		},
+		{
+			Name: "ReconcileEmptyIndex",
+			Type: "bool",
+
+			Comment: `Note: The number of tipsets reconciled (i.e. indexed) during this process can be
+controlled using the MaxReconcileTipsets option.`,
+		},
+		{
+			Name: "MaxReconcileTipsets",
+			Type: "uint64",
+
+			Comment: `Note: Setting this value too low may result in incomplete indexing, while setting it too high
+may increase startup time.`,
+		},
+	},
 	"lotus_config.Chainstore": []DocField{
 		{
 			Name: "EnableSplitstore",
@@ -912,74 +941,15 @@ your node if metadata log is disabled`,
 			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
 		},
 	},
-	"lotus_config.DeprecatedEvents": []DocField{
-		{
-			Name: "DisableRealTimeFilterAPI",
-			Type: "bool",
-
-			Comment: `DisableRealTimeFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableRealTimeFilterAPI instead.`,
-		},
-		{
-			Name: "DisableHistoricFilterAPI",
-			Type: "bool",
-
-			Comment: `DisableHistoricFilterAPI is DEPRECATED and will be removed in a future release. Use Events.DisableHistoricFilterAPI instead.`,
-		},
-		{
-			Name: "FilterTTL",
-			Type: "Duration",
-
-			Comment: `FilterTTL is DEPRECATED and will be removed in a future release. Use Events.FilterTTL instead.`,
-		},
-		{
-			Name: "MaxFilters",
-			Type: "int",
-
-			Comment: `MaxFilters is DEPRECATED and will be removed in a future release. Use Events.MaxFilters instead.`,
-		},
-		{
-			Name: "MaxFilterResults",
-			Type: "int",
-
-			Comment: `MaxFilterResults is DEPRECATED and will be removed in a future release. Use Events.MaxFilterResults instead.`,
-		},
-		{
-			Name: "MaxFilterHeightRange",
-			Type: "uint64",
-
-			Comment: `MaxFilterHeightRange is DEPRECATED and will be removed in a future release. Use Events.MaxFilterHeightRange instead.`,
-		},
-		{
-			Name: "DatabasePath",
-			Type: "string",
-
-			Comment: `DatabasePath is DEPRECATED and will be removed in a future release. Use Events.DatabasePath instead.`,
-		},
-	},
 	"lotus_config.EventsConfig": []DocField{
-		{
-			Name: "DisableRealTimeFilterAPI",
-			Type: "bool",
-
-			Comment: `DisableRealTimeFilterAPI will disable the RealTimeFilterAPI that can create and query filters for actor events as they are emitted.
-The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
-		},
-		{
-			Name: "DisableHistoricFilterAPI",
-			Type: "bool",
-
-			Comment: `DisableHistoricFilterAPI will disable the HistoricFilterAPI that can create and query filters for actor events
-that occurred in the past. HistoricFilterAPI maintains a queryable index of events.
-The API is enabled when Fevm.EnableEthRPC or EnableActorEventsAPI is true, but can be disabled selectively with this flag.`,
-		},
 		{
 			Name: "EnableActorEventsAPI",
 			Type: "bool",
 
 			Comment: `EnableActorEventsAPI enables the Actor events API that enables clients to consume events
 emitted by (smart contracts + built-in Actors).
-This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be
-disabled by setting their respective Disable* options.`,
+Note: Setting this to true will also require that ChainIndexer is enabled, otherwise it will cause an error at startup.
+Set EnableIndexer in the ChainIndexer section of the config to true to enable the ChainIndexer.`,
 		},
 		{
 			Name: "FilterTTL",
@@ -1010,15 +980,6 @@ of filters per connection.`,
 
 			Comment: `MaxFilterHeightRange specifies the maximum range of heights that can be used in a filter (to avoid querying
 the entire chain)`,
-		},
-		{
-			Name: "DatabasePath",
-			Type: "string",
-
-			Comment: `DatabasePath is the full path to a sqlite database that will be used to index actor events to
-support the historic filter APIs. If the database does not exist it will be created. The directory containing
-the database must already exist and be writeable. If a relative path is provided here, sqlite treats it as
-relative to the CWD (current working directory).`,
 		},
 	},
 	"lotus_config.FaultReporterConfig": []DocField{
@@ -1063,27 +1024,15 @@ rewards. This address should have adequate funds to cover gas fees.`,
 			Name: "EnableEthRPC",
 			Type: "bool",
 
-			Comment: `EnableEthRPC enables eth_ rpc, and enables storing a mapping of eth transaction hashes to filecoin message Cids.
-This will also enable the RealTimeFilterAPI and HistoricFilterAPI by default, but they can be disabled by config options above.`,
-		},
-		{
-			Name: "EthTxHashMappingLifetimeDays",
-			Type: "int",
-
-			Comment: `EthTxHashMappingLifetimeDays the transaction hash lookup database will delete mappings that have been stored for more than x days
-Set to 0 to keep all mappings`,
+			Comment: `EnableEthRPC enables eth_ RPC methods.
+Note: Setting this to true will also require that ChainIndexer is enabled, otherwise it will cause an error at startup.
+Set EnableIndexer in the ChainIndexer section of the config to true to enable the ChainIndexer.`,
 		},
 		{
 			Name: "EthTraceFilterMaxResults",
 			Type: "uint64",
 
 			Comment: `EthTraceFilterMaxResults sets the maximum results returned per request by trace_filter`,
-		},
-		{
-			Name: "Events",
-			Type: "DeprecatedEvents",
-
-			Comment: ``,
 		},
 		{
 			Name: "EthBlkCacheSize",
@@ -1140,8 +1089,8 @@ Note: Setting this value to 0 disables the cache.`,
 			Comment: ``,
 		},
 		{
-			Name: "Index",
-			Type: "IndexConfig",
+			Name: "ChainIndexer",
+			Type: "ChainIndexerConfig",
 
 			Comment: ``,
 		},
@@ -1183,15 +1132,6 @@ in a cluster. Only 1 is required`,
 			Type: "string",
 
 			Comment: `The port to find Yugabyte. Blank for default.`,
-		},
-	},
-	"lotus_config.IndexConfig": []DocField{
-		{
-			Name: "EnableMsgIndex",
-			Type: "bool",
-
-			Comment: `EXPERIMENTAL FEATURE. USE WITH CAUTION
-EnableMsgIndex enables indexing of messages on chain.`,
 		},
 	},
 	"lotus_config.JournalConfig": []DocField{
