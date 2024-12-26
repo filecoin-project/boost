@@ -213,7 +213,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			// Custom CheckRedirect function to limit redirects
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 2 { // Limit to 2 redirects
-					return fmt.Errorf("too many redirects: %d", len(via))
+					return http.ErrUseLastResponse
 				}
 				return nil
 			},
