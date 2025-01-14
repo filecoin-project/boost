@@ -8,9 +8,9 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/boxo/bitswap/network"
 	"github.com/ipfs/boxo/bitswap/server"
-	blockstore "github.com/ipfs/boxo/blockstore"
-	nilrouting "github.com/ipfs/boxo/routing/none"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
+	nilrouting "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -66,10 +66,7 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo, opts *B
 	}
 
 	// Start a bitswap server on the provider
-	nilRouter, err := nilrouting.ConstructNilRouting(s.ctx, nil, nil, nil)
-	if err != nil {
-		return err
-	}
+	nilRouter := nilrouting.Null{}
 	bsopts := []server.Option{
 		server.EngineBlockstoreWorkerCount(opts.EngineBlockstoreWorkerCount),
 		server.EngineTaskWorkerCount(opts.EngineTaskWorkerCount),

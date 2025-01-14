@@ -18,11 +18,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	chainTypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
-	cbor "github.com/ipfs/go-ipld-cbor"
-	"go.uber.org/fx"
-
 	"github.com/ipfs/go-datastore"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipni/go-libipni/ingest/schema"
+	"go.uber.org/fx"
 
 	"github.com/filecoin-project/boost/db"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
@@ -866,4 +866,53 @@ func (w *Wrapper) AnnounceBoostDirectDealRemoved(ctx context.Context, dealUUID u
 		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)
 	}
 	return annCid, err
+}
+
+func (w *Wrapper) AnnounceRemoveAll(ctx context.Context) ([]cid.Cid, error) {
+	var allAds []*schema.Advertisement
+	_, ad, err := w.prov.GetLatestAdv(ctx)
+	if err != nil {
+		return nil, err
+	}
+	allAds = append(allAds, ad)
+
+	prev, err := cid.Parse(ad.PreviousID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	for prev != cid.Undef {
+		ad, err := w.prov.GetAdv(ctx, prev)
+		if err != nil {
+			return nil, err
+		}
+
+		prev, err = cid.Parse(ad.PreviousID.String())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var entryAds []*schema.Advertisement
+
+	for _, ad := range allAds {
+		if !ad.IsRm {
+			entryAds = append(entryAds, ad)
+		}
+	}
+
+	var newAds []cid.Cid
+
+	for _, ad := range entryAds {
+		a, err := w.prov.NotifyRemove(ctx, w.h.ID(), ad.ContextID)
+		if err != nil {
+			if !errors.Is(err, provider.ErrContextIDNotFound) {
+				return nil, fmt.Errorf("failed to publish the removal ad: %w", err)
+			}
+		}
+		newAds = append(newAds, a)
+	}
+
+	return newAds, nil
+
 }

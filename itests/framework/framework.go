@@ -401,6 +401,12 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	// Enable LID with leveldb
 	cfg.LocalIndexDirectory.Leveldb.Enabled = true
+	cfg.IndexProvider.Announce.AnnounceOverHttp = true
+	//cfg.IndexProvider.DataTransferPublisher = false
+	cfg.IndexProvider.HttpPublisher.Enabled = true
+	//cfg.IndexProvider.HttpPublisher.Port = 3333
+	cfg.IndexProvider.HttpPublisher.PublicHostname = "127.0.0.1"
+	cfg.IndexProvider.HttpPublisher.WithLibp2p = true
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
