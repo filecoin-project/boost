@@ -42,7 +42,7 @@ var walletCmd = &cli.Command{
 var walletNew = &cli.Command{
 	Name:      "new",
 	Usage:     "Generate a new key of the given type",
-	ArgsUsage: "[bls|secp256k1 (default secp256k1)]",
+	ArgsUsage: "[bls|secp256k1|delegated (default secp256k1)]",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
@@ -459,6 +459,8 @@ var walletImport = &cli.Command{
 				ki.Type = types.KTSecp256k1
 			case 2:
 				ki.Type = types.KTBLS
+			case 3:
+				ki.Type = types.KTDelegated
 			default:
 				return fmt.Errorf("unrecognized key type: %d", gk.SigType)
 			}
