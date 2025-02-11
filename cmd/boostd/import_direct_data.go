@@ -114,7 +114,7 @@ var importDirectDataCmd = &cli.Command{
 		}
 		alloc, err := lapi.StateGetAllocation(ctx, clientAddr, verifreg.AllocationId(allocationId), head.Key())
 		if err != nil {
-			return fmt.Errorf("getting claim details from chain: %w", err)
+			return fmt.Errorf("getting allocation details from chain: %w", err)
 		}
 		if alloc == nil {
 			return fmt.Errorf("no allocation found with ID %d", allocationId)
