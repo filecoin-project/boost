@@ -321,12 +321,12 @@ var directDealAllocate = &cli.Command{
 			eg.Go(func() error {
 				wait, err := gapi.StateWaitMsg(ctx, m, uint64(cctx.Int("confidence")), 2000, true)
 				if err != nil {
-					return fmt.Errorf("timeout waiting for message to land on chain %s", wait.Message)
+					return fmt.Errorf("timeout waiting for message to land on chain %s", m.String())
 
 				}
 
 				if wait.Receipt.ExitCode.IsError() {
-					return fmt.Errorf("failed to execute message %s: %w", wait.Message, wait.Receipt.ExitCode)
+					return fmt.Errorf("failed to execute message %s: %w", m.String(), wait.Receipt.ExitCode)
 				}
 				return nil
 			})
@@ -687,12 +687,12 @@ If the client id different then claim can be extended up to maximum 5 years from
 			eg.Go(func() error {
 				wait, err := gapi.StateWaitMsg(ctx, m, uint64(cctx.Int("confidence")), 2000, true)
 				if err != nil {
-					return fmt.Errorf("timeout waiting for message to land on chain %s", wait.Message)
+					return fmt.Errorf("timeout waiting for message to land on chain %s", m.String())
 
 				}
 
 				if wait.Receipt.ExitCode.IsError() {
-					return fmt.Errorf("failed to execute message %s: %w", wait.Message, wait.Receipt.ExitCode)
+					return fmt.Errorf("failed to execute message %s: %w", m.String(), wait.Receipt.ExitCode)
 				}
 				return nil
 			})
