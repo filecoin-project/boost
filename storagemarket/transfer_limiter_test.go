@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/rand"
+	"math/rand"
 	"testing"
 	"time"
 

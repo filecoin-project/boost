@@ -402,6 +402,11 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	// Enable LID with leveldb
 	cfg.LocalIndexDirectory.Leveldb.Enabled = true
 
+	// Test IPNI config
+	cfg.IndexProvider.HttpPublisher.WithLibp2p = true
+	cfg.IndexProvider.HttpPublisher.Enabled = true
+	cfg.IndexProvider.HttpPublisher.PublicHostname = "127.0.0.1"
+
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg

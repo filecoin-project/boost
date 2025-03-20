@@ -77,17 +77,17 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
 			// engine would create its own instance of pubsub down the line in dagsync, which has
 			// no validators by default.
-			t, err := ps.Join(topicName)
-			if err != nil {
-				llog.Errorw("Failed to join indexer topic", "err", err)
-				return nil, xerrors.Errorf("joining indexer topic %s: %w", topicName, err)
-			}
+			//t, err := ps.Join(topicName)
+			//if err != nil {
+			//	llog.Errorw("Failed to join indexer topic", "err", err)
+			//	return nil, xerrors.Errorf("joining indexer topic %s: %w", topicName, err)
+			//}
 
 			// Get the miner ID and set as extra gossip data.
 			// The extra data is required by the lotus-specific index-provider gossip message validators.
 			ma := address.Address(maddr)
 			opts = append(opts,
-				engine.WithTopic(t),
+				//engine.WithTopic(t),
 				engine.WithExtraGossipData(ma.Bytes()),
 			)
 			if cfg.Announce.AnnounceOverHttp {
@@ -114,8 +114,9 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 				}
 			} else {
 				// HTTP publisher not enabled, so use only libp2p
-				opts = append(opts, engine.WithPublisherKind(engine.Libp2pPublisher))
-				llog = llog.With("publisher", "libp2phttp", "extraGossipData", ma)
+				return nil, fmt.Errorf("libp2p only publisher is no longer supported. Please enable HTTP publisher")
+				//opts = append(opts, engine.WithPublisherKind(engine.Libp2pPublisher))
+				//llog = llog.With("publisher", "libp2phttp", "extraGossipData", ma)
 			}
 		} else {
 			opts = append(opts, engine.WithPublisherKind(engine.NoPublisher))
