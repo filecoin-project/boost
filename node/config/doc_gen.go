@@ -898,6 +898,14 @@ controlled using the MaxReconcileTipsets option.`,
 			Comment: `Note: Setting this value too low may result in incomplete indexing, while setting it too high
 may increase startup time.`,
 		},
+		{
+			Name: "AllowIndexReconciliationFailure",
+			Type: "bool",
+
+			Comment: `Default: false
+// WARNING: Only set to true if you are okay with an index that may be out of sync with the chain.
+This can lead to inaccurate or missing data in RPC responses that depend on the indexer.`,
+		},
 	},
 	"lotus_config.Chainstore": []DocField{
 		{
@@ -1787,7 +1795,8 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Name: "BatchPreCommitAboveBaseFee",
 			Type: "types.FIL",
 
-			Comment: `network BaseFee below which to stop doing precommit batching, instead
+			Comment: `DEPRECATED: remove after nv25 (FIP 0100)
+network BaseFee below which to stop doing precommit batching, instead
 sending precommit messages to the chain individually. When the basefee is
 below this threshold, precommit messages will get sent out immediately.`,
 		},
@@ -1795,7 +1804,8 @@ below this threshold, precommit messages will get sent out immediately.`,
 			Name: "AggregateAboveBaseFee",
 			Type: "types.FIL",
 
-			Comment: `network BaseFee below which to stop doing commit aggregation, instead
+			Comment: `DEPRECATED: remove after nv25 (FIP 0100)
+network BaseFee below which to stop doing commit aggregation, instead
 submitting proofs to the chain individually`,
 		},
 		{

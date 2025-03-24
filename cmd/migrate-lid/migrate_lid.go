@@ -228,7 +228,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 		if errCount > 0 {
 			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
 			msg += " See the log for details:\n" + logPath
-			fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
+			fmt.Fprintf(os.Stderr, "\n%s\n", msg)
 		}
 		if err != nil {
 			return fmt.Errorf("migrating indices: %w", err)
@@ -244,7 +244,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	if errCount > 0 {
 		msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
 		msg += " See the log for details:\n" + logPath
-		fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
+		fmt.Fprintf(os.Stderr, "\n%s\n", msg)
 	}
 	if err != nil {
 		return fmt.Errorf("migrating piece store: %w", err)

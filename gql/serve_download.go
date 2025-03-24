@@ -3,9 +3,10 @@ package gql
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"net/http"
 )
 
 const downloadBlockPath = "/download/block/"
@@ -18,20 +19,20 @@ type BlockGetter interface {
 func serveDownload(ctx context.Context, mux *http.ServeMux, bstore BlockGetter) {
 	mux.HandleFunc(downloadBlockPath, func(writer http.ResponseWriter, request *http.Request) {
 		if len(request.URL.Path) <= len(downloadBlockPath) {
-			writeError(writer, fmt.Sprintf("url path too short: "+request.URL.Path))
+			writeError(writer, fmt.Sprint("url path too short: "+request.URL.Path))
 			return
 		}
 
 		cidstr := request.URL.Path[len(downloadBlockPath):]
 		c, err := cid.Parse(cidstr)
 		if err != nil {
-			writeError(writer, fmt.Sprintf("parsing payload cid "+cidstr+": "+err.Error()))
+			writeError(writer, fmt.Sprint("parsing payload cid "+cidstr+": "+err.Error()))
 			return
 		}
 
 		blk, err := bstore.Get(ctx, c)
 		if err != nil {
-			writeError(writer, fmt.Sprintf("getting block "+cidstr+": "+err.Error()))
+			writeError(writer, fmt.Sprint("getting block "+cidstr+": "+err.Error()))
 			return
 		}
 

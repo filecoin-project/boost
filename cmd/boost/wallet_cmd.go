@@ -303,7 +303,7 @@ var walletBalance = &cli.Command{
 				}
 				return cmd.PrintJson(out)
 			} else {
-				afmt.Printf(fmt.Sprintf("%s (warning: %s)\n", types.FIL(balance), warningMessage))
+				afmt.Printf("%s", fmt.Sprintf("%s (warning: %s)\n", types.FIL(balance), warningMessage))
 			}
 		} else {
 			if cctx.Bool("json") {

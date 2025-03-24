@@ -218,7 +218,7 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
 		msg := fmt.Sprintf("Remote API version didn't match (expected %s, remote %s)",
 			lapi.FullAPIVersion1, v.APIVersion)
-		return nil, fmt.Errorf(msg + ". Boost and Lotus Daemon must have the same API version")
+		return nil, fmt.Errorf("%s. Boost and Lotus Daemon must have the same API version", msg)
 	}
 
 	fmt.Println("Creating boost repo")

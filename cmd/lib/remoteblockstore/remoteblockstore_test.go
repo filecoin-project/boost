@@ -2,10 +2,11 @@ package remoteblockstore
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestNormalizeError(t *testing.T) {
@@ -24,7 +25,7 @@ func TestNormalizeError(t *testing.T) {
 		isNotFoundErr: true,
 	}, {
 		name:          "stringified ipld ErrNotFound",
-		err:           fmt.Errorf(format.ErrNotFound{Cid: dummyCid}.Error()),
+		err:           fmt.Errorf("%s", format.ErrNotFound{Cid: dummyCid}.Error()),
 		expected:      format.ErrNotFound{Cid: dummyCid},
 		isNotFoundErr: true,
 	}, {
@@ -34,7 +35,7 @@ func TestNormalizeError(t *testing.T) {
 		isNotFoundErr: true,
 	}, {
 		name:          "stringified ipld ErrNotFound no cid",
-		err:           fmt.Errorf(format.ErrNotFound{}.Error()),
+		err:           fmt.Errorf("%s", format.ErrNotFound{}.Error()),
 		expected:      format.ErrNotFound{},
 		isNotFoundErr: true,
 	}, {
@@ -44,7 +45,7 @@ func TestNormalizeError(t *testing.T) {
 		isNotFoundErr: true,
 	}, {
 		name:          "stringified ipld ErrorNotFound with prefix",
-		err:           fmt.Errorf(fmt.Errorf("some err: %w", format.ErrNotFound{Cid: dummyCid}).Error()),
+		err:           fmt.Errorf("%s", fmt.Errorf("some err: %w", format.ErrNotFound{Cid: dummyCid}).Error()),
 		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{Cid: dummyCid}),
 		isNotFoundErr: true,
 	}, {
@@ -54,7 +55,7 @@ func TestNormalizeError(t *testing.T) {
 		isNotFoundErr: true,
 	}, {
 		name:          "stringified ipld ErrorNotFound no cid with prefix",
-		err:           fmt.Errorf(fmt.Errorf("some err: %w", format.ErrNotFound{}).Error()),
+		err:           fmt.Errorf("%s", fmt.Errorf("some err: %w", format.ErrNotFound{}).Error()),
 		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{}),
 		isNotFoundErr: true,
 	}, {
