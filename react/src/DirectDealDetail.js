@@ -128,7 +128,7 @@ export function DirectDealDetail(props) {
                 </tr>
                 <tr>
                     <th>Verified</th>
-                    <td>{deal.IsVerified ? 'Yes' : 'No'}</td>
+                    <td>{'Yes'}</td>
                 </tr>
                 <tr>
                     <th>Keep Unsealed Copy</th>
