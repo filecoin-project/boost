@@ -30,4 +30,5 @@ setup_github_runner() {
 }
 
 # Execute the function
+docker system prune -a -f
 setup_github_runner
