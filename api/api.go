@@ -26,6 +26,7 @@ type Boost interface {
 	Net
 
 	// MethodGroup: Boost
+	BoostIndexerRemoveAll(ctx context.Context) ([]cid.Cid, error)                                                                               //perm:admin
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                                     //perm:admin
 	BoostIndexerListMultihashes(ctx context.Context, contextID []byte) ([]multihash.Multihash, error)                                           //perm:admin
 	BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error)                                                                            //perm:admin

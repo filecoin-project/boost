@@ -111,13 +111,14 @@ function ProviderIpniInfoRender(props){
                     &nbsp;
                     <span className="aux">({moment(data.LastAdvertisementTime).fromNow()} ago)</span>
                     &nbsp;
-                    {distance.data ? <span className="aux">({distance.data.ipniDistanceFromLatestAd} behind)</span>: ''}
+                    {distance.data ?
+                        <span className="aux">({distance.data.ipniDistanceFromLatestAd} behind)</span> : ''}
                 </td>
             </tr>
             <tr>
                 <th>Latest Advertisement on Boost</th>
                 <td>
-                    {lad ? <Link to={'/ipni/ad/'+lad}>{lad}</Link>: ''}
+                    {lad ? <Link to={'/ipni/ad/' + lad}>{lad}</Link> : ''}
                 </td>
             </tr>
             <tr>
@@ -137,7 +138,7 @@ function ProviderConfig({configJson}) {
     const cfg = JSON.parse(configJson)
     return <div>
         <h3>Index Provider Config</h3>
-        <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'} />
+        <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'}/>
     </div>
 }
 

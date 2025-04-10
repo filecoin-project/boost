@@ -60,6 +60,8 @@ type BoostStruct struct {
 
 		BoostIndexerListMultihashes func(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) `perm:"admin"`
 
+		BoostIndexerRemoveAll func(p0 context.Context) ([]cid.Cid, error) `perm:"admin"`
+
 		BoostLegacyDealByProposalCid func(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) `perm:"admin"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -353,6 +355,17 @@ func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 []byte)
 
 func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 []byte) ([]multihash.Multihash, error) {
 	return *new([]multihash.Multihash), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerRemoveAll(p0 context.Context) ([]cid.Cid, error) {
+	if s.Internal.BoostIndexerRemoveAll == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerRemoveAll(p0)
+}
+
+func (s *BoostStub) BoostIndexerRemoveAll(p0 context.Context) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostLegacyDealByProposalCid(p0 context.Context, p1 cid.Cid) (legacytypes.MinerDeal, error) {

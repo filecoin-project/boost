@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	boost_build "github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -34,13 +32,8 @@ func TestIPNIPublish(t *testing.T) {
 	addrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
 
-	ntwkName, err := f.FullNode.StateNetworkName(ctx)
-	require.NoError(t, err)
-
-	topicName := boost_build.IndexerIngestTopic(dtypes.NetworkName(ntwkName))
-
 	// Create new ipni-cli client
-	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName(topicName), adpub.WithEntriesDepthLimit(100000))
+	ipniClient, err := adpub.NewClient(addrs, adpub.WithEntriesDepthLimit(100000))
 	require.NoError(t, err)
 
 	// Get head when boost starts
