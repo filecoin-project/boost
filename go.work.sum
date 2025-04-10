@@ -2608,6 +2608,8 @@ github.com/filecoin-project/kubo-api-client v0.0.1/go.mod h1:c36PPMIVOkKfHDwDG5U
 github.com/filecoin-project/lotus v1.25.0-rc1/go.mod h1:L4HPpbCl0dvIVLW/anT1iBu1/CURDYN9n4ULKkDZ5ps=
 github.com/filecoin-project/lotus v1.25.3-0.20240228124156-fc6229abf7f4 h1:ccee29n37fR0ymXBL3rSPSY+56AuLXBuIeMFcZmVy0g=
 github.com/filecoin-project/lotus v1.25.3-0.20240228124156-fc6229abf7f4/go.mod h1:m2HZtRLwJKm2WVBFzYitQqq4Jqb2wcxzR1qWHNVUHuY=
+github.com/filecoin-project/lotus v1.32.2 h1:UQsJgLeZVKE7dPc171va7LlIBYN5XTSqrCs8hooGcik=
+github.com/filecoin-project/lotus v1.32.2/go.mod h1:eNfZ0eXGMckDBFQmL1/MJk/0UgxVKHy74z40uMrGlg4=
 github.com/filecoin-project/specs-storage v0.4.1 h1:yvLEaLZj8f+uByhNC4mFOtCUyL2wQku+NGBp6hjTe9M=
 github.com/filecoin-project/storetheindex v0.4.17 h1:w0dVc954TGPukoVbidlYvn9Xt+wVhk5vBvrqeJiRo8I=
 github.com/filecoin-project/test-vectors/schema v0.0.7 h1:hhrcxLnQR2Oe6fjk63hZXG1fWQGyxgCVXOOlAlR/D9A=
