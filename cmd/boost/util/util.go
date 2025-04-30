@@ -133,7 +133,7 @@ type PieceInfos struct {
 // 6. Extend all claims for multiple miner IDs with different client address (2 messages)
 // 7. Extend specified claims for a miner ID with different client address (2 messages)
 // 8. Extend specific claims for specific miner ID with different client address (2 messages)
-func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg13.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes bool, batchSize int) ([]*types.Message, error) {
+func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg13.ClaimId]ProvInfo, miners []string, wallet address.Address, tmax abi.ChainEpoch, all, assumeYes, noDatacap bool, batchSize int) ([]*types.Message, error) {
 	ac, err := api.StateLookupID(ctx, wallet, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -174,6 +174,9 @@ func CreateExtendClaimMsg(ctx context.Context, api api.Gateway, pcm map[verifreg
 				claim := c
 				// If the client is not the original client - burn datacap
 				if claim.Client != wid {
+					if noDatacap {
+						continue
+					}
 					// The new duration should be greater than the original deal duration and claim should not already be expired
 					if head.Height()+tmax-claim.TermStart > claim.TermMax-claim.TermStart && claim.TermStart+claim.TermMax > head.Height() {
 						req := verifreg13.ClaimExtensionRequest{
