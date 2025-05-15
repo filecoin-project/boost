@@ -231,3 +231,7 @@ func (sm *BoostAPI) PdCleanup(ctx context.Context) error {
 func (sm *BoostAPI) MarketGetAsk(ctx context.Context) (*legacytypes.SignedStorageAsk, error) {
 	return sm.StorageProvider.GetAsk(), nil
 }
+
+func (sm *BoostAPI) BoostIndexerRemoveAll(ctx context.Context) ([]cid.Cid, error) {
+	return sm.IndexProvider.AnnounceRemoveAll(ctx)
+}

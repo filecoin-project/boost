@@ -133,6 +133,11 @@ boostci: $(BUILD_DEPS)
 	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
 .PHONY: boostci
 
+migrate-curio: $(BUILD_DEPS)
+	rm -f migrate-curio
+	$(GOCC) build $(GOFLAGS) -o migrate-curio ./cmd/migrate-curio
+.PHONY: boostci
+
 react: validate-node-version
 	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
 	npm run --prefix react build
@@ -143,7 +148,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid
+build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid migrate-curio
 .PHONY: build-go
 
 build: react build-go
@@ -162,6 +167,7 @@ install-boost:
 	install -C ./booster-http /usr/local/bin/booster-http
 	install -C ./booster-bitswap /usr/local/bin/booster-bitswap
 	install -C ./migrate-lid /usr/local/bin/migrate-lid
+	install -C ./migrate-curio /usr/local/bin/migrate-curio
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
@@ -217,7 +223,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.32.1
+lotus_version?=v1.32.2
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
