@@ -27,7 +27,7 @@ import {
 } from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
-import {MonitoringAlert} from "./MonitoringAlert";
+import {DeprecationAlert, MonitoringAlert} from "./MonitoringAlert";
 import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
 import {DirectDealsPage} from "./DirectDeals";
 import {DirectDealDetail} from "./DirectDealDetail";
@@ -43,7 +43,8 @@ function App(props) {
                             <Menu />
                             <td className="main-content">
                                 <div className="page-content">
-                                    <MonitoringAlert />
+                                    <DeprecationAlert />
+                                    {/*<MonitoringAlert />*/}
                                     <MinerAddress />
                                     <Epoch />
                                     <Banner />

@@ -1,5 +1,7 @@
 import React from "react";
 import './Banner.css'
+import warnImg from "./bootstrap-icons/icons/exclamation-circle.svg";
+import {Link} from "react-router-dom";
 
 export function ShowBanner(msg, isError) {
     const banner = document.getElementById('banner')
