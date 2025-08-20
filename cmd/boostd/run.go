@@ -62,7 +62,7 @@ var runCmd = &cli.Command{
 		}
 
 		subCh := gateway.NewEthSubHandler()
-		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscribtionHandler(subCh))
+		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscriptionHandler(subCh))
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
 		}

@@ -135,7 +135,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return err
 	}
 
-	api, closer, err := lcli.GetGatewayAPI(cctx)
+	api, closer, err := lcli.GetGatewayAPIV1(cctx)
 	if err != nil {
 		return fmt.Errorf("cant setup gateway connection: %w", err)
 	}

@@ -1,15 +1,15 @@
 package bitswap
 
 import (
-	"github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 var Protocols = []protocol.ID{
-	network.ProtocolBitswap,
-	network.ProtocolBitswapNoVers,
-	network.ProtocolBitswapOneOne,
-	network.ProtocolBitswapOneZero,
+	bsnet.ProtocolBitswap,
+	bsnet.ProtocolBitswapNoVers,
+	bsnet.ProtocolBitswapOneOne,
+	bsnet.ProtocolBitswapOneZero,
 }
 
 var ProtocolStrings = []string{}

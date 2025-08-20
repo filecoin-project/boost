@@ -1,7 +1,9 @@
-go 1.23.7
+go 1.24.0
+
+toolchain go1.24.6
 
 use (
- .
- extern/boostd-data
- extern/filecoin-ffi
+	.
+	extern/boostd-data
+	extern/filecoin-ffi
 )
