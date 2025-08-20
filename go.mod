@@ -125,6 +125,7 @@ require (
 	golang.org/x/text v0.28.0
 	golang.org/x/tools v0.36.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
+	google.golang.org/protobuf v1.36.7
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )
 
@@ -382,7 +383,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250212204824-5a70512c5d8b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/grpc v1.71.0-dev // indirect
-	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -398,3 +398,5 @@ exclude (
 )
 
 replace github.com/ipfs/go-log => github.com/ipfs/go-log v1.0.1
+
+replace github.com/ipfs/go-log/v2 => github.com/ipfs/go-log/v2 v2.6.0
