@@ -76,7 +76,7 @@ require (
 	github.com/ipld/ipld/specs v0.0.0-20231012031213-54d3b21deda4
 	github.com/ipni/go-libipni v0.6.19
 	github.com/ipni/index-provider v0.15.5
-	github.com/ipni/ipni-cli v0.1.1
+	github.com/ipni/ipni-cli v0.4.3
 	github.com/ipni/storetheindex v0.8.30
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jellydator/ttlcache/v2 v2.11.1
@@ -291,7 +291,7 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/montanaflynn/stats v0.7.0 // indirect
+	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect

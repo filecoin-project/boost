@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
 	chunk "github.com/ipfs/boxo/chunker"
@@ -23,6 +22,7 @@ import (
 	"github.com/ipld/go-car"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCarOffsetWriterDagOrder(t *testing.T) {

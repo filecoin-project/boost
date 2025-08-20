@@ -1108,6 +1108,12 @@ Note: Setting this value to 0 disables the cache.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "PaymentChannels",
+			Type: "PaymentChannelsConfig",
+
+			Comment: ``,
+		},
 	},
 	"lotus_config.HarmonyDB": []DocField{
 		{
@@ -1394,6 +1400,17 @@ When disabled and no external block producers are configured, all potential
 block rewards will be missed!`,
 		},
 	},
+	"lotus_config.PaymentChannelsConfig": []DocField{
+		{
+			Name: "EnablePaymentChannelManager",
+			Type: "bool",
+
+			Comment: `EnablePaymentChannelManager controls whether the payment channel manager is started.
+Default: false (disabled) - payment channels currently have minimal use on mainnet, although
+they remain a Filecoin protocol feature.
+Set to true to enable payment channel functionality if needed.`,
+		},
+	},
 	"lotus_config.ProvingConfig": []DocField{
 		{
 			Name: "ParallelCheckLimit",
@@ -1522,7 +1539,7 @@ Format: https://<username>:<password>@<elasticsearch_url>:<port>/`,
 			Type: "string",
 
 			Comment: `Name of elasticsearch index that will be used to save tracer data.
-This property is used only if ElasticSearchTracer propery is set.`,
+This property is used only if ElasticSearchTracer property is set.`,
 		},
 		{
 			Name: "TracerSourceAuth",
@@ -1762,12 +1779,6 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Comment: `time buffer for forceful batch submission before sectors/deal in batch would start expiring`,
 		},
 		{
-			Name: "AggregateCommits",
-			Type: "bool",
-
-			Comment: `enable / disable commit aggregation (takes effect after nv13)`,
-		},
-		{
 			Name: "MinCommitBatch",
 			Type: "int",
 
@@ -1790,23 +1801,6 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Type: "Duration",
 
 			Comment: `time buffer for forceful batch submission before sectors/deals in batch would start expiring`,
-		},
-		{
-			Name: "BatchPreCommitAboveBaseFee",
-			Type: "types.FIL",
-
-			Comment: `DEPRECATED: remove after nv25 (FIP 0100)
-network BaseFee below which to stop doing precommit batching, instead
-sending precommit messages to the chain individually. When the basefee is
-below this threshold, precommit messages will get sent out immediately.`,
-		},
-		{
-			Name: "AggregateAboveBaseFee",
-			Type: "types.FIL",
-
-			Comment: `DEPRECATED: remove after nv25 (FIP 0100)
-network BaseFee below which to stop doing commit aggregation, instead
-submitting proofs to the chain individually`,
 		},
 		{
 			Name: "MaxSectorProveCommitsSubmittedPerEpoch",
