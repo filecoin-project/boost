@@ -160,7 +160,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 	// write an outbound forwarding request with the remote peer and protocol
 	err = messages.WriteOutboundForwardingRequest(routedStream, p, protocols)
 	if err != nil {
-		routedStream.Close()
+		_ = routedStream.Close()
 		return nil, err
 	}
 
@@ -168,12 +168,12 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 	outbound, err := messages.ReadForwardingResponse(routedStream)
 	// check for error writing the response
 	if err != nil {
-		routedStream.Close()
+		_ = routedStream.Close()
 		return nil, err
 	}
 	// check the response was accepted
 	if outbound.Code != messages.ResponseOk {
-		routedStream.Close()
+		_ = routedStream.Close()
 		return nil, fmt.Errorf("opening forwarded stream: %s", outbound.Message)
 	}
 

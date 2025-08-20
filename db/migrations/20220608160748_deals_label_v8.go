@@ -22,7 +22,7 @@ func UpDealsLabelV8(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf(errPrefix+"getting deals from DB: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id string
@@ -70,7 +70,7 @@ func DownDealsLabelV8(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf(errPrefix+"getting deals from DB: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id string
