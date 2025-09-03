@@ -247,7 +247,7 @@ var directDealAllocate = &cli.Command{
 			return err
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}
@@ -381,7 +381,7 @@ var directDealGetAllocations = &cli.Command{
 			return err
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}
@@ -591,7 +591,7 @@ If the client id different then claim can be extended up to maximum 5 years from
 			return fmt.Errorf("specified term-max %d is larger than %d maximum allowed by verified regirty actor policy", tmax, verifreg13types.MaximumVerifiedAllocationTerm)
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}
@@ -725,7 +725,7 @@ var listClaimsCmd = &cli.Command{
 			return fmt.Errorf("must provide a miner ID")
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}

@@ -254,10 +254,14 @@ func ConfigCommon(cfg *config.Common) Option {
 	return Options(
 		func(s *Settings) error { s.Config = true; return nil },
 		Override(new(dtypes.APIEndpoint), func() (dtypes.APIEndpoint, error) {
-			return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			ma, err := multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			if err != nil {
+				return nil, err
+			}
+			return dtypes.APIEndpoint(ma), nil
 		}),
 		Override(SetApiEndpointKey, func(lr lotus_repo.LockedRepo, e dtypes.APIEndpoint) error {
-			return lr.SetAPIEndpoint(e)
+			return lr.SetAPIEndpoint(multiaddr.Multiaddr(e))
 		}),
 		Override(new(paths.URLs), func(e dtypes.APIEndpoint) (paths.URLs, error) {
 			ip := cfg.API.RemoteListenAddress

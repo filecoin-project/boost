@@ -22,6 +22,7 @@ import (
 	"github.com/ipld/go-car"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCarOffsetWriterDagOrder(t *testing.T) {
@@ -46,7 +47,7 @@ func TestCarOffsetWriterDagOrder(t *testing.T) {
 			{Hash: aaaaBlk.Cid().Bytes(), Name: &aaaa},
 		},
 	}
-	rootByts, err := pbn.Marshal()
+	rootByts, err := proto.Marshal(pbn)
 	require.NoError(t, err)
 	rootBlk := blocks.NewBlock(rootByts)
 	require.NoError(t, bserv.AddBlock(ctx, rootBlk))
