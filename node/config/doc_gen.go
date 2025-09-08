@@ -9,7 +9,7 @@ type DocField struct {
 }
 
 var Doc = map[string][]DocField{
-	"Backup": {
+	"Backup": []DocField{
 		{
 			Name: "DisableMetadataLog",
 			Type: "bool",
@@ -18,7 +18,7 @@ var Doc = map[string][]DocField{
 your node if metadata log is disabled`,
 		},
 	},
-	"BitswapRetrievalConfig": {
+	"BitswapRetrievalConfig": []DocField{
 		{
 			Name: "BitswapPeerID",
 			Type: "string",
@@ -56,7 +56,7 @@ extended provider
 a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
 		},
 	},
-	"Boost": {
+	"Boost": []DocField{
 		{
 			Name: "ConfigVersion",
 			Type: "int",
@@ -148,7 +148,7 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Comment: ``,
 		},
 	},
-	"Common": {
+	"Common": []DocField{
 		{
 			Name: "API",
 			Type: "lotus_config.API",
@@ -174,7 +174,7 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Comment: ``,
 		},
 	},
-	"ContractDealsConfig": {
+	"ContractDealsConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
@@ -194,7 +194,7 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 			Comment: `From address for eth_ state call`,
 		},
 	},
-	"DealPublishConfig": {
+	"DealPublishConfig": []DocField{
 		{
 			Name: "ManualDealPublish",
 			Type: "bool",
@@ -226,7 +226,7 @@ as a multiplier of the minimum collateral bound
 The maximum fee to pay when sending the PublishStorageDeals message`,
 		},
 	},
-	"DealmakingConfig": {
+	"DealmakingConfig": []DocField{
 		{
 			Name: "ConsiderOnlineStorageDeals",
 			Type: "bool",
@@ -388,7 +388,7 @@ accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
 	},
-	"GraphqlConfig": {
+	"GraphqlConfig": []DocField{
 		{
 			Name: "ListenAddress",
 			Type: "string",
@@ -402,7 +402,7 @@ for any other deal.`,
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
-	"GraphsyncRetrievalConfig": {
+	"GraphsyncRetrievalConfig": []DocField{
 		{
 			Name: "SimultaneousTransfersForRetrieval",
 			Type: "uint64",
@@ -440,7 +440,7 @@ configured in SectorIndexApiInfo.`,
 see https://boost.filecoin.io/configuration/deal-filters for more details`,
 		},
 	},
-	"HTTPRetrievalConfig": {
+	"HTTPRetrievalConfig": []DocField{
 		{
 			Name: "HTTPRetrievalMultiaddr",
 			Type: "string",
@@ -449,7 +449,7 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
 		},
 	},
-	"HttpDownloadConfig": {
+	"HttpDownloadConfig": []DocField{
 		{
 			Name: "HttpTransferMaxConcurrentDownloads",
 			Type: "uint64",
@@ -487,7 +487,7 @@ doesn't support range requests yet. NChunks must be greater than 0 and less than
 The default is false.`,
 		},
 	},
-	"IndexProviderAnnounceConfig": {
+	"IndexProviderAnnounceConfig": []DocField{
 		{
 			Name: "AnnounceOverHttp",
 			Type: "bool",
@@ -503,7 +503,7 @@ of this setting.`,
 			Comment: `The list of URLs of indexing nodes to announce to.`,
 		},
 	},
-	"IndexProviderConfig": {
+	"IndexProviderConfig": []DocField{
 		{
 			Name: "Enable",
 			Type: "bool",
@@ -575,7 +575,7 @@ over libp2p or HTTP is not working, and publishing over
 data-transfer/graphsync was previously working.`,
 		},
 	},
-	"IndexProviderHttpPublisherConfig": {
+	"IndexProviderHttpPublisherConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
@@ -606,7 +606,7 @@ Otherwise, the publisher will publish content advertisements using only
 plain HTTP if Enabled is true.`,
 		},
 	},
-	"LocalIndexDirectoryConfig": {
+	"LocalIndexDirectoryConfig": []DocField{
 		{
 			Name: "Yugabyte",
 			Type: "LocalIndexDirectoryYugabyteConfig",
@@ -671,7 +671,7 @@ for the expired/slashed deals. Disabled if set to '0s'. Please DO NOT set a valu
 as this task consumes considerable resources and time`,
 		},
 	},
-	"LocalIndexDirectoryLeveldbConfig": {
+	"LocalIndexDirectoryLeveldbConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
@@ -679,7 +679,7 @@ as this task consumes considerable resources and time`,
 			Comment: ``,
 		},
 	},
-	"LocalIndexDirectoryYugabyteConfig": {
+	"LocalIndexDirectoryYugabyteConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
@@ -711,7 +711,7 @@ as this task consumes considerable resources and time`,
 			Comment: `The yugabyte cassandra password eg "cassandra"`,
 		},
 	},
-	"MonitoringConfig": {
+	"MonitoringConfig": []DocField{
 		{
 			Name: "MpoolAlertEpochs",
 			Type: "int64",
@@ -720,7 +720,7 @@ as this task consumes considerable resources and time`,
 message in lotus mpool`,
 		},
 	},
-	"RetrievalConfig": {
+	"RetrievalConfig": []DocField{
 		{
 			Name: "Graphsync",
 			Type: "GraphsyncRetrievalConfig",
@@ -740,7 +740,7 @@ message in lotus mpool`,
 			Comment: ``,
 		},
 	},
-	"StorageConfig": {
+	"StorageConfig": []DocField{
 		{
 			Name: "ParallelFetchLimit",
 			Type: "int",
@@ -764,7 +764,7 @@ Disable this if you wish to manually handle the refresh. If manually managing th
 and it is not triggered, retrieval quality for users will be impacted.`,
 		},
 	},
-	"TracingConfig": {
+	"TracingConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
@@ -784,7 +784,7 @@ and it is not triggered, retrieval quality for users will be impacted.`,
 			Comment: ``,
 		},
 	},
-	"WalletsConfig": {
+	"WalletsConfig": []DocField{
 		{
 			Name: "Miner",
 			Type: "string",
@@ -811,7 +811,7 @@ Must be a control or worker address of the miner.`,
 			Comment: `Deprecated: Renamed to DealCollateral`,
 		},
 	},
-	"lotus_config.API": {
+	"lotus_config.API": []DocField{
 		{
 			Name: "ListenAddress",
 			Type: "string",
@@ -831,7 +831,7 @@ Must be a control or worker address of the miner.`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.ApisConfig": {
+	"lotus_config.ApisConfig": []DocField{
 		{
 			Name: "ChainApiInfo",
 			Type: "[]string",
@@ -847,7 +847,7 @@ If integrating with lotus-miner this must match the value from
 cat ~/.lotusminer/keystore/MF2XI2BNNJ3XILLQOJUXMYLUMU | jq -r .PrivateKey`,
 		},
 	},
-	"lotus_config.Backup": {
+	"lotus_config.Backup": []DocField{
 		{
 			Name: "DisableMetadataLog",
 			Type: "bool",
@@ -856,7 +856,7 @@ cat ~/.lotusminer/keystore/MF2XI2BNNJ3XILLQOJUXMYLUMU | jq -r .PrivateKey`,
 your node if metadata log is disabled`,
 		},
 	},
-	"lotus_config.BatchFeeConfig": {
+	"lotus_config.BatchFeeConfig": []DocField{
 		{
 			Name: "Base",
 			Type: "types.FIL",
@@ -870,7 +870,7 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.ChainIndexerConfig": {
+	"lotus_config.ChainIndexerConfig": []DocField{
 		{
 			Name: "EnableIndexer",
 			Type: "bool",
@@ -907,7 +907,7 @@ may increase startup time.`,
 This can lead to inaccurate or missing data in RPC responses that depend on the indexer.`,
 		},
 	},
-	"lotus_config.Chainstore": {
+	"lotus_config.Chainstore": []DocField{
 		{
 			Name: "EnableSplitstore",
 			Type: "bool",
@@ -921,7 +921,7 @@ This can lead to inaccurate or missing data in RPC responses that depend on the 
 			Comment: ``,
 		},
 	},
-	"lotus_config.Common": {
+	"lotus_config.Common": []DocField{
 		{
 			Name: "API",
 			Type: "API",
@@ -941,7 +941,7 @@ This can lead to inaccurate or missing data in RPC responses that depend on the 
 			Comment: ``,
 		},
 	},
-	"lotus_config.DealmakingConfig": {
+	"lotus_config.DealmakingConfig": []DocField{
 		{
 			Name: "StartEpochSealingBuffer",
 			Type: "uint64",
@@ -949,7 +949,7 @@ This can lead to inaccurate or missing data in RPC responses that depend on the 
 			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
 		},
 	},
-	"lotus_config.EventsConfig": {
+	"lotus_config.EventsConfig": []DocField{
 		{
 			Name: "EnableActorEventsAPI",
 			Type: "bool",
@@ -990,7 +990,7 @@ of filters per connection.`,
 the entire chain)`,
 		},
 	},
-	"lotus_config.FaultReporterConfig": {
+	"lotus_config.FaultReporterConfig": []DocField{
 		{
 			Name: "EnableConsensusFaultReporter",
 			Type: "bool",
@@ -1019,7 +1019,7 @@ ReportConsensusFault messages. It will pay for gas fees, and receive any
 rewards. This address should have adequate funds to cover gas fees.`,
 		},
 	},
-	"lotus_config.FeeConfig": {
+	"lotus_config.FeeConfig": []DocField{
 		{
 			Name: "DefaultMaxFee",
 			Type: "types.FIL",
@@ -1027,7 +1027,7 @@ rewards. This address should have adequate funds to cover gas fees.`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.FevmConfig": {
+	"lotus_config.FevmConfig": []DocField{
 		{
 			Name: "EnableEthRPC",
 			Type: "bool",
@@ -1053,7 +1053,7 @@ The default size of the cache is 500 blocks.
 Note: Setting this value to 0 disables the cache.`,
 		},
 	},
-	"lotus_config.FullNode": {
+	"lotus_config.FullNode": []DocField{
 		{
 			Name: "Libp2p",
 			Type: "Libp2p",
@@ -1115,7 +1115,7 @@ Note: Setting this value to 0 disables the cache.`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.HarmonyDB": {
+	"lotus_config.HarmonyDB": []DocField{
 		{
 			Name: "Hosts",
 			Type: "[]string",
@@ -1148,7 +1148,7 @@ in a cluster. Only 1 is required`,
 			Comment: `The port to find Yugabyte. Blank for default.`,
 		},
 	},
-	"lotus_config.JournalConfig": {
+	"lotus_config.JournalConfig": []DocField{
 		{
 			Name: "//Events",
 			Type: "of",
@@ -1162,7 +1162,7 @@ in a cluster. Only 1 is required`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.Libp2p": {
+	"lotus_config.Libp2p": []DocField{
 		{
 			Name: "ListenAddresses",
 			Type: "[]string",
@@ -1229,7 +1229,7 @@ count towards this limit.`,
 closed by the connection manager.`,
 		},
 	},
-	"lotus_config.Logging": {
+	"lotus_config.Logging": []DocField{
 		{
 			Name: "SubsystemLevels",
 			Type: "map[string]string",
@@ -1237,7 +1237,7 @@ closed by the connection manager.`,
 			Comment: `SubsystemLevels specify per-subsystem log levels`,
 		},
 	},
-	"lotus_config.MinerAddressConfig": {
+	"lotus_config.MinerAddressConfig": []DocField{
 		{
 			Name: "PreCommitControl",
 			Type: "[]string",
@@ -1279,7 +1279,7 @@ A control address that doesn't have enough funds will still be chosen
 over the worker address if this flag is set.`,
 		},
 	},
-	"lotus_config.MinerFeeConfig": {
+	"lotus_config.MinerFeeConfig": []DocField{
 		{
 			Name: "MaxPreCommitGasFee",
 			Type: "types.FIL",
@@ -1335,7 +1335,7 @@ over the worker address if this flag is set.`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.MinerSubsystemConfig": {
+	"lotus_config.MinerSubsystemConfig": []DocField{
 		{
 			Name: "EnableMining",
 			Type: "bool",
@@ -1400,7 +1400,7 @@ When disabled and no external block producers are configured, all potential
 block rewards will be missed!`,
 		},
 	},
-	"lotus_config.PaymentChannelsConfig": {
+	"lotus_config.PaymentChannelsConfig": []DocField{
 		{
 			Name: "EnablePaymentChannelManager",
 			Type: "bool",
@@ -1411,7 +1411,7 @@ they remain a Filecoin protocol feature.
 Set to true to enable payment channel functionality if needed.`,
 		},
 	},
-	"lotus_config.ProvingConfig": {
+	"lotus_config.ProvingConfig": []DocField{
 		{
 			Name: "ParallelCheckLimit",
 			Type: "int",
@@ -1488,7 +1488,7 @@ resulting in more total gas use (but each message will have lower gas limit)`,
 to prove each deadline, resulting in more total gas use (but each message will have lower gas limit)`,
 		},
 	},
-	"lotus_config.Pubsub": {
+	"lotus_config.Pubsub": []DocField{
 		{
 			Name: "Bootstrapper",
 			Type: "bool",
@@ -1548,7 +1548,7 @@ This property is used only if ElasticSearchTracer property is set.`,
 			Comment: `Auth token that will be passed with logs to elasticsearch - used for weighted peers score.`,
 		},
 	},
-	"lotus_config.SealerConfig": {
+	"lotus_config.SealerConfig": []DocField{
 		{
 			Name: "ParallelFetchLimit",
 			Type: "int",
@@ -1649,7 +1649,7 @@ to use when evaluating tasks against this worker. An empty value defaults
 to "hardware".`,
 		},
 	},
-	"lotus_config.SealingConfig": {
+	"lotus_config.SealingConfig": []DocField{
 		{
 			Name: "MaxWaitDealsSectors",
 			Type: "uint64",
@@ -1861,7 +1861,7 @@ Submitting a smaller number of prove commits per epoch would reduce the possibil
 			Comment: `Whether to abort if any piece activation notification returns a non-zero exit code (updating sectors, only with ProveReplicaUpdates3).`,
 		},
 	},
-	"lotus_config.Splitstore": {
+	"lotus_config.Splitstore": []DocField{
 		{
 			Name: "ColdStoreType",
 			Type: "string",
@@ -1928,7 +1928,7 @@ is set.  Moving GC will not occur when total moving size exceeds
 HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 		},
 	},
-	"lotus_config.StorageMiner": {
+	"lotus_config.StorageMiner": []DocField{
 		{
 			Name: "Subsystems",
 			Type: "MinerSubsystemConfig",
@@ -1978,7 +1978,7 @@ HotstoreMaxSpaceTarget - HotstoreMaxSpaceSafetyBuffer`,
 			Comment: ``,
 		},
 	},
-	"lotus_config.Wallet": {
+	"lotus_config.Wallet": []DocField{
 		{
 			Name: "RemoteBackend",
 			Type: "string",
