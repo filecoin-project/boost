@@ -49,7 +49,9 @@ func TestDealFastRetrieval(t *testing.T) {
 
 	rows, err := sqldb.Query("SELECT FastRetrieval FROM Deals WHERE ID =?", deal.DealUuid)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 

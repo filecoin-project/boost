@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	"fmt"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	smfunds "github.com/filecoin-project/boost/storagemarket/funds"
 	"github.com/graph-gophers/graphql-go"

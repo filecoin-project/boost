@@ -97,7 +97,7 @@ func TestOutboundForwarding(t *testing.T) {
 					require.Equal(t, "request", string(request))
 					_, err = s.Write([]byte("response"))
 					require.NoError(t, err)
-					s.Close()
+					_ = s.Close()
 				}
 				tn.publicNode.SetStreamHandler(testProtocols[1], handler)
 				tn.publicNode.SetStreamHandler(otherProtocol, handler)
@@ -114,7 +114,7 @@ func TestOutboundForwarding(t *testing.T) {
 				streamResponse, err := io.ReadAll(s)
 				require.NoError(t, err)
 				require.Equal(t, "response", string(streamResponse))
-				s.Close()
+				_ = s.Close()
 			}
 			pp.Close()
 		})
@@ -188,7 +188,9 @@ func TestInboundForwarding(t *testing.T) {
 			pp.Start(ctx)
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
-					defer s.Close()
+					defer func() {
+						_ = s.Close()
+					}()
 					request, err := messages.ReadForwardingRequest(s)
 					require.Equal(t, &messages.ForwardingRequest{
 						Kind:      messages.ForwardingInbound,
@@ -233,7 +235,7 @@ func TestInboundForwarding(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 					require.Equal(t, "response", string(streamResponse))
-					s.Close()
+					_ = s.Close()
 				}
 			}
 			pp.Close()

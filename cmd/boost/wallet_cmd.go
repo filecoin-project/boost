@@ -208,7 +208,7 @@ var walletList = &cli.Command{
 					if !cctx.Bool("json") && dcap == nil {
 						wallet[dataCapKey] = "X"
 					} else if dcap != nil {
-						wallet[dataCapKey] = humanize.IBytes(dcap.Int.Uint64())
+						wallet[dataCapKey] = humanize.IBytes(dcap.Uint64())
 					}
 				} else {
 					wallet[dataCapKey] = "n/a"

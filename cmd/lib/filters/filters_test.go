@@ -255,10 +255,8 @@ func (fbf *fakeBlockFetcher) fetchDenyList(fetchTime time.Time) (bool, io.ReadCl
 		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"}
 	]
 	`
-	updated := true
-	if fbf.fetchCount == 1 {
-		updated = false
-	}
+	updated := fbf.fetchCount != 1
+
 	if fbf.fetchCount > 1 {
 		denyList = `[
 			{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"},
@@ -293,10 +291,8 @@ func (fpf *fakePeerFetcher) fetchList(fetchTime time.Time) (bool, io.ReadCloser,
 				"PeerIDs": ["Qma9T5YraSnpRDZqRR4krcSJabThc8nwZuJV3LercPHufi", "QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N"]
 		}
 	}`
-	updated := true
-	if fpf.fetchCount == 1 {
-		updated = false
-	}
+	updated := fpf.fetchCount != 1
+
 	if fpf.fetchCount > 1 {
 		list = `{
 			"AllowDenyList": {

@@ -77,7 +77,9 @@ var backupCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("locking repo: %w. Please stop the boostd process to take backup", err)
 		}
-		defer lr.Close()
+		defer func() {
+			_ = lr.Close()
+		}()
 
 		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
@@ -111,7 +113,9 @@ var backupCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		defer lb.Close()
+		defer func() {
+			_ = lb.Close()
+		}()
 
 		fmt.Println("Copying keystore")
 
@@ -215,7 +219,9 @@ var restoreCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		defer lr.Close()
+		defer func() {
+			_ = lr.Close()
+		}()
 
 		b, err := lotus_repo.NewFS(bpath)
 		if err != nil {
@@ -226,7 +232,9 @@ var restoreCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		defer lb.Close()
+		defer func() {
+			_ = lb.Close()
+		}()
 
 		fmt.Println("Copying keystore")
 
@@ -255,7 +263,9 @@ var restoreCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("opening backup file: %w", err)
 		}
-		defer f.Close()
+		defer func() {
+			_ = f.Close()
+		}()
 
 		fmt.Println("Restoring metadata backup")
 

@@ -108,7 +108,9 @@ var fetchCmd = &cli.Command{
 		idbs := lotus_blockstore.WrapIDStore(bs)
 		brn := &blockReceiver{bs: idbs, ctx: ctx, cancel: cancel}
 		bsClient := client.New(ctx, net, nilRouter, idbs, client.WithBlockReceivedNotifier(brn))
-		defer bsClient.Close()
+		defer func() {
+			_ = bsClient.Close()
+		}()
 		net.Start(bsClient)
 
 		// Connect to host

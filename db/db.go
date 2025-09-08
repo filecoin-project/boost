@@ -68,7 +68,9 @@ func SqlBackup(ctx context.Context, srcDB *sql.DB, dstDir, dbFileName string) er
 		return fmt.Errorf("failed to open source sql db for backup: %w", err)
 	}
 
-	defer dstDB.Close()
+	defer func() {
+		_ = dstDB.Close()
+	}()
 
 	err = dstDB.Ping()
 	if err != nil {
@@ -81,7 +83,9 @@ func SqlBackup(ctx context.Context, srcDB *sql.DB, dstDir, dbFileName string) er
 	}
 
 	// Conn must be closed explicitly otherwise, DB conn hangs
-	defer destConn.Close()
+	defer func() {
+		_ = destConn.Close()
+	}()
 
 	srcConn, err := srcDB.Conn(ctx)
 	if err != nil {
@@ -89,7 +93,9 @@ func SqlBackup(ctx context.Context, srcDB *sql.DB, dstDir, dbFileName string) er
 	}
 
 	// Conn must be closed explicitly otherwise, DB conn hangs
-	defer srcConn.Close()
+	defer func() {
+		_ = srcConn.Close()
+	}()
 
 	return destConn.Raw(func(destConn interface{}) error {
 		return srcConn.Raw(func(srcConn interface{}) error {

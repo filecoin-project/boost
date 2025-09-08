@@ -98,7 +98,9 @@ func (f *filter) update() error {
 	if !updated {
 		return nil
 	}
-	defer stream.Close()
+	defer func() {
+		_ = stream.Close()
+	}()
 	// write cache to the temp file first
 	tmpFile := f.CacheFile + ".tmp"
 	cache, err := os.OpenFile(tmpFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -191,7 +193,9 @@ func (mf *MultiFilter) Start(ctx context.Context) error {
 			}
 			cachedCopies = append(cachedCopies, false)
 		} else {
-			defer cache.Close()
+			defer func() {
+				_ = cache.Close()
+			}()
 			// otherwise, read the file and fetch the list asynchronously
 			err = f.Handler.ParseUpdate(cache)
 			if err != nil {

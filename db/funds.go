@@ -105,7 +105,9 @@ func (f *FundsDB) Logs(ctx context.Context, cursor *time.Time, offset int, limit
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	fundsLogs := make([]FundsLog, 0, 16)
 	for rows.Next() {
@@ -151,7 +153,9 @@ func (f *FundsDB) TotalTagged(ctx context.Context) (*TotalTagged, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting total tagged: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	tt := &TotalTagged{
 		Collateral: abi.NewTokenAmount(0),

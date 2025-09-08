@@ -305,7 +305,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// there is an unsealed copy
 	ssu := &sectorstatemgr.SectorStateUpdates{
 		ActiveSectors: map[abi.SectorID]struct{}{
-			dlSectorID: struct{}{},
+			dlSectorID: {},
 		},
 		SectorStates: map[abi.SectorID]db.SealState{
 			dlSectorID: db.SealStateUnsealed,

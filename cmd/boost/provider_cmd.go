@@ -170,7 +170,9 @@ var storageAskCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
 		}
-		defer s.Close()
+		defer func() {
+			_ = s.Close()
+		}()
 
 		var resp network.AskResponse
 

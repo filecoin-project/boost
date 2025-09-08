@@ -3,12 +3,11 @@ package node
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	crand "crypto/rand"
 
 	"github.com/filecoin-project/boost/lib/keystore"
 	"github.com/filecoin-project/go-address"
@@ -33,7 +32,7 @@ func Setup(cfgdir string) (*Node, error) {
 
 	_, err = os.Stat(cfgdir)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
-		return nil, errors.New("repo dir doesn't exist. run `boost init` first.")
+		return nil, errors.New("repo dir doesn't exist. run `boost init` first")
 	}
 
 	peerkey, err := loadOrInitPeerKey(keyPath(cfgdir))
@@ -67,7 +66,7 @@ func loadOrInitPeerKey(kf string) (crypto.PrivKey, error) {
 			return nil, err
 		}
 
-		k, _, err := crypto.GenerateEd25519Key(crand.Reader)
+		k, _, err := crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
 			return nil, err
 		}

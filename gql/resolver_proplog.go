@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/graph-gophers/graphql-go"

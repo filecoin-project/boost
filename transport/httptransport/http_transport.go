@@ -342,7 +342,9 @@ func (t *transfer) execute(ctx context.Context) error {
 	if err != nil {
 		return &httpError{error: fmt.Errorf("failed to send HEAD http req: %w", err)}
 	}
-	defer resp.Body.Close() // nolint
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return &httpError{
@@ -501,7 +503,9 @@ func (t *transfer) execute(ctx context.Context) error {
 		bt := time.NewTimer(duration)
 		t.dl.Infow(duuid, "backing off before retrying http request", "backoff time", duration.String(),
 			"attempts", nAttempts)
-		defer bt.Stop()
+		defer func() {
+			_ = bt.Stop()
+		}()
 		select {
 		case <-bt.C:
 			t.dl.Infow(duuid, "back-off complete, retrying http request", "backoff time", duration.String())
@@ -585,7 +589,9 @@ func (t *transfer) readControlFile(cf string) (*transferConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening control file for read %s: %w", cf, err)
 	}
-	defer input.Close()
+	defer func() {
+		_ = input.Close()
+	}()
 
 	data, err := io.ReadAll(input)
 	if err != nil {
@@ -605,7 +611,9 @@ func (t *transfer) writeControlFile(cf string, conf transferConfig) error {
 	if err != nil {
 		return fmt.Errorf("error opening control file for write %s: %w", cf, err)
 	}
-	defer output.Close()
+	defer func() {
+		_ = output.Close()
+	}()
 
 	data, err := json.Marshal(&conf)
 	if err != nil {
