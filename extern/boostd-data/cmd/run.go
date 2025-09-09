@@ -290,7 +290,7 @@ var yugabyteMigrateCmd = &cli.Command{
 		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
 			msg := "You must set the miner-address flag to do the migration. " +
 				"Set it to the address of the storage miner eg f1234"
-			return fmt.Errorf(msg)
+			return fmt.Errorf("%s", msg)
 		}
 		return err
 	},
@@ -368,7 +368,9 @@ var yugabyteAddIndexCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("couldn't open file: %s", err)
 		}
-		defer reader.Close()
+		defer func() {
+			_ = reader.Close()
+		}()
 
 		opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 		blockReader, err := carv2.NewBlockReader(reader, opts...)
