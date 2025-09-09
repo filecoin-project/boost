@@ -49,7 +49,9 @@ func TestSetStreamHandler(t *testing.T) {
 			})
 
 			fh.SetStreamHandler(testProtocol, func(s network.Stream) {
-				defer s.Close()
+				defer func() {
+					_ = s.Close()
+				}()
 				require.Equal(t, s.Protocol(), testProtocol)
 				require.Equal(t, s.Conn().RemotePeer(), peers.publicNode.id)
 				data, err := io.ReadAll(s)
@@ -60,7 +62,9 @@ func TestSetStreamHandler(t *testing.T) {
 			})
 			s, err := tn.proxyNode.NewStream(ctx, tn.serviceNode.ID(), ForwardingProtocolID)
 			require.NoError(t, err)
-			defer s.Close()
+			defer func() {
+				_ = s.Close()
+			}()
 			err = messages.WriteInboundForwardingRequest(s, tn.publicNode.ID(), testCase.protocol)
 			require.NoError(t, err)
 			_, err = s.Write([]byte("request"))
@@ -109,7 +113,9 @@ func TestNewStream(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 
 			tn.proxyNode.SetStreamHandler(ForwardingProtocolID, func(s network.Stream) {
-				defer s.Close()
+				defer func() {
+					_ = s.Close()
+				}()
 				request, err := messages.ReadForwardingRequest(s)
 				require.NoError(t, err)
 				require.Equal(t, messages.ForwardingOutbound, request.Kind)
@@ -136,7 +142,9 @@ func TestNewStream(t *testing.T) {
 				require.EqualError(t, err, testCase.protocolProxyForwardingError.Error())
 			} else {
 				require.NoError(t, err)
-				defer s.Close()
+				defer func() {
+					_ = s.Close()
+				}()
 				_, err = s.Write([]byte("request"))
 				require.NoError(t, err)
 				err = s.CloseWrite()

@@ -6,7 +6,6 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
-	_ "github.com/filecoin-project/boost/lib/legacy/mocks"
 	mocks_legacy "github.com/filecoin-project/boost/lib/legacy/mocks"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
@@ -43,8 +42,8 @@ func TestSectorStateManagerMatchingDealOnly(t *testing.T) {
 		prov.EXPECT().NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 
 		sus := map[abi.SectorID]db.SealState{
-			abi.SectorID{Miner: abi.ActorID(minerID), Number: sectorNum}:     db.SealStateUnsealed,
-			abi.SectorID{Miner: abi.ActorID(minerID), Number: sectorNum + 1}: db.SealStateUnsealed,
+			{Miner: abi.ActorID(minerID), Number: sectorNum}:     db.SealStateUnsealed,
+			{Miner: abi.ActorID(minerID), Number: sectorNum + 1}: db.SealStateUnsealed,
 		}
 		err = wrapper.handleUpdates(ctx, sus)
 		require.NoError(t, err)
@@ -79,7 +78,7 @@ func TestSectorStateManagerMatchingDealOnly(t *testing.T) {
 		}}
 		legacyStorageProvider.EXPECT().ListDeals().Return(deals, nil)
 
-		provAddr := deals[0].ClientDealProposal.Proposal.Provider
+		provAddr := deals[0].Proposal.Provider
 		runTest(t, wrapper, storageMiner, prov, provAddr, sectorNum)
 	})
 }

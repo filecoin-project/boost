@@ -186,7 +186,9 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	dealStates := make([]RetrievalDealState, 0, 16)
 	for rows.Next() {
@@ -286,7 +288,7 @@ func (d *RetrievalLogDB) Update(ctx context.Context, state legacyretrievaltypes.
 		"UpdatedAt": time.Now(),
 	}
 	where := "PeerID = ? AND DealID = ?"
-	args := []interface{}{state.Receiver.String(), state.DealProposal.ID}
+	args := []interface{}{state.Receiver.String(), state.ID}
 	if state.ChannelID != nil {
 		where += " AND TransferID = ?"
 		args = append(args, state.ChannelID.ID)
@@ -349,7 +351,9 @@ func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transf
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	dtEvents := make([]DTEvent, 0, 16)
 	for rows.Next() {
@@ -408,7 +412,9 @@ func (d *RetrievalLogDB) ListMarketEvents(ctx context.Context, peerID string, de
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	evts := make([]MarketEvent, 0, 16)
 	for rows.Next() {

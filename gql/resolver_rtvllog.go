@@ -42,10 +42,10 @@ func (r *retrievalStateResolver) PayloadCID() string {
 }
 
 func (r *retrievalStateResolver) PieceCid() string {
-	if r.RetrievalDealState.PieceCID == nil {
+	if r.PieceCID == nil {
 		return ""
 	}
-	return r.RetrievalDealState.PieceCID.String()
+	return r.PieceCID.String()
 }
 
 func (r *retrievalStateResolver) PaymentInterval() gqltypes.Uint64 {
@@ -69,7 +69,7 @@ func (r *retrievalStateResolver) TotalSent() gqltypes.Uint64 {
 }
 
 func (r *retrievalStateResolver) DTEvents(ctx context.Context) ([]*retrievalDTEventResolver, error) {
-	if r.RetrievalDealState.TransferID == 0 || r.RetrievalDealState.LocalPeerID == "" {
+	if r.RetrievalDealState.TransferID == 0 || r.LocalPeerID == "" {
 		return nil, nil
 	}
 
@@ -96,7 +96,7 @@ func (r *retrievalDTEventResolver) CreatedAt() graphql.Time {
 }
 
 func (r *retrievalStateResolver) MarketEvents(ctx context.Context) ([]*retrievalMarketEventResolver, error) {
-	if r.RetrievalDealState.DealID == 0 || r.RetrievalDealState.LocalPeerID == "" {
+	if r.RetrievalDealState.DealID == 0 || r.LocalPeerID == "" {
 		return nil, nil
 	}
 

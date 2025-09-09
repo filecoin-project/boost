@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"golang.org/x/tools/go/packages"
 	"os"
 	"sort"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 const lotusCfgPkg = "github.com/filecoin-project/lotus/node/config"

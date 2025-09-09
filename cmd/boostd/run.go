@@ -62,7 +62,7 @@ var runCmd = &cli.Command{
 		}
 
 		subCh := gateway.NewEthSubHandler()
-		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscribtionHandler(subCh))
+		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscriptionHandler(subCh))
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
 		}
@@ -97,7 +97,7 @@ var runCmd = &cli.Command{
 		log.Debugw("Remote full node version", "version", v)
 
 		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-			return fmt.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
+			return fmt.Errorf("remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
 
 		log.Debug("Checking full node sync status")

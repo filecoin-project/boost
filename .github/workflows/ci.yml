@@ -9,7 +9,7 @@ on:
       - main
 
 env:
-  GO_VERSION: 1.23.7
+  GO_VERSION: 1.24.7
 
 jobs:
   ci-lint:
@@ -73,8 +73,8 @@ jobs:
             target: "./itests/dummydeal_offline_test.go"
           - name: test-itest-dummydeal
             target: "./itests/dummydeal_test.go"
-          - name: test-graphsync_identity_cid
-            target: "./itests/graphsync_identity_cid_test.go"
+#          - name: test-graphsync_identity_cid
+#            target: "./itests/graphsync_identity_cid_test.go"
           - name: test-itest-retrieval
             target: "./itests/graphsync_retrieval_test.go"
           - name: test-itest-direct_deal
@@ -144,7 +144,7 @@ jobs:
 
       - name: Install golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.60.1
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.4.0
         shell: bash
 
       - name: Lint

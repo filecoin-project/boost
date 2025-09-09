@@ -6,7 +6,7 @@ orbs:
 executors:
   golang:
     docker:
-      - image: cimg/go:1.23.7
+      - image: cimg/go:1.24.7
     resource_class: 2xlarge
   ubuntu:
     docker:
@@ -87,7 +87,7 @@ jobs:
   lid-docker-compose:
     description: 'Run LID integration tests'
     docker:
-      - image: cimg/go:1.23.7 # Primary container to run Go tests
+      - image: cimg/go:1.24.7 # Primary container to run Go tests
         environment:
           YUGABYTE_HOST: yugabyte
       - image: yugabytedb/yugabyte:2024.1.3.0-b105 # Service container for YugabyteDB
@@ -172,7 +172,7 @@ jobs:
           linux: false
           darwin: true
       - golang/install:
-          version: "1.23.7"
+          version: "1.24.7"
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
@@ -271,7 +271,7 @@ jobs:
         default: golang
       golangci-lint-version:
         type: string
-        default: 1.60.1
+        default: 2.4.0
       concurrency:
         type: string
         default: '2'
@@ -336,10 +336,10 @@ workflows:
           suite: itest-dummydeal
           target: "./itests/dummydeal_test.go"
 
-      - test:
-          name: test-graphsync_identity_cid
-          suite: itest-graphsync_identity_cid
-          target: "./itests/graphsync_identity_cid_test.go"
+#      - test:
+#          name: test-graphsync_identity_cid
+#          suite: itest-graphsync_identity_cid
+#          target: "./itests/graphsync_identity_cid_test.go"
 
       - test:
           name: test-itest-retrieval

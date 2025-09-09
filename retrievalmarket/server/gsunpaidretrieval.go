@@ -180,7 +180,7 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	// tell GraphSync to cancel the request
 	if (gsRequestID != graphsync.RequestID{}) {
-		err := g.GraphExchange.Cancel(ctx, gsRequestID)
+		err := g.Cancel(ctx, gsRequestID)
 		if err != nil {
 			log.Info("unable to force close graphsync request %s: %s", tID, err)
 		}
@@ -270,7 +270,7 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 		// If we don't recognize the voucher, don't intercept the retrieval.
 		// Instead it will be passed through to the legacy code for processing.
 		log.Debugw("decoding new request voucher", "request", request, "err", decodeErr)
-		if !errors.Is(decodeErr, unknownVoucherErr) {
+		if !errors.Is(decodeErr, ErrUnknownVoucher) {
 			return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 		}
 	}
@@ -491,7 +491,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 
 		// Include a markets protocol Completed message in the response
 		dealResponse := &legacyretrievaltypes.DealResponse{
-			ID:     state.mkts.DealProposal.ID,
+			ID:     state.mkts.ID,
 			Status: legacyretrievaltypes.DealStatusCompleted,
 		}
 
@@ -593,7 +593,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsy
 		// Consider network errors as fatal, clients can send a new request if they wish
 
 		// Cancel the graphsync retrieval
-		cancelErr := g.GraphExchange.Cancel(g.ctx, request.ID())
+		cancelErr := g.Cancel(g.ctx, request.ID())
 		if cancelErr != nil {
 			log.Errorf("cancelling graphsync response after network error: %w", cancelErr)
 		}
@@ -614,13 +614,13 @@ func (g *GraphsyncUnpaidRetrieval) failTransfer(state *retrievalState, err error
 	log.Infow("transfer failed", "transfer id", state.cs.transferID, "peer", state.cs.recipient, "err", err)
 }
 
-var unknownVoucherErr = errors.New("unknown voucher type")
+var ErrUnknownVoucher = errors.New("unknown voucher type")
 
 func (g *GraphsyncUnpaidRetrieval) decodeVoucher(request datatransfer.Request, registry *registry.Registry) (datatransfer.Voucher, error) {
 	vtypStr := request.VoucherType()
 	decoder, has := registry.Decoder(vtypStr)
 	if !has {
-		return nil, fmt.Errorf("voucher type: %s: %w", vtypStr, unknownVoucherErr)
+		return nil, fmt.Errorf("voucher type: %s: %w", vtypStr, ErrUnknownVoucher)
 	}
 	encodable, err := request.Voucher(decoder)
 	if err != nil {

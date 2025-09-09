@@ -132,7 +132,9 @@ func makeDataSegmentPiece(t *testing.T, dataSegmentFile string, subPieces []stri
 	// open output file
 	fo, err := os.Create(dataSegmentFile)
 	require.NoError(t, err)
-	defer fo.Close()
+	defer func() {
+		_ = fo.Close()
+	}()
 
 	written, err := io.Copy(fo, out)
 	require.NoError(t, err)

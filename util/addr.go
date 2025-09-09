@@ -2,9 +2,10 @@ package util
 
 import (
 	"fmt"
-	ma "github.com/multiformats/go-multiaddr"
 	"net"
 	"strings"
+
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 func ToHttpMultiaddr(hostname string, port int) (ma.Multiaddr, error) {

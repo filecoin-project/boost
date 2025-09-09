@@ -147,7 +147,7 @@ func (r *legacyDealResolver) PublishCid() string {
 }
 
 func (r *legacyDealResolver) PieceSize() gqltypes.Uint64 {
-	return gqltypes.Uint64(r.ClientDealProposal.Proposal.PieceSize)
+	return gqltypes.Uint64(r.Proposal.PieceSize)
 }
 
 func (r *legacyDealResolver) PiecePath() string {
@@ -159,15 +159,15 @@ func (r *legacyDealResolver) SectorNumber() gqltypes.Uint64 {
 }
 
 func (r *legacyDealResolver) ProviderCollateral() gqltypes.Uint64 {
-	return gqltypes.Uint64(r.ClientDealProposal.Proposal.ProviderCollateral.Uint64())
+	return gqltypes.Uint64(r.Proposal.ProviderCollateral.Uint64())
 }
 
 func (r *legacyDealResolver) StartEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(r.ClientDealProposal.Proposal.StartEpoch)
+	return gqltypes.Uint64(r.Proposal.StartEpoch)
 }
 
 func (r *legacyDealResolver) EndEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(r.ClientDealProposal.Proposal.EndEpoch)
+	return gqltypes.Uint64(r.Proposal.EndEpoch)
 }
 
 func (r *legacyDealResolver) FundsReserved() gqltypes.Uint64 {
@@ -175,7 +175,7 @@ func (r *legacyDealResolver) FundsReserved() gqltypes.Uint64 {
 }
 
 func (r *legacyDealResolver) PieceCid() string {
-	return r.ClientDealProposal.Proposal.PieceCID.String()
+	return r.Proposal.PieceCID.String()
 }
 
 func (r *legacyDealResolver) TransferType() string {

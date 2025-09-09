@@ -1144,7 +1144,7 @@ func (ii *insertionIndex) Get(c cid.Cid) (uint64, error) {
 		return 0, errUnsupported
 	}
 
-	return r.Record.Offset, nil
+	return r.Offset, nil
 }
 
 func (ii *insertionIndex) GetAll(c cid.Cid, fn func(uint64) bool) error {
@@ -1162,7 +1162,7 @@ func (ii *insertionIndex) GetAll(c cid.Cid, fn func(uint64) bool) error {
 			return false
 		}
 		any = true
-		return fn(existing.Record.Offset)
+		return fn(existing.Offset)
 	}
 	ii.items.AscendGreaterOrEqual(entry, iter)
 	if !any {
@@ -1264,7 +1264,7 @@ func (ii *insertionIndex) hasExactCID(c cid.Cid) bool {
 			// We've already looked at all entries with matching digests.
 			return false
 		}
-		if existing.Record.Cid == c {
+		if existing.Cid == c {
 			// We found an exact match.
 			found = true
 			return false
@@ -1359,7 +1359,7 @@ func OpenReadWrite(path string, roots []cid.Cid, opts ...carv2.Option) (*ReadWri
 	// If construction of blockstore fails, make sure to close off the open file.
 	defer func() {
 		if err != nil {
-			f.Close()
+			_ = f.Close()
 		}
 	}()
 
@@ -1605,7 +1605,7 @@ func (b *ReadWrite) Discard() {
 	// The only difference is that our method is called Discard,
 	// to further clarify that we're not properly finalizing and writing a
 	// CARv2 file.
-	b.ronly.Close()
+	_ = b.ronly.Close()
 }
 
 // Finalize finalizes this blockstore by writing the CARv2 header, along with flattened index

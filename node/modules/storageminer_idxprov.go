@@ -131,7 +131,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		}
 		llog.Info("Instantiated index provider engine")
 
-		args.Lifecycle.Append(fx.Hook{
+		args.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				// Note that the OnStart context is cancelled after startup. Its use in e.Start is
 				// to start up gossipsub publishers and restore cache, all of  which are completed

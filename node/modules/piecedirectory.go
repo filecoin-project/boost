@@ -17,13 +17,12 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"go.uber.org/fx"
 )
 
-func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr lotus_dtypes.MinerAddress) *bdclient.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr lotus_dtypes.MinerAddress) *bdclient.Store {
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr dtypes.MinerAddress) *bdclient.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr dtypes.MinerAddress) *bdclient.Store {
 		svcDialOpts := []jsonrpc.Option{
 			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
 		}
@@ -149,8 +148,8 @@ func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.Min
 	}
 }
 
-func NewPieceDoctor(cfg *config.Boost) func(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
-	return func(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+func NewPieceDoctor(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
 		if !cfg.LocalIndexDirectory.EnablePieceDoctor {
 			return &piecedirectory.Doctor{}
 		}

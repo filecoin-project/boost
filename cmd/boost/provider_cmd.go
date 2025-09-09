@@ -53,7 +53,7 @@ var libp2pInfoCmd = &cli.Command{
 			return fmt.Errorf("setting up CLI node: %w", err)
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("setting up gateway connection: %w", err)
 		}
@@ -144,7 +144,7 @@ var storageAskCmd = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}
@@ -170,7 +170,9 @@ var storageAskCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
 		}
-		defer s.Close()
+		defer func() {
+			_ = s.Close()
+		}()
 
 		var resp network.AskResponse
 
@@ -225,7 +227,7 @@ var retrievalTransportsCmd = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}

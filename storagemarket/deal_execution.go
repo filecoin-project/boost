@@ -11,7 +11,6 @@ import (
 
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
@@ -44,9 +43,9 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", dcpy)
 
 	// Clear any error from a previous run
-	if deal.Err != "" || deal.Retry == smtypes.DealRetryAuto {
+	if deal.Err != "" || deal.Retry == types.DealRetryAuto {
 		deal.Err = ""
-		deal.Retry = smtypes.DealRetryAuto
+		deal.Retry = types.DealRetryAuto
 		p.saveDealToDB(dh.Publisher, deal)
 	}
 
@@ -72,7 +71,7 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		p.dealLogger.Infow(deal.DealUuid, "deal paused because boost was shut down",
 			"checkpoint", deal.Checkpoint.String())
 	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", err.error.Error(),
+		p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", err.Error(),
 			"checkpoint", deal.Checkpoint.String(), "retry", err.retry)
 	}
 
@@ -81,15 +80,15 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.saveDealToDB(dh.Publisher, deal)
 }
 
-func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (dmerr *dealMakingError) {
+func (p *Provider) execDeal(deal *types.ProviderDealState, dh *dealHandler) (dmerr *dealMakingError) {
 	// Capture any panic as a manually retryable error
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorw("caught panic executing deal", "id", deal.DealUuid, "err", err)
-			fmt.Fprint(os.Stderr, string(debug.Stack()))
+			_, _ = fmt.Fprint(os.Stderr, string(debug.Stack()))
 			dmerr = &dealMakingError{
-				error: fmt.Errorf("Caught panic in deal execution: %s\n%s", err, debug.Stack()),
-				retry: smtypes.DealRetryManual,
+				error: fmt.Errorf("caught panic in deal execution: %s\n%s", err, debug.Stack()),
+				retry: types.DealRetryManual,
 			}
 		}
 	}()
@@ -106,7 +105,7 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 		if err != nil {
 			return &dealMakingError{
 				error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
-				retry: smtypes.DealRetryFatal,
+				retry: types.DealRetryFatal,
 			}
 		}
 		deal.NBytesReceived = fi.Size()
@@ -282,7 +281,7 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 	}
 }
 
-func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *smtypes.ProviderDealState) *dealMakingError {
+func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	// Use a context specifically for transfers, that can be cancelled by the user
 	ctx := dh.transferCtx
 
@@ -304,12 +303,12 @@ func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *s
 		// automatically retry on restart.
 		if errors.Is(err, context.Canceled) {
 			return &dealMakingError{
-				retry: smtypes.DealRetryAuto,
+				retry: types.DealRetryAuto,
 				error: fmt.Errorf("boost shutdown while waiting to start transfer for deal %s: %w", deal.DealUuid, err),
 			}
 		}
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("queued transfer failed to start for deal %s: %w", deal.DealUuid, err),
 		}
 	}
@@ -328,7 +327,7 @@ func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *s
 	})
 	if err != nil {
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("transferAndVerify failed to start data transfer: %w", err),
 		}
 	}
@@ -357,7 +356,7 @@ func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *s
 		// it fails, it means it's already retried several times and we should
 		// fail the deal
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("data-transfer failed: %w", err),
 		}
 	}
@@ -580,7 +579,7 @@ func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser
 	if err != nil {
 		return nil, fmt.Errorf("failed to open CAR reader over %s: %w", filePath, err)
 	}
-	v2r.Close()
+	_ = v2r.Close()
 
 	r, err := os.Open(filePath)
 	if err != nil {
@@ -793,10 +792,10 @@ func HasDeal(deals []abi.DealID, pdsDealId abi.DealID) bool {
 	return ret
 }
 
-func (p *Provider) failDeal(pub event.Emitter, deal *smtypes.ProviderDealState, err error, cancelled bool) {
+func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error, cancelled bool) {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	deal.Retry = smtypes.DealRetryFatal
+	deal.Retry = types.DealRetryFatal
 	if cancelled {
 		deal.Err = DealCancelled
 		p.dealLogger.Infow(deal.DealUuid, "deal cancelled by user")
@@ -809,7 +808,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *smtypes.ProviderDealState, 
 	p.cleanupDeal(deal)
 }
 
-func (p *Provider) saveDealToDB(pub event.Emitter, deal *smtypes.ProviderDealState) {
+func (p *Provider) saveDealToDB(pub event.Emitter, deal *types.ProviderDealState) {
 	// In the case that the provider has been shutdown, the provider's context
 	// will be cancelled, so use a background context when saving state to the
 	// DB to avoid this edge case.
@@ -887,7 +886,7 @@ func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealS
 	// we don't want a graceful shutdown to mess with db updates so pass a background context
 	if err := p.dealsDB.Update(context.Background(), deal); err != nil {
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("failed to persist deal state: %w", err),
 		}
 	}
@@ -897,7 +896,7 @@ func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealS
 	return nil
 }
 
-func (p *Provider) checkDealProposalStartEpoch(deal *smtypes.ProviderDealState) *dealMakingError {
+func (p *Provider) checkDealProposalStartEpoch(deal *types.ProviderDealState) *dealMakingError {
 	chainHead, err := p.fullnodeApi.ChainHead(p.ctx)
 	if err != nil {
 		log.Warnw("failed to check deal proposal start epoch", "err", err)
@@ -909,7 +908,7 @@ func (p *Provider) checkDealProposalStartEpoch(deal *smtypes.ProviderDealState) 
 	height := chainHead.Height()
 	if height > deal.ClientDealProposal.Proposal.StartEpoch {
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("deal proposal must be proven on chain by deal proposal "+
 				"start epoch %d, but it has expired: current chain height: %d",
 				deal.ClientDealProposal.Proposal.StartEpoch, height),

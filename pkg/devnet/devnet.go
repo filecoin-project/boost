@@ -75,7 +75,9 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeD
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	for _, cmdArgs := range commands {
 		log.Debugw("running command", "name", name, "cmd", strings.Join(cmdArgs, " "))

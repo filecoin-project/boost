@@ -143,11 +143,11 @@ func (dr *directDealResolver) CreatedAt() graphql.Time {
 }
 
 func (dr *directDealResolver) ClientAddress() string {
-	return dr.DirectDeal.Client.String()
+	return dr.Client.String()
 }
 
 func (dr *directDealResolver) ProviderAddress() string {
-	return dr.DirectDeal.Provider.String()
+	return dr.Provider.String()
 }
 
 func (dr *directDealResolver) KeepUnsealedCopy() bool {
@@ -172,9 +172,9 @@ func (dr *directDealResolver) Transferred() gqltypes.Uint64 {
 
 func (dr *directDealResolver) Sector() *sectorResolver {
 	return &sectorResolver{
-		ID:     gqltypes.Uint64(dr.DirectDeal.SectorID),
-		Offset: gqltypes.Uint64(dr.DirectDeal.Offset),
-		Length: gqltypes.Uint64(dr.DirectDeal.Length),
+		ID:     gqltypes.Uint64(dr.SectorID),
+		Offset: gqltypes.Uint64(dr.Offset),
+		Length: gqltypes.Uint64(dr.Length),
 	}
 }
 
@@ -187,7 +187,7 @@ func (dr *directDealResolver) EndEpoch() gqltypes.Uint64 {
 }
 
 func (dr *directDealResolver) PieceCid() string {
-	return dr.DirectDeal.PieceCID.String()
+	return dr.PieceCID.String()
 }
 
 func (dr *directDealResolver) Checkpoint() string {
@@ -204,8 +204,8 @@ func (dr *directDealResolver) Retry() string {
 
 func (dr *directDealResolver) Message(ctx context.Context) string {
 	msg := dr.message(ctx, dr.DirectDeal.Checkpoint, dr.DirectDeal.CheckpointAt)
-	if dr.DirectDeal.Retry != types.DealRetryFatal && dr.DirectDeal.Err != "" {
-		msg = "Paused at '" + msg + "': " + dr.DirectDeal.Err
+	if dr.DirectDeal.Retry != types.DealRetryFatal && dr.Err != "" {
+		msg = "Paused at '" + msg + "': " + dr.Err
 	}
 	return msg
 }
@@ -213,7 +213,7 @@ func (dr *directDealResolver) Message(ctx context.Context) string {
 func (dr *directDealResolver) message(ctx context.Context, checkpoint dealcheckpoints.Checkpoint, checkpointAt time.Time) string {
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
-		if dr.DirectDeal.InboundFilePath != "" {
+		if dr.InboundFilePath != "" {
 			return "Verifying Commp"
 		}
 		return "Awaiting Direct Data Import"

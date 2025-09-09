@@ -38,9 +38,9 @@ func TestHttpTransportMultistreamPerformance(t *testing.T) {
 
 			w.WriteHeader(200)
 			if end == 0 {
-				w.Write(st.carBytes[start:]) //nolint:errcheck
+				_, _ = w.Write(st.carBytes[start:])
 			} else {
-				w.Write(st.carBytes[start:end]) //nolint:errcheck
+				_, _ = w.Write(st.carBytes[start:end])
 			}
 		case http.MethodHead:
 			addContentLengthHeader(w, len(st.carBytes))
@@ -87,7 +87,9 @@ func TestHttpTransportMultistreamPerformance(t *testing.T) {
 func handleConnection(t *testing.T, localConn net.Conn, remoteAddr string, latency time.Duration) {
 	remoteConn, err := net.Dial("tcp", remoteAddr)
 	require.NoError(t, err)
-	defer remoteConn.Close()
+	defer func() {
+		_ = remoteConn.Close()
+	}()
 
 	proxyFunc := func(from, to net.Conn) {
 		buf := make([]byte, readBufferSize)

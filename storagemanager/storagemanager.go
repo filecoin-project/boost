@@ -184,7 +184,9 @@ func (m *StorageManager) DownloadFilePath(dealUuid uuid.UUID) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create download file %s", path)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	return file.Name(), nil
 }

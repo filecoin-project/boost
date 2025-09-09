@@ -236,7 +236,9 @@ func (d *DirectDealsDB) list(ctx context.Context, offset int, limit int, whereCl
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	deals := make([]*types.DirectDeal, 0, 16)
 	for rows.Next() {

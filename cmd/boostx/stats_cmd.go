@@ -47,7 +47,7 @@ var statsCmd = &cli.Command{
 			return fmt.Errorf("setting up CLI node: %w", err)
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("setting up gateway connection: %w", err)
 		}

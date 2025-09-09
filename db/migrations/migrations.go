@@ -3,6 +3,7 @@ package migrations
 import (
 	"database/sql"
 	"embed"
+
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/pressly/goose/v3"
 )

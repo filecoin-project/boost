@@ -285,7 +285,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			var j int
 			for ; j < len(lds); j++ {
 				l := lds[j]
-				lpcid, err := l.ClientDealProposal.Proposal.Cid()
+				lpcid, err := l.Proposal.Cid()
 				if err != nil {
 					return nil, err
 				}

@@ -23,7 +23,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport"
@@ -130,7 +129,7 @@ type Provider struct {
 
 	pieceAdder                  types.PieceAdder
 	commpThrottle               CommpThrottle
-	commpCalc                   smtypes.CommpCalculator
+	commpCalc                   types.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
 
@@ -148,7 +147,7 @@ type Provider struct {
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator, commpThrottle CommpThrottle,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc types.CommpCalculator, commpThrottle CommpThrottle,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -308,7 +307,7 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
 		CleanupData:        !dp.IsOffline,
-		Retry:              smtypes.DealRetryAuto,
+		Retry:              types.DealRetryAuto,
 		FastRetrieval:      !dp.RemoveUnsealedCopy,
 		AnnounceToIPNI:     !dp.SkipIPNIAnnounce,
 	}
@@ -333,7 +332,7 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 }
 
 // executeDeal sends the deal to the main provider run loop for execution
-func (p *Provider) executeDeal(ctx context.Context, ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
+func (p *Provider) executeDeal(ctx context.Context, ds types.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "Provider.executeDeal")
 	defer span.End()
 
@@ -486,7 +485,7 @@ func (p *Provider) Start() error {
 		// Check if the deal can be restarted automatically.
 		// Note that if the retry type is "fatal" then the deal should already
 		// have been marked as complete (and therefore not returned by ListActive).
-		if deal.Retry != smtypes.DealRetryAuto {
+		if deal.Retry != types.DealRetryAuto {
 			p.dealLogger.Infow(deal.DealUuid, "deal must be manually restarted: waiting for manual restart")
 			continue
 		}
@@ -650,7 +649,7 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 	return err
 }
 
-func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*PackingResult, error) {
+func (p *Provider) AddPieceToSector(ctx context.Context, deal types.ProviderDealState, pieceData io.Reader) (*PackingResult, error) {
 	// Sanity check - we must have published the deal before handing it off
 	// to the sealing subsystem
 	if deal.PublishCID == nil {
@@ -683,7 +682,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	}, nil
 }
 
-func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func addPieceWithRetry(ctx context.Context, pieceAdder types.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	info, err := pieceAdder.SectorAddPieceToAny(ctx, pieceSize, pieceData, sdInfo)
 	curTime := build.Clock.Now()
 	for err != nil && build.Clock.Since(curTime) < addPieceRetryTimeout {

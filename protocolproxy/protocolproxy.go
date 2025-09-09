@@ -129,7 +129,9 @@ func (pp *ProtocolProxy) Disconnected(n network.Network, c network.Conn) { // ca
 
 // handle a request from a routed peer to make an external ougoing connection
 func (pp *ProtocolProxy) handleForwarding(s network.Stream) {
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
 	p := s.Conn().RemotePeer()
 	request, err := messages.ReadForwardingRequest(s)
 	if err != nil {
@@ -161,7 +163,9 @@ func (pp *ProtocolProxy) handleForwarding(s network.Stream) {
 		return
 	}
 
-	defer outgoingStream.Close()
+	defer func() {
+		_ = outgoingStream.Close()
+	}()
 
 	// write accept response
 	err = messages.WriteOutboundForwardingResponseSuccess(s, outgoingStream.Conn().RemotePublicKey(), outgoingStream.Protocol())
@@ -227,7 +231,9 @@ func (pp *ProtocolProxy) bridgeStreams(s1, s2 network.Stream) {
 }
 
 func (pp *ProtocolProxy) handleIncoming(s network.Stream) {
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
 
 	// check routed peer for this stream
 	pp.activeRoutesLk.RLock()
@@ -251,7 +257,9 @@ func (pp *ProtocolProxy) handleIncoming(s network.Stream) {
 		return
 	}
 
-	defer routedStream.Close()
+	defer func() {
+		_ = routedStream.Close()
+	}()
 	// write an inbound forwarding request with the remote peer and protoocol
 	err = messages.WriteInboundForwardingRequest(routedStream, s.Conn().RemotePeer(), s.Protocol())
 	if err != nil {

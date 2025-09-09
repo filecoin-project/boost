@@ -2,6 +2,8 @@ package lp2pimpl
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
@@ -10,7 +12,6 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // TestDealParamsMissingFields verifies that when the client sends a v1.2.0

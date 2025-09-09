@@ -183,9 +183,9 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		for _, sectorDecl := range loc {
 			// Explicity set the sector state if its Sealed or Unsealed
 			switch {
-			case sectorDecl.SectorFileType.Has(storiface.FTUnsealed):
+			case sectorDecl.Has(storiface.FTUnsealed):
 				sectorStates[sectorDecl.SectorID] = db.SealStateUnsealed
-			case sectorDecl.SectorFileType.Has(storiface.FTSealed):
+			case sectorDecl.Has(storiface.FTSealed):
 				if state, ok := sectorStates[sectorDecl.SectorID]; !ok || state != db.SealStateUnsealed {
 					sectorStates[sectorDecl.SectorID] = db.SealStateSealed
 				}
