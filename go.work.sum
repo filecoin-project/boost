@@ -3516,8 +3516,6 @@ github.com/ipni/go-libipni v0.6.11/go.mod h1:hHkfaG5zP8M8RQX8C84gTUre5KODHGPxEbI
 github.com/ipni/index-provider v0.10.0/go.mod h1:InSXbZp2p/ZhAwiDElG/wzjnA1ea1iJ3hhyiAHrD+Vo=
 github.com/ipni/index-provider v0.12.0/go.mod h1:GhyrADJp7n06fqoc1djzkvL4buZYHzV8SoWrlxEo5F4=
 github.com/ipni/index-provider v0.14.2/go.mod h1:mArx7Ou3Y62fIDSj9a1Neh5G14xQcwXGbfEbf47vyuM=
-github.com/ipni/ipni-cli v0.4.3 h1:jSPKLQAYx+m86NmL5tMc+fB7zE4OTCUIGf4ys4tz1s4=
-github.com/ipni/ipni-cli v0.4.3/go.mod h1:aHv3kH/+bQlhYbFpj4LLgwGDBlMQFQ0DErz39KAbE/8=
 github.com/ipni/relayx v0.0.1 h1:N6e9+RwR1tqYhMIlaLO4GAbjeBlOr62oXLy6rh3weuU=
 github.com/ipni/relayx v0.0.1/go.mod h1:FPzE2u4dabuSM9wFseULf1CqiOziHK9XvJbJvm9LBXo=
 github.com/ipni/storetheindex v0.5.3-0.20221203123030-16745cb63f15/go.mod h1:c/NS640Iu2NrCCIErnUhsUM5KVEyeXymgtNnx6eDwMU=
@@ -5210,6 +5208,7 @@ go.opentelemetry.io/otel/sdk/metric v0.39.0 h1:Kun8i1eYf48kHH83RucG93ffz0zGV1sh4
 go.opentelemetry.io/otel/sdk/metric v0.39.0/go.mod h1:piDIRgjcK7u0HCL5pCA4e74qpK/jk3NiUoAHATVAmiI=
 go.opentelemetry.io/otel/sdk/metric v1.28.0/go.mod h1:cWPjykihLAPvXKi4iZc1dpER3Jdq2Z0YLse3moQUCpg=
 go.opentelemetry.io/otel/sdk/metric v1.31.0/go.mod h1:CRInTMVvNhUKgSAMbKyTMxqOBC0zgyxzW55lZzX43Y8=
+go.opentelemetry.io/otel/sdk/metric v1.32.0/go.mod h1:PWeZlq0zt9YkYAp3gjKZ0eicRYvOh1Gd+X99x6GHpCQ=
 go.opentelemetry.io/otel/sdk/metric v1.34.0/go.mod h1:jQ/r8Ze28zRKoNRdkjCZxfs6YvBTG1+YIqyFVFYec5w=
 go.opentelemetry.io/otel/trace v1.6.3/go.mod h1:GNJQusJlUgZl9/TQBPKU/Y/ty+0iVB5fjhKeJGZPGFs=
 go.opentelemetry.io/otel/trace v1.10.0/go.mod h1:Sij3YYczqAdz+EhmGhE6TpTxUO5/F/AzrK+kxfGqySM=
@@ -6065,6 +6064,7 @@ google.golang.org/genproto/googleapis/api v0.0.0-20250106144421-5f5ef82da422/go.
 google.golang.org/genproto/googleapis/api v0.0.0-20250115164207-1a7da9e5054f/go.mod h1:Ic02D47M+zbarjYYUlK57y316f2MoN0gjAwI3f2S95o=
 google.golang.org/genproto/googleapis/api v0.0.0-20250204164813-702378808489/go.mod h1:iYONQfRdizDB8JJBybql13nArx91jcUk7zCXEsOofM4=
 google.golang.org/genproto/googleapis/api v0.0.0-20250207221924-e9438ea467c6/go.mod h1:iYONQfRdizDB8JJBybql13nArx91jcUk7zCXEsOofM4=
+google.golang.org/genproto/googleapis/api v0.0.0-20250212204824-5a70512c5d8b/go.mod h1:iYONQfRdizDB8JJBybql13nArx91jcUk7zCXEsOofM4=
 google.golang.org/genproto/googleapis/bytestream v0.0.0-20230530153820-e85fd2cbaebc/go.mod h1:ylj+BE99M198VPbBh6A8d9n3w8fChvyLK3wwBOjXBFA=
 google.golang.org/genproto/googleapis/bytestream v0.0.0-20230807174057-1744710a1577/go.mod h1:NjCQG/D8JandXxM57PZbAJL1DCNL6EypA0vPPwfsc7c=
 google.golang.org/genproto/googleapis/bytestream v0.0.0-20231030173426-d783a09b4405 h1:o4S3HvTUEXgRsNSUQsALDVog0O9F/U1JJlHmmUN8Uas=
@@ -6139,6 +6139,7 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f/go.
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47/go.mod h1:+2Yz8+CLJbIfL9z73EW45avw8Lmge3xVElCP9zEKi50=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250204164813-702378808489/go.mod h1:8BS3B93F/U1juMFq9+EDk+qOT5CO1R9IzXxG3PTqiRk=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6/go.mod h1:8BS3B93F/U1juMFq9+EDk+qOT5CO1R9IzXxG3PTqiRk=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b/go.mod h1:8BS3B93F/U1juMFq9+EDk+qOT5CO1R9IzXxG3PTqiRk=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4/go.mod h1:LuRYeWDFV6WOn90g357N17oMCaxpgCnbi/44qJvDn2I=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
 google.golang.org/grpc v0.0.0-20160317175043-d3ddb4469d5a/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
