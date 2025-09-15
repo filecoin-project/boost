@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	abi "github.com/filecoin-project/go-state-types/abi"
+	miner "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	verifreg "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -756,7 +757,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write([]byte{170}); err != nil {
+	if _, err := cw.Write([]byte{171}); err != nil {
 		return err
 	}
 
@@ -897,6 +898,32 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 
 	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.AllocationID)); err != nil {
 		return err
+	}
+
+	// t.Notifications ([]miner.DataActivationNotification) (slice)
+	if len("Notifications") > 8192 {
+		return xerrors.Errorf("Value in field \"Notifications\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Notifications"))); err != nil {
+		return err
+	}
+	if _, err := cw.WriteString(string("Notifications")); err != nil {
+		return err
+	}
+
+	if len(t.Notifications) > 8192 {
+		return xerrors.Errorf("Slice value in field t.Notifications was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajArray, uint64(len(t.Notifications))); err != nil {
+		return err
+	}
+	for _, v := range t.Notifications {
+		if err := v.MarshalCBOR(cw); err != nil {
+			return err
+		}
+
 	}
 
 	// t.SkipIPNIAnnounce (bool) (bool)
@@ -1112,6 +1139,45 @@ func (t *DirectDealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 				t.AllocationID = verifreg.AllocationId(extra)
 
+			}
+			// t.Notifications ([]miner.DataActivationNotification) (slice)
+		case "Notifications":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+
+			if extra > 8192 {
+				return fmt.Errorf("t.Notifications: array too large (%d)", extra)
+			}
+
+			if maj != cbg.MajArray {
+				return fmt.Errorf("expected cbor array")
+			}
+
+			if extra > 0 {
+				t.Notifications = make([]miner.DataActivationNotification, extra)
+			}
+
+			for i := 0; i < int(extra); i++ {
+				{
+					var maj byte
+					var extra uint64
+					var err error
+					_ = maj
+					_ = extra
+					_ = err
+
+					{
+
+						if err := t.Notifications[i].UnmarshalCBOR(cr); err != nil {
+							return xerrors.Errorf("unmarshaling t.Notifications[i]: %w", err)
+						}
+
+					}
+
+				}
 			}
 			// t.SkipIPNIAnnounce (bool) (bool)
 		case "SkipIPNIAnnounce":

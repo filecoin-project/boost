@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     Retry TEXT,
     AnnounceToIPNI BOOL,
     KeepUnsealedCopy BOOL,
+    Notifications TEXT,
     PRIMARY KEY(ID)
 );
 -- +goose StatementEnd
