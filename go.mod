@@ -395,8 +395,15 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ipfs/go-log => github.com/ipfs/go-log v1.0.1
+// TODO: Remove this once lotus upgrades to support go-libp2p v0.44.0+
+// go-libp2p v0.44.0 upgraded go-libp2p-pubsub to v0.15.0 which changed the NewRemoteTracer API
+// to require *slog.Logger parameter. lotus v1.34.1 doesn't provide this parameter yet.
+replace github.com/libp2p/go-libp2p v0.44.0 => github.com/libp2p/go-libp2p v0.43.0
 
-replace github.com/ipfs/go-log/v2 => github.com/ipfs/go-log/v2 v2.6.0
+// TODO: Remove this once lotus upgrades to support go-libp2p-pubsub v0.15.0+
+// go-libp2p-pubsub v0.15.0 changed NewRemoteTracer to require *slog.Logger. Downgrade to v0.12.0.
+replace github.com/libp2p/go-libp2p-pubsub v0.15.0 => github.com/libp2p/go-libp2p-pubsub v0.12.0
 
-replace github.com/ipni/go-libipni => github.com/ipni/go-libipni v0.5.30
+// TODO: Remove this once lotus upgrades to support boxo v0.34.0+
+// boxo v0.34.0+ removed the HashOnRead() method that lotus v1.34.1 still requires.
+replace github.com/ipfs/boxo v0.35.0 => github.com/ipfs/boxo v0.33.1
