@@ -74,7 +74,9 @@ var initCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		defer lr.Close()
+		defer func() {
+			_ = lr.Close()
+		}()
 
 		ds, err := lr.Datastore(context.Background(), metadataNamespace)
 		if err != nil {
@@ -291,7 +293,7 @@ func checkV1ApiSupport(ctx context.Context, cctx *cli.Context) error {
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion0) {
-		return fmt.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion0, v.APIVersion)
+		return fmt.Errorf("remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion0, v.APIVersion)
 	}
 
 	return nil

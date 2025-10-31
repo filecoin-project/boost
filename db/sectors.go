@@ -35,7 +35,9 @@ func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	states := make([]SectorState, 0, 16)
 	for rows.Next() {

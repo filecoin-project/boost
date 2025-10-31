@@ -208,14 +208,14 @@ func (p *pdcleaner) CleanOnce(ctx context.Context) error {
 				return fmt.Errorf("checking if bitfield is set: %w", err)
 			}
 			if !present {
-				err = p.pd.RemoveDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.ProposalCid.String())
+				err = p.pd.RemoveDealForPiece(ctx, deal.Proposal.PieceCID, deal.ProposalCid.String())
 				if err != nil {
 					if strings.Contains(err.Error(), "not found") {
 						return nil
 					}
-					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", deal.ProposalCid.String(), deal.ClientDealProposal.Proposal.PieceCID.String(), err.Error())
+					return fmt.Errorf("cleaning up legacy deal %s for piece %s: %s", deal.ProposalCid.String(), deal.Proposal.PieceCID.String(), err.Error())
 				}
-				log.Infof("removed legacy deal for %s and deal ID %s", deal.ClientDealProposal.Proposal.PieceCID.String(), deal.ProposalCid.String())
+				log.Infof("removed legacy deal for %s and deal ID %s", deal.Proposal.PieceCID.String(), deal.ProposalCid.String())
 			}
 			return nil
 		})

@@ -39,7 +39,6 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/go-state-types/crypto"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
@@ -578,7 +577,7 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 			// Simulate panic
 			return h.newDealBuilder(t, 1, withOfflineDeal()).withCommpFailing(errors.New("panic: commp panic")).build()
 		},
-		expectedErr: "Caught panic in deal execution: commp panic",
+		expectedErr: "caught panic in deal execution: commp panic",
 		onResume: func(builder *testDealBuilder) *testDeal {
 			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
@@ -1292,7 +1291,9 @@ func (h *ProviderHarness) AssertFundManagerState(t *testing.T, ctx context.Conte
 func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath string, read []byte) {
 	r, err := os.Open(carV2FilePath)
 	require.NoError(t, err)
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	actual, err := io.ReadAll(r)
 	require.NoError(t, err)
@@ -2447,8 +2448,8 @@ func mockTipset(minerAddr address.Address, height abi.ChainEpoch) (*chaintypes.T
 		ParentStateRoot:       dummyCid,
 		Messages:              dummyCid,
 		ParentMessageReceipts: dummyCid,
-		BlockSig:              &crypto.Signature{Type: crypto.SigTypeBLS},
-		BLSAggregate:          &crypto.Signature{Type: crypto.SigTypeBLS},
+		BlockSig:              &acrypto.Signature{Type: acrypto.SigTypeBLS},
+		BLSAggregate:          &acrypto.Signature{Type: acrypto.SigTypeBLS},
 		Timestamp:             1,
 	}})
 }

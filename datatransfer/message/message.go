@@ -1,7 +1,7 @@
 package message
 
 import (
-	"github.com/filecoin-project/boost/datatransfer/message/message1_1prime"
+	message1_1 "github.com/filecoin-project/boost/datatransfer/message/message1_1prime"
 )
 
 var NewRequest = message1_1.NewRequest

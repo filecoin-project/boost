@@ -614,7 +614,7 @@ func (f *TestFramework) WaitForDealAddedToSector(dealUuid uuid.UUID) error {
 			switch {
 			case resp.DealStatus.Status == dealcheckpoints.Complete.String():
 				if resp.DealStatus.Error != "" {
-					return fmt.Errorf("Deal Error: %s", resp.DealStatus.Error)
+					return fmt.Errorf("Deal Error: %s", resp.DealStatus.Error) // nolint:staticcheck
 				}
 				return nil
 			case resp.DealStatus.Status == dealcheckpoints.IndexedAndAnnounced.String():
@@ -900,7 +900,7 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, request trus
 			if err != nil {
 				return nil, err
 			}
-			if err := storage.Put(lc.Ctx, l.(cidlink.Link).Cid.KeyString(), buf); err != nil {
+			if err := storage.Put(lc.Ctx, l.(cidlink.Link).KeyString(), buf); err != nil {
 				return nil, err
 			}
 			return bytes.NewReader(buf), nil
@@ -1003,7 +1003,7 @@ func RetrievalQuery(ctx context.Context, t *testing.T, client *clinode.Node, pee
 	client.Host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
 	defer func() {
 		client.Host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
-		s.Close()
+		_ = s.Close()
 	}()
 
 	// We have connected

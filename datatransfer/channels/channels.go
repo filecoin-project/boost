@@ -41,7 +41,7 @@ func NewErrNotFound(chid datatransfer.ChannelID) error {
 }
 
 // ErrWrongType is returned when a caller attempts to change the type of implementation data after setting it
-var ErrWrongType = errors.New("Cannot change type of implementation specific data after setting it")
+var ErrWrongType = errors.New("cannot change type of implementation specific data after setting it")
 
 // Channels is a thread safe list of channels
 type Channels struct {

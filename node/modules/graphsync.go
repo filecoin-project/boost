@@ -15,7 +15,6 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
-	retrievalimpl "github.com/filecoin-project/boost/retrievalmarket/server"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/ipfs/kubo/core/node/helpers"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -35,7 +34,7 @@ func RetrievalGraphsync(parallelTransfersForRetrieval uint64) func(mctx lotus_he
 
 		// Wrap the Graphsync instance with a handler for unpaid retrieval requests
 		vdeps := server.ValidationDeps{
-			DealDecider:    retrievalimpl.DealDecider(dealDecider),
+			DealDecider:    server.DealDecider(dealDecider),
 			PieceDirectory: pid,
 			SectorAccessor: sa,
 			AskStore:       askGetter,

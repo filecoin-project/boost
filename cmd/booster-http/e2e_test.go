@@ -196,7 +196,9 @@ func verifyCarContains(t *testing.T, carFilepath string, wantCids []cid.Cid) {
 func requireHttpResponse(t *testing.T, to string) ([]byte, string, int) {
 	req, err := http.Get(to)
 	require.NoError(t, err)
-	defer req.Body.Close()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 	byts, err := io.ReadAll(req.Body)
 	require.NoError(t, err)
 	return byts, req.Header.Get("Content-Type"), req.StatusCode

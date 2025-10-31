@@ -3,6 +3,11 @@ package piecedirectory
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc"
@@ -11,10 +16,6 @@ import (
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-	"math/rand"
-	"os"
-	"testing"
-	"time"
 )
 
 func testPieceDirectoryFuzz(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
@@ -39,11 +40,15 @@ func testPieceDirectoryBlockstoreGetFuzz(ctx context.Context, t *testing.T, cl *
 		_, carFilePath := CreateCarFile(t, i+1)
 		carFile, err := os.Open(carFilePath)
 		require.NoError(t, err)
-		defer carFile.Close()
+		defer func() {
+			_ = carFile.Close()
+		}()
 
 		carReader, err := car.OpenReader(carFilePath)
 		require.NoError(t, err)
-		defer carReader.Close()
+		defer func() {
+			_ = carReader.Close()
+		}()
 		carv1Reader, err := carReader.DataReader()
 		require.NoError(t, err)
 

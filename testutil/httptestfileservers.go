@@ -190,7 +190,9 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 				w.WriteHeader(500)
 				return
 			}
-			defer f.Close()
+			defer func() {
+				_ = f.Close()
+			}()
 
 			// prevent buffer overflow
 			fi, err := f.Stat()
@@ -226,7 +228,7 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 
 			// close the connection so client sees an error while reading the response
 			c := GetConn(r)
-			c.Close() //nolint:errcheck
+			_ = c.Close()
 		case http.MethodHead:
 			stat, err := os.Stat(absPath)
 			if err != nil {

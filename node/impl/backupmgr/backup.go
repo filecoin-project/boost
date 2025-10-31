@@ -69,7 +69,9 @@ func (b *BackupMgr) initBackup(ctx context.Context, dstDir string) error {
 		return err
 	}
 
-	defer os.RemoveAll(bkpDir)
+	defer func() {
+		_ = os.RemoveAll(bkpDir)
+	}()
 
 	err = b.takeBackup(ctx, bkpDir)
 	if err != nil {
@@ -100,7 +102,9 @@ func (b *BackupMgr) takeBackup(ctx context.Context, bkpDir string) error {
 		return err
 	}
 
-	defer dst.Close()
+	defer func() {
+		_ = dst.Close()
+	}()
 
 	// Create keystore at backup location
 	if err := os.Mkdir(path.Join(dst.Path(), "keystore"), 0700); err != nil {

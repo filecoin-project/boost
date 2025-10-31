@@ -126,8 +126,8 @@ func TestRefreshState(t *testing.T) {
 						sid6: db.SealStateRemoved,
 					},
 					ActiveSectors: map[abi.SectorID]struct{}{
-						sid3: struct{}{},
-						sid4: struct{}{},
+						sid3: {},
+						sid4: {},
 					},
 					SectorStates: map[abi.SectorID]db.SealState{
 						sid3: db.SealStateUnsealed,
@@ -206,8 +206,8 @@ func TestRefreshState(t *testing.T) {
 						sid3: db.SealStateSealed,
 					},
 					ActiveSectors: map[abi.SectorID]struct{}{
-						sid1: struct{}{},
-						sid2: struct{}{},
+						sid1: {},
+						sid2: {},
 					},
 					SectorStates: map[abi.SectorID]db.SealState{
 						sid1: db.SealStateUnsealed,

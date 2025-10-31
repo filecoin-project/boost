@@ -46,7 +46,7 @@ func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, e
 	for _, addrString := range cfg.Retrievals.Bitswap.BitswapPublicAddresses {
 		addr, err := multiaddr.NewMultiaddr(addrString)
 		if err != nil {
-			return nil, fmt.Errorf("Could not parse bitswap address '%s' as multiaddr: %w", addrString, err)
+			return nil, fmt.Errorf("could not parse bitswap address '%s' as multiaddr: %w", addrString, err)
 		}
 		addrs = append(addrs, addr)
 	}
@@ -54,7 +54,7 @@ func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, e
 	// in order to make these multiaddrs fully dialable, we encapsulate the bitswap peer id inside of them
 	bsPeerID, err := peer.Decode(cfg.Retrievals.Bitswap.BitswapPeerID)
 	if err != nil {
-		return nil, fmt.Errorf("Could not parse bitswap peer id '%s': %w", cfg.Retrievals.Bitswap.BitswapPeerID, err)
+		return nil, fmt.Errorf("could not parse bitswap peer id '%s': %w", cfg.Retrievals.Bitswap.BitswapPeerID, err)
 	}
 	return peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
 		ID:    bsPeerID,

@@ -3,6 +3,7 @@ package filters
 import (
 	"context"
 	"fmt"
+
 	blockstore "github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"

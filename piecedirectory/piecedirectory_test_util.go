@@ -94,12 +94,16 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFile.Close()
+	defer func() {
+		_ = carFile.Close()
+	}()
 
 	// Create a random CAR file
 	carReader, err := car.OpenReader(carFilePath)
 	require.NoError(t, err)
-	defer carReader.Close()
+	defer func() {
+		_ = carReader.Close()
+	}()
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
@@ -125,7 +129,9 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	// Create a CARv2 index over the CAR file
 	carFileIdxReader, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFileIdxReader.Close()
+	defer func() {
+		_ = carFileIdxReader.Close()
+	}()
 	idx, err := car.ReadOrGenerateIndex(carFileIdxReader)
 	require.NoError(t, err)
 
@@ -165,11 +171,15 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFile.Close()
+	defer func() {
+		_ = carFile.Close()
+	}()
 
 	carReader, err := car.OpenReader(carFilePath)
 	require.NoError(t, err)
-	defer carReader.Close()
+	defer func() {
+		_ = carReader.Close()
+	}()
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
@@ -214,7 +224,9 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a CARv2 index over the CAR file
 	carFileIdxReader, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFileIdxReader.Close()
+	defer func() {
+		_ = carFileIdxReader.Close()
+	}()
 	idx, err := car.ReadOrGenerateIndex(carFileIdxReader)
 	require.NoError(t, err)
 
@@ -300,11 +312,15 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFile.Close()
+	defer func() {
+		_ = carFile.Close()
+	}()
 
 	carReader, err := car.OpenReader(carFilePath)
 	require.NoError(t, err)
-	defer carReader.Close()
+	defer func() {
+		_ = carReader.Close()
+	}()
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
@@ -422,11 +438,15 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer carFile.Close()
+	defer func() {
+		_ = carFile.Close()
+	}()
 
 	carReader, err := car.OpenReader(carFilePath)
 	require.NoError(t, err)
-	defer carReader.Close()
+	defer func() {
+		_ = carReader.Close()
+	}()
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 

@@ -2,9 +2,10 @@ package types
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestTransferHost(t *testing.T) {

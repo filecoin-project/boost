@@ -39,7 +39,9 @@ func (d *LogsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	dealLogs := make([]DealLog, 0, 16)
 	for rows.Next() {

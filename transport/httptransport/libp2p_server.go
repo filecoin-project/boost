@@ -82,7 +82,7 @@ func (s *Libp2pCarServer) Start(ctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	// Start up the transfers manager (asynchronous)
-	s.transfersMgr.start(s.ctx)
+	s.start(s.ctx)
 
 	// Listen on HTTP over libp2p
 	listener, err := gostream.Listen(s.h, types.DataTransferProtocol)
@@ -121,7 +121,7 @@ func (s *Libp2pCarServer) Stop(ctx context.Context) error {
 	serr := s.server.Close()
 
 	// Wait for all events to be processed
-	s.transfersMgr.awaitStop(ctx)
+	s.awaitStop(ctx)
 
 	if lerr != nil {
 		return lerr
@@ -233,7 +233,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 	xfer := newLibp2pTransfer(val, authToken, s.h.ID().String(), r.RemoteAddr, content)
 
 	// Add transfer to the list of active transfers
-	fireEvent, err := s.transfersMgr.add(xfer)
+	fireEvent, err := s.add(xfer)
 	if err != nil {
 		return fmt.Errorf("creating new transfer: %w", err)
 	}

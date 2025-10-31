@@ -258,7 +258,9 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 	// new deal subscription channel returned by this method.
 	go func() {
 		// When the connection ends, unsubscribe
-		defer sub.Close()
+		defer func() {
+			_ = sub.Close()
+		}()
 
 		for {
 			select {
@@ -433,7 +435,7 @@ func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealS
 }
 
 func (dr *dealResolver) ID() graphql.ID {
-	return graphql.ID(dr.ProviderDealState.DealUuid.String())
+	return graphql.ID(dr.DealUuid.String())
 }
 
 func (dr *dealResolver) CreatedAt() graphql.Time {
@@ -441,19 +443,19 @@ func (dr *dealResolver) CreatedAt() graphql.Time {
 }
 
 func (dr *dealResolver) ClientAddress() string {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.Client.String()
+	return dr.ClientDealProposal.Proposal.Client.String()
 }
 
 func (dr *dealResolver) ProviderAddress() string {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.Provider.String()
+	return dr.ClientDealProposal.Proposal.Provider.String()
 }
 
 func (dr *dealResolver) IsVerified() bool {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.VerifiedDeal
+	return dr.ClientDealProposal.Proposal.VerifiedDeal
 }
 
 func (dr *dealResolver) KeepUnsealedCopy() bool {
-	return dr.ProviderDealState.FastRetrieval
+	return dr.FastRetrieval
 }
 
 func (dr *dealResolver) AnnounceToIPNI() bool {
@@ -461,7 +463,7 @@ func (dr *dealResolver) AnnounceToIPNI() bool {
 }
 
 func (dr *dealResolver) ProposalLabel() (string, error) {
-	l := dr.ProviderDealState.ClientDealProposal.Proposal.Label
+	l := dr.ClientDealProposal.Proposal.Label
 	if l.IsString() {
 		return l.ToString()
 	}
@@ -489,14 +491,14 @@ func (dr *dealResolver) SignedProposalCid() (string, error) {
 }
 
 func (dr *dealResolver) PublishCid() string {
-	if dr.ProviderDealState.PublishCID == nil {
+	if dr.PublishCID == nil {
 		return ""
 	}
-	return dr.ProviderDealState.PublishCID.String()
+	return dr.PublishCID.String()
 }
 
 func (dr *dealResolver) PieceSize() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.PieceSize)
 }
 
 func (dr *dealResolver) ChainDealID() gqltypes.Uint64 {
@@ -504,7 +506,7 @@ func (dr *dealResolver) ChainDealID() gqltypes.Uint64 {
 }
 
 func (dr *dealResolver) Transferred() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.NBytesReceived)
+	return gqltypes.Uint64(dr.NBytesReceived)
 }
 
 type sectorResolver struct {
@@ -515,9 +517,9 @@ type sectorResolver struct {
 
 func (dr *dealResolver) Sector() *sectorResolver {
 	return &sectorResolver{
-		ID:     gqltypes.Uint64(dr.ProviderDealState.SectorID),
-		Offset: gqltypes.Uint64(dr.ProviderDealState.Offset),
-		Length: gqltypes.Uint64(dr.ProviderDealState.Length),
+		ID:     gqltypes.Uint64(dr.SectorID),
+		Offset: gqltypes.Uint64(dr.Offset),
+		Length: gqltypes.Uint64(dr.Length),
 	}
 }
 
@@ -547,27 +549,27 @@ func (dr *dealResolver) Transfer() dealTransfer {
 }
 
 func (dr *dealResolver) ProviderCollateral() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.ProviderCollateral.Int64())
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.ProviderCollateral.Int64())
 }
 
 func (dr *dealResolver) ClientCollateral() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.ClientCollateral.Uint64())
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.ClientCollateral.Uint64())
 }
 
 func (dr *dealResolver) StoragePricePerEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64())
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64())
 }
 
 func (dr *dealResolver) StartEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.StartEpoch)
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.StartEpoch)
 }
 
 func (dr *dealResolver) EndEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.EndEpoch)
+	return gqltypes.Uint64(dr.ClientDealProposal.Proposal.EndEpoch)
 }
 
 func (dr *dealResolver) PieceCid() string {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.PieceCID.String()
+	return dr.ClientDealProposal.Proposal.PieceCID.String()
 }
 
 func (dr *dealResolver) Checkpoint() string {
@@ -584,8 +586,8 @@ func (dr *dealResolver) Retry() string {
 
 func (dr *dealResolver) Message(ctx context.Context) string {
 	msg := dr.message(ctx, dr.ProviderDealState.Checkpoint, dr.ProviderDealState.CheckpointAt)
-	if dr.ProviderDealState.Retry != types.DealRetryFatal && dr.ProviderDealState.Err != "" {
-		msg = "Paused at '" + msg + "': " + dr.ProviderDealState.Err
+	if dr.ProviderDealState.Retry != types.DealRetryFatal && dr.Err != "" {
+		msg = "Paused at '" + msg + "': " + dr.Err
 	}
 	return msg
 }
@@ -594,7 +596,7 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
-			if dr.ProviderDealState.InboundFilePath != "" {
+			if dr.InboundFilePath != "" {
 				return "Verifying Commp"
 			}
 			return "Awaiting Offline Data Import"
@@ -700,7 +702,7 @@ func (dr *dealResolver) sealingState(ctx context.Context) string {
 }
 
 func (dr *dealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
-	logs, err := dr.logsDB.Logs(ctx, dr.ProviderDealState.DealUuid)
+	logs, err := dr.logsDB.Logs(ctx, dr.DealUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +763,9 @@ type subLastUpdate struct {
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 	// When the connection ends, unsubscribe from deal update events
-	defer s.sub.Close()
+	defer func() {
+		_ = s.sub.Close()
+	}()
 
 	var lastUpdate interface{}
 	for {

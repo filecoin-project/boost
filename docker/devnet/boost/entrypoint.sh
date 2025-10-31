@@ -118,4 +118,4 @@ fi
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
-exec boostd -vv run --nosync=true &>> $BOOST_PATH/boostd.log
+exec boostd -vv run --nosync=true --deprecated=true &>> $BOOST_PATH/boostd.log

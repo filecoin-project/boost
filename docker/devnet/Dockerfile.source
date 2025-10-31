@@ -2,7 +2,7 @@
 ## docker will invoke this file from ../../.. dir in order to access the code
 #########################################################################################
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
-FROM ${LOTUS_TEST_IMAGE} as lotus-test
+FROM ${LOTUS_TEST_IMAGE} AS lotus-test
 #########################################################################################
 FROM node:20.11.1-alpine3.19 AS react-builder
 
@@ -13,7 +13,7 @@ COPY gql /src/gql
 RUN npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react&& \
       npm run --prefix react build
 #########################################################################################
-FROM golang:1.23-bullseye as builder
+FROM golang:1.24-bullseye AS builder
 
 RUN apt update && apt install -y \
       build-essential \
@@ -78,7 +78,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
       make debug
 #########################################################################################
-FROM ubuntu:22.04 as runner
+FROM ubuntu:22.04 AS runner
 
 RUN apt update && apt install -y \
       curl \
@@ -96,7 +96,7 @@ COPY --from=lotus-test /usr/local/bin/lotus-shed /usr/local/bin/
 ## Test lotus starts
 RUN lotus -v && lotus-miner -v
 #########################################################################################
-FROM runner as boost-dev
+FROM runner AS boost-dev
 
 ARG BUILD_VERSION=0.1
 
@@ -128,7 +128,7 @@ RUN boost -v
 
 ENTRYPOINT ["./entrypoint.sh"]
 #########################################################################################
-FROM runner as booster-http-dev
+FROM runner AS booster-http-dev
 
 ARG BUILD_VERSION=0.1
 
@@ -150,7 +150,7 @@ COPY docker/devnet/booster-http/entrypoint.sh /app/
 
 ENTRYPOINT ["./entrypoint.sh"]
 #########################################################################################
-FROM runner as booster-bitswap-dev
+FROM runner AS booster-bitswap-dev
 
 ARG BUILD_VERSION=0.1
 

@@ -67,11 +67,15 @@ func (c *TransportsClient) SendQuery(ctx context.Context, id peer.ID) (*types.Qu
 		return nil, err
 	}
 
-	defer s.Close() // nolint
+	defer func() {
+		_ = s.Close()
+	}()
 
 	// Set a deadline on reading from the stream so it doesn't hang
 	_ = s.SetReadDeadline(time.Now().Add(streamReadDeadline))
-	defer s.SetReadDeadline(time.Time{}) // nolint
+	defer func() {
+		_ = s.SetReadDeadline(time.Time{})
+	}()
 
 	// Read the response from the stream
 	queryResponsei, err := types.BindnodeRegistry.TypeFromReader(s, (*types.QueryResponse)(nil), dagcbor.Decode)
@@ -102,7 +106,9 @@ func (p *TransportsListener) Stop() {
 
 // Called when the client opens a libp2p stream
 func (l *TransportsListener) handleNewQueryStream(s network.Stream) {
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
 
 	slog.Debugw("query", "peer", s.Conn().RemotePeer())
 
@@ -110,7 +116,9 @@ func (l *TransportsListener) handleNewQueryStream(s network.Stream) {
 
 	// Set a deadline on writing to the stream so it doesn't hang
 	_ = s.SetWriteDeadline(time.Now().Add(streamWriteDeadline))
-	defer s.SetWriteDeadline(time.Time{}) // nolint
+	defer func() {
+		_ = s.SetWriteDeadline(time.Time{})
+	}()
 
 	// Write the response to the client
 	err := types.BindnodeRegistry.TypeToWriter(&response, s, dagcbor.Encode)

@@ -2,6 +2,8 @@ package filters
 
 import (
 	"context"
+	"testing"
+
 	"github.com/filecoin-project/boost/cmd/lib/filters/mock"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/lotus/blockstore"
@@ -9,7 +11,6 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestFilteredBlockstore(t *testing.T) {

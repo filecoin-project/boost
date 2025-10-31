@@ -22,14 +22,18 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	st := newServerTest(t, rawSize)
 
 	clientHost, srvHost := setupLibp2pHosts(t)
-	defer srvHost.Close()
-	defer clientHost.Close()
+	defer func() {
+		_ = srvHost.Close()
+		_ = clientHost.Close()
+	}()
 
 	authDB := NewAuthTokenDB(st.ds)
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop(ctx) //nolint:errcheck
+	defer func() {
+		_ = srv.Stop(ctx)
+	}()
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -92,14 +96,18 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	st := newServerTest(t, rawSize)
 
 	clientHost, srvHost := setupLibp2pHosts(t)
-	defer srvHost.Close()
-	defer clientHost.Close()
+	defer func() {
+		_ = srvHost.Close()
+		_ = clientHost.Close()
+	}()
 
 	authDB := NewAuthTokenDB(st.ds)
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop(ctx) //nolint:errcheck
+	defer func() {
+		_ = srv.Stop(ctx)
+	}()
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -211,14 +219,18 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	st := newServerTest(t, rawSize)
 
 	clientHost, srvHost := setupLibp2pHosts(t)
-	defer srvHost.Close()
-	defer clientHost.Close()
+	defer func() {
+		_ = srvHost.Close()
+		_ = clientHost.Close()
+	}()
 
 	authDB := NewAuthTokenDB(st.ds)
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop(ctx) //nolint:errcheck
+	defer func() {
+		_ = srv.Stop(ctx)
+	}()
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -280,14 +292,18 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	st := newServerTest(t, rawSize)
 
 	clientHost, srvHost := setupLibp2pHosts(t)
-	defer srvHost.Close()
-	defer clientHost.Close()
+	defer func() {
+		_ = srvHost.Close()
+		_ = clientHost.Close()
+	}()
 
 	authDB := NewAuthTokenDB(st.ds)
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop(ctx) //nolint:errcheck
+	defer func() {
+		_ = srv.Stop(ctx)
+	}()
 
 	// Create an auth token
 	carSize := len(st.carBytes)

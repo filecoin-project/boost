@@ -31,7 +31,7 @@ func BuildTypeString() string {
 	}
 }
 
-const BuildVersion = "2.4.3"
+const BuildVersion = "2.4.5"
 
 func UserVersion() string {
 	return BuildVersion + BuildTypeString() + CurrentCommit

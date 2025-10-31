@@ -202,7 +202,9 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	if err != nil {
 		return nil, nil, fmt.Errorf("locking mem repo: %w", err)
 	}
-	defer lr.Close()
+	defer func() {
+		_ = lr.Close()
+	}()
 
 	if err := lr.SetStorage(func(sc *storiface.StorageConfig) {
 		sc.StoragePaths = []storiface.LocalPath{}

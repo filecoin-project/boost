@@ -65,7 +65,9 @@ func (d *downloader) doHttp() error {
 		return &httpError{error: fmt.Errorf("failed to send http req: %w", err)}
 	}
 	// we should either get back a 200 or a 206 -> anything else means something has gone wrong and we return an error.
-	defer resp.Body.Close() // nolint
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return &httpError{
@@ -79,7 +81,9 @@ func (d *downloader) doHttp() error {
 	if err != nil {
 		return &httpError{error: fmt.Errorf("failed to open chunk file %s for write: %w", d.chunkFile, err)}
 	}
-	defer of.Close()
+	defer func() {
+		_ = of.Close()
+	}()
 
 	//  start reading the response stream `readBufferSize` at a time using a limit reader so we only read as many bytes as we need to.
 	buf := make([]byte, readBufferSize)
@@ -122,13 +126,17 @@ func (d *downloader) appendChunkToTheOutput() error {
 	if err != nil {
 		return fmt.Errorf("error opening chunk file %s: %w", d.chunkFile, err)
 	}
-	defer chunk.Close()
+	defer func() {
+		_ = chunk.Close()
+	}()
 
 	output, err := os.OpenFile(d.outputFile, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("error opening output file %s: %w", d.outputFile, err)
 	}
-	defer output.Close()
+	defer func() {
+		_ = output.Close()
+	}()
 
 	outputStats, err := output.Stat()
 	if err != nil {
@@ -186,7 +194,9 @@ func (d *downloader) verify() error {
 	if err != nil {
 		return fmt.Errorf("error opening chunk file %s: %w", d.chunkFile, err)
 	}
-	defer chunk.Close()
+	defer func() {
+		_ = chunk.Close()
+	}()
 
 	chunkStats, err := chunk.Stat()
 	if err != nil {

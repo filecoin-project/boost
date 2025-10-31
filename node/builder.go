@@ -58,7 +58,6 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
-	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/ctladdr"
 	"github.com/filecoin-project/lotus/storage/paths"
@@ -195,37 +194,37 @@ var LibP2P = Options(
 
 	// Host dependencies
 	Override(new(peerstore.Peerstore), func() (peerstore.Peerstore, error) { return pstoremem.NewPeerstore() }),
-	Override(PstoreAddSelfKeysKey, lotus_lp2p.PstoreAddSelfKeys),
-	Override(StartListeningKey, lotus_lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
+	Override(PstoreAddSelfKeysKey, lp2p.PstoreAddSelfKeys),
+	Override(StartListeningKey, lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
 
 	// Host settings
-	Override(DefaultTransportsKey, lotus_lp2p.DefaultTransports),
-	Override(AddrsFactoryKey, lotus_lp2p.AddrsFactory(nil, nil)),
-	Override(SmuxTransportKey, lotus_lp2p.SmuxTransport()),
-	Override(RelayKey, lotus_lp2p.NoRelay()),
-	Override(SecurityKey, lotus_lp2p.Security(true, false)),
+	Override(DefaultTransportsKey, lp2p.DefaultTransports),
+	Override(AddrsFactoryKey, lp2p.AddrsFactory(nil, nil)),
+	Override(SmuxTransportKey, lp2p.SmuxTransport()),
+	Override(RelayKey, lp2p.NoRelay()),
+	Override(SecurityKey, lp2p.Security(true, false)),
 	Override(DefaultTransportsKey, lp2p.DefaultTransports),
 
 	// Host
 	Override(new(lbuild.BuildVersion), lbuild.MinerUserVersion()),
-	Override(new(lotus_lp2p.RawHost), lotus_lp2p.Host),
-	Override(new(host.Host), lotus_lp2p.RoutedHost),
-	Override(new(lotus_lp2p.BaseIpfsRouting), lotus_lp2p.DHTRouting(dht.ModeAuto)),
+	Override(new(lp2p.RawHost), lp2p.Host),
+	Override(new(host.Host), lp2p.RoutedHost),
+	Override(new(lp2p.BaseIpfsRouting), lp2p.DHTRouting(dht.ModeAuto)),
 
-	Override(DiscoveryHandlerKey, lotus_lp2p.DiscoveryHandler),
+	Override(DiscoveryHandlerKey, lp2p.DiscoveryHandler),
 
 	// Routing
 	Override(new(record.Validator), modules.RecordValidator),
-	Override(BaseRoutingKey, lotus_lp2p.BaseRouting),
-	Override(new(routing.Routing), lotus_lp2p.Routing),
+	Override(BaseRoutingKey, lp2p.BaseRouting),
+	Override(new(routing.Routing), lp2p.Routing),
 
 	// Services
-	Override(BandwidthReporterKey, lotus_lp2p.BandwidthCounter),
-	Override(AutoNATSvcKey, lotus_lp2p.AutoNATService),
+	Override(BandwidthReporterKey, lp2p.BandwidthCounter),
+	Override(AutoNATSvcKey, lp2p.AutoNATService),
 
 	// Services (pubsub)
-	Override(new(*lotus_dtypes.ScoreKeeper), lotus_lp2p.ScoreKeeper),
-	Override(new(*pubsub.PubSub), lotus_lp2p.GossipSub),
+	Override(new(*lotus_dtypes.ScoreKeeper), lp2p.ScoreKeeper),
+	Override(new(*pubsub.PubSub), lp2p.GossipSub),
 	Override(new(*lotus_config.Pubsub), func(bs lotus_dtypes.Bootstrapper) *lotus_config.Pubsub {
 		return &lotus_config.Pubsub{
 			Bootstrapper: bool(bs),
@@ -233,9 +232,9 @@ var LibP2P = Options(
 	}),
 
 	// Services (connection management)
-	Override(ConnectionManagerKey, lotus_lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
-	Override(new(*conngater.BasicConnectionGater), lotus_lp2p.ConnGater),
-	Override(ConnGaterKey, lotus_lp2p.ConnGaterOption),
+	Override(ConnectionManagerKey, lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
+	Override(new(*conngater.BasicConnectionGater), lp2p.ConnGater),
+	Override(ConnGaterKey, lp2p.ConnGaterOption),
 )
 
 func Base() Option {
@@ -254,10 +253,14 @@ func ConfigCommon(cfg *config.Common) Option {
 	return Options(
 		func(s *Settings) error { s.Config = true; return nil },
 		Override(new(dtypes.APIEndpoint), func() (dtypes.APIEndpoint, error) {
-			return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			ma, err := multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			if err != nil {
+				return nil, err
+			}
+			return dtypes.APIEndpoint(ma), nil
 		}),
 		Override(SetApiEndpointKey, func(lr lotus_repo.LockedRepo, e dtypes.APIEndpoint) error {
-			return lr.SetAPIEndpoint(e)
+			return lr.SetAPIEndpoint(multiaddr.Multiaddr(e))
 		}),
 		Override(new(paths.URLs), func(e dtypes.APIEndpoint) (paths.URLs, error) {
 			ip := cfg.API.RemoteListenAddress
@@ -274,8 +277,8 @@ func ConfigCommon(cfg *config.Common) Option {
 		Override(new(lotus_api.Common), From(new(lotus_common.CommonAPI))),
 
 		Override(new(lotus_dtypes.MetadataDS), lotus_modules.Datastore(cfg.Backup.DisableMetadataLog)),
-		Override(StartListeningKey, lotus_lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
-		Override(ConnectionManagerKey, lotus_lp2p.ConnectionManager(
+		Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
+		Override(ConnectionManagerKey, lp2p.ConnectionManager(
 			cfg.Libp2p.ConnMgrLow,
 			cfg.Libp2p.ConnMgrHigh,
 			time.Duration(cfg.Libp2p.ConnMgrGrace),
@@ -293,10 +296,10 @@ func ConfigCommon(cfg *config.Common) Option {
 			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
 		),
 
-		Override(AddrsFactoryKey, lotus_lp2p.AddrsFactory(
+		Override(AddrsFactoryKey, lp2p.AddrsFactory(
 			cfg.Libp2p.AnnounceAddresses,
 			cfg.Libp2p.NoAnnounceAddresses)),
-		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lotus_lp2p.NatPortMap)),
+		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
 	)
 }
 
@@ -326,7 +329,7 @@ func Repo(r lotus_repo.Repo) Option {
 		return Options(
 			Override(new(lotus_repo.LockedRepo), lotus_modules.LockedRepo(lr)), // module handles closing
 
-			Override(new(ci.PrivKey), lotus_lp2p.PrivKey),
+			Override(new(ci.PrivKey), lp2p.PrivKey),
 			Override(new(ci.PubKey), ci.PrivKey.GetPublic),
 			Override(new(peer.ID), peer.IDFromPublicKey),
 

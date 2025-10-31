@@ -127,7 +127,9 @@ func TestHttpGzipResponse(t *testing.T) {
 	req.NoError(err)
 	_, err = f.Seek(0, io.SeekStart)
 	req.NoError(err)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	// Crate pieceInfo
 	deal := model.DealInfo{
@@ -219,24 +221,36 @@ func TestHttpGzipResponse(t *testing.T) {
 
 			logHandler := func(ts time.Time, remoteAddr, method string, url url.URL, status int, duration time.Duration, bytes int, compressionRatio, userAgent, msg string) {
 				t.Logf("%s %s %s %s %d %s %d %s %s %s", ts.Format(time.RFC3339), remoteAddr, method, url.String(), status, duration, bytes, compressionRatio, userAgent, msg)
-				req.Equal(http.MethodGet, method)
+				req.Condition(func() (success bool) {
+					if method == http.MethodGet || method == http.MethodHead {
+						return true
+					}
+					return false
+				})
 				if url.Path == "/" { // waitServerUp
 					return
 				}
 				if strings.HasPrefix(url.Path, "/piece") {
 					req.Equal("/piece/"+testPieceCid, url.Path)
 				} else if strings.HasPrefix(url.Path, "/ipfs") {
-					req.Equal("/ipfs/"+rootEnt.Root.String(), url.Path)
+					req.Condition(func() (success bool) {
+						if url.Path == "/ipfs/"+rootEnt.Root.String() || url.Path == "/ipfs/bafkqaaa" || url.Path == "/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" {
+							return true
+						}
+						return false
+					})
 				} else {
 					req.Failf("unexpected url path", "path: %s", url.Path)
 				}
-				req.Equal(http.StatusOK, status)
-				if tc.expectGzip {
-					req.NotEqual("-", compressionRatio, "compression ratio should be set for %s", url.Path)
-					// convert compressionRatio string to a float64
-					compressionRatio, err := strconv.ParseFloat(compressionRatio, 64)
-					req.NoError(err)
-					req.True(compressionRatio > 10, "compression ratio (%s) should be > 10 for %s", compressionRatio, url.Path) // it's all zeros
+				//req.Equal(http.StatusOK, status)
+				if method == http.MethodGet {
+					if tc.expectGzip && url.Path != "/ipfs/bafkqaaa" {
+						req.NotEqual("-", compressionRatio, "compression ratio should be set for %s", url.Path)
+						// convert compressionRatio string to a float64
+						compressionRatio, err := strconv.ParseFloat(compressionRatio, 64)
+						req.NoError(err)
+						req.True(compressionRatio > 10, "compression ratio (%s) should be > 10 for %s", compressionRatio, url.Path) // it's all zeros
+					}
 				}
 			}
 
@@ -268,7 +282,9 @@ func TestHttpGzipResponse(t *testing.T) {
 				client := &http.Client{Transport: &http.Transport{DisableCompression: tc.noClientCompression}}
 				response, err := client.Do(request)
 				req.NoError(err)
-				defer response.Body.Close()
+				defer func() {
+					_ = response.Body.Close()
+				}()
 
 				if response.StatusCode != http.StatusOK {
 					body, _ := io.ReadAll(response.Body)
@@ -348,6 +364,118 @@ func TestHttpGzipResponse(t *testing.T) {
 				}
 				req.ElementsMatch(wantCids, gotCids)
 			}
+
+			{ // test HEAD request for existing content
+				request, err := http.NewRequest(http.MethodHead, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rootEnt.Root.String()), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.car")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusOK, response.StatusCode)
+
+				// HEAD should have headers but no body
+				req.Equal("application/vnd.ipld.car;version=1;order=dfs;dups=y", response.Header.Get("Content-Type"))
+				req.NotEmpty(response.Header.Get("Etag"))
+				req.Equal("Accept, Accept-Encoding", response.Header.Get("Vary"))
+
+				body, err := io.ReadAll(response.Body)
+				req.NoError(err)
+				req.Empty(body, "HEAD request should not return a body")
+			}
+
+			{ // test HEAD request with raw format
+				request, err := http.NewRequest(http.MethodHead, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rootEnt.Root.String()), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.raw")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusOK, response.StatusCode)
+
+				// HEAD should have headers but no body
+				req.Equal("application/vnd.ipld.raw", response.Header.Get("Content-Type"))
+				req.NotEmpty(response.Header.Get("Etag"))
+
+				body, err := io.ReadAll(response.Body)
+				req.NoError(err)
+				req.Empty(body, "HEAD request should not return a body")
+			}
+
+			{ // test probe path with GET
+				request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/bafkqaaa", port), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.raw")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusOK, response.StatusCode)
+
+				// Probe CID (identity CID) should return empty content for raw format
+				body, err := io.ReadAll(response.Body)
+				req.NoError(err)
+				req.Empty(body, "Probe CID should return empty content for raw format")
+			}
+
+			{ // test probe path with HEAD
+				request, err := http.NewRequest(http.MethodHead, fmt.Sprintf("http://localhost:%d/ipfs/bafkqaaa", port), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.raw")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusOK, response.StatusCode)
+
+				// HEAD should have headers but no body
+				req.NotEmpty(response.Header.Get("Etag"))
+				body, err := io.ReadAll(response.Body)
+				req.NoError(err)
+				req.Empty(body, "HEAD request should not return a body")
+			}
+
+			{ // test probe path with CAR format
+				request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/bafkqaaa", port), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.car")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusOK, response.StatusCode)
+
+				// Probe CID should return a minimal CAR
+				req.Equal("application/vnd.ipld.car;version=1;order=dfs;dups=y", response.Header.Get("Content-Type"))
+
+				// Parse the CAR to verify it's valid
+				cr, err := car.NewBlockReader(response.Body)
+				req.NoError(err)
+				req.Equal(uint64(1), cr.Version)
+				req.Equal(1, len(cr.Roots))
+				req.Equal("bafkqaaa", cr.Roots[0].String())
+
+				// The CAR should be minimal (no blocks for identity CID)
+				_, err = cr.Next()
+				req.ErrorIs(err, io.EOF)
+			}
+
+			{ // test HEAD for non-existing content
+				request, err := http.NewRequest(http.MethodHead, fmt.Sprintf("http://localhost:%d/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", port), nil)
+				request.Header.Set("Accept", "application/vnd.ipld.raw")
+				req.NoError(err)
+				request = request.WithContext(ctx)
+				client := &http.Client{}
+				response, err := client.Do(request)
+				req.NoError(err)
+				req.Equal(http.StatusInternalServerError, response.StatusCode)
+
+				body, err := io.ReadAll(response.Body)
+				req.NoError(err)
+				req.Empty(body, "HEAD request should not return a body even for errors")
+			}
 		})
 	}
 }
@@ -366,7 +494,9 @@ func TestHttpInfo(t *testing.T) {
 
 	response, err := http.Get(fmt.Sprintf("http://localhost:%d/info", port))
 	require.NoError(t, err)
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	json.NewDecoder(response.Body).Decode(&v) //nolint:errcheck
 	require.Equal(t, "0.3.0", v.Version)

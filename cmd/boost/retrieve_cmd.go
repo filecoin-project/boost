@@ -149,7 +149,7 @@ var retrieveCmd = &cli.Command{
 			selNode = selspec.Node()
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("setting up gateway connection: %w", err)
 		}
@@ -166,7 +166,9 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("setting up temp dir: %w", err)
 		}
 		// Clean up the temp directory before exiting
-		defer os.RemoveAll(bstoreTmpDir)
+		defer func() {
+			_ = os.RemoveAll(bstoreTmpDir)
+		}()
 
 		bstoreDatastore, err := flatfs.CreateOrOpen(bstoreTmpDir, flatfs.NextToLast(3), false)
 		bstore := blockstore.NewBlockstore(bstoreDatastore, blockstore.NoPrefix())
@@ -180,7 +182,9 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("setting up temp dir: %w", err)
 		}
 		// Clean up the temp directory before exiting
-		defer os.RemoveAll(datastoreTmpDir)
+		defer func() {
+			_ = os.RemoveAll(datastoreTmpDir)
+		}()
 
 		ds, err := levelds.NewDatastore(datastoreTmpDir, nil)
 		if err != nil {
@@ -200,7 +204,7 @@ var retrieveCmd = &cli.Command{
 
 		proposal, err := rc.RetrievalProposalForAsk(query, c, selNode)
 		if err != nil {
-			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
+			return fmt.Errorf("failed to create retrieval proposal with candidate miner %s: %v", miner, err)
 		}
 
 		// Retrieve the data
@@ -213,7 +217,7 @@ var retrieveCmd = &cli.Command{
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("Failed to retrieve content with candidate miner %s: %v", miner, err)
+			return fmt.Errorf("failed to retrieve content with candidate miner %s: %v", miner, err)
 		}
 
 		printRetrievalStats(&FILRetrievalStats{RStats: *stats})

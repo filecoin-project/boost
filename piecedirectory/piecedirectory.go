@@ -36,7 +36,6 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/jellydator/ttlcache/v2"
 	"github.com/multiformats/go-multihash"
-	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
@@ -213,7 +212,7 @@ func (ps *PieceDirectory) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) (
 	return deals, nil
 }
 
-func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash) (*model.OffsetSize, error) {
 	defer func(start time.Time) {
 		log.Debugw("piece directory ; GetOffsetSize span", "took", time.Since(start))
 	}(time.Now())
@@ -318,7 +317,9 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
 
-	defer reader.Close() //nolint:errcheck
+	defer func() {
+		_ = reader.Close()
+	}()
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
@@ -769,7 +770,7 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (ps *PieceDirectory) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
+func (ps *PieceDirectory) PiecesContainingMultihash(ctx context.Context, m multihash.Multihash) ([]cid.Cid, error) {
 	defer func(start time.Time) {
 		log.Debugw("piece directory ; PiecesContainingMultihash span", "took", time.Since(start))
 	}(time.Now())
@@ -826,7 +827,9 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			if err != nil {
 				return nil, fmt.Errorf("getting piece reader: %w", err)
 			}
-			defer reader.Close()
+			defer func() {
+				_ = reader.Close()
+			}()
 
 			// Get the offset of the block within the piece (CAR file)
 			offsetSize, err := ps.GetOffsetSize(ctx, pieceCid, c.Hash())
@@ -1029,7 +1032,7 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr a
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 
-	isUnsealed, err := s.SectorAccessor.IsUnsealed(ctx, id, offset.Unpadded(), length.Unpadded())
+	isUnsealed, err := s.IsUnsealed(ctx, id, offset.Unpadded(), length.Unpadded())
 	if err != nil {
 		return nil, fmt.Errorf("checking unsealed state of sector %d: %w", id, err)
 	}
@@ -1038,7 +1041,7 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr a
 		return nil, fmt.Errorf("getting reader over sector %d: %w", id, types.ErrSealed)
 	}
 
-	r, err := s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+	r, err := s.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
 	if err != nil {
 		return nil, fmt.Errorf("getting reader over sector %d: %w", id, err)
 	}

@@ -220,7 +220,9 @@ func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) ([]*types
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var deals []*types.ProviderDealState
 	for rows.Next() {
@@ -413,7 +415,9 @@ func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	deals := make([]*types.ProviderDealState, 0, 16)
 	for rows.Next() {

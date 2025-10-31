@@ -244,7 +244,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	if errCount > 0 {
 		msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
 		msg += " See the log for details:\n" + logPath
-		fmt.Fprintf(os.Stderr, "\n%s\n", msg)
+		_, _ = fmt.Fprintf(os.Stderr, "\n%s\n", msg)
 	}
 	if err != nil {
 		return fmt.Errorf("migrating piece store: %w", err)
@@ -579,7 +579,7 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
+		return nil, fmt.Errorf("wanted %v but got %v", multicodec.CarMultihashIndexSorted, idx.Codec())
 	}
 	return records, nil
 }
@@ -618,7 +618,9 @@ func loadIndex(path string) (index.Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer idxf.Close()
+	defer func() {
+		_ = idxf.Close()
+	}()
 
 	subject, err := index.ReadFrom(idxf)
 	if err != nil {

@@ -330,7 +330,7 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 	c.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
 	defer func() {
 		c.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
-		s.Close()
+		_ = s.Close()
 	}()
 
 	// We have connected

@@ -11,7 +11,7 @@ import (
 	"github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
 	chunk "github.com/ipfs/boxo/chunker"
-	offline "github.com/ipfs/boxo/exchange/offline"
+	"github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/ipld/merkledag"
 	"github.com/ipfs/boxo/ipld/unixfs/importer/balanced"
@@ -151,7 +151,9 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService, chunksize int64, 
 	if err != nil {
 		return cid.Undef, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	stat, err := file.Stat()
 	if err != nil {

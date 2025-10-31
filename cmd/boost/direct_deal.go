@@ -130,7 +130,9 @@ var directDealAllocate = &cli.Command{
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() {
+				_ = file.Close()
+			}()
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
 				line := scanner.Text()
@@ -247,7 +249,7 @@ var directDealAllocate = &cli.Command{
 			return err
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}
@@ -381,7 +383,7 @@ var directDealGetAllocations = &cli.Command{
 			return err
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}
@@ -522,6 +524,10 @@ If the client id different then claim can be extended up to maximum 5 years from
 			Name:  "all",
 			Usage: "automatically extend TermMax of all claims for specified miner[s] to --term-max (default: 5 years from claim start epoch)",
 		},
+		&cli.BoolFlag{
+			Name:  "no-datacap",
+			Usage: "will only extend the claim expiration without requiring a datacap i.e. made with --wallet address",
+		},
 		&cli.StringSliceFlag{
 			Name:    "miner",
 			Usage:   "storage provider address[es]",
@@ -556,6 +562,11 @@ If the client id different then claim can be extended up to maximum 5 years from
 		all := cctx.Bool("all")
 		wallet := cctx.String("wallet")
 		tmax := cctx.Int64("term-max")
+		noDatacap := cctx.Bool("no-datacap")
+
+		if !all && noDatacap {
+			return fmt.Errorf("can't use --no-datacap flag without --all flag")
+		}
 
 		// No miner IDs and no arguments
 		if len(miners) == 0 && cctx.Args().Len() == 0 {
@@ -582,7 +593,7 @@ If the client id different then claim can be extended up to maximum 5 years from
 			return fmt.Errorf("specified term-max %d is larger than %d maximum allowed by verified regirty actor policy", tmax, verifreg13types.MaximumVerifiedAllocationTerm)
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}
@@ -654,7 +665,7 @@ If the client id different then claim can be extended up to maximum 5 years from
 
 		log.Debugw("selected wallet", "wallet", walletAddr)
 
-		msgs, err := util.CreateExtendClaimMsg(ctx, gapi, claimMap, miners, walletAddr, abi.ChainEpoch(tmax), all, cctx.Bool("assume-yes"), cctx.Int("batch-size"))
+		msgs, err := util.CreateExtendClaimMsg(ctx, gapi, claimMap, miners, walletAddr, abi.ChainEpoch(tmax), all, cctx.Bool("assume-yes"), noDatacap, cctx.Int("batch-size"))
 		if err != nil {
 			return err
 		}
@@ -716,7 +727,7 @@ var listClaimsCmd = &cli.Command{
 			return fmt.Errorf("must provide a miner ID")
 		}
 
-		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}

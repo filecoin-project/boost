@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/google/uuid"
 )
@@ -224,7 +223,7 @@ func (p *Provider) processOnlineDealProposal(deal *types.ProviderDealState) *acc
 
 // processOfflineDealProposal just saves the deal to the database after running deal filters
 // Execution resumes when processImportOfflineDealData is called.
-func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh *dealHandler) *acceptError {
+func (p *Provider) processOfflineDealProposal(ds *types.ProviderDealState, dh *dealHandler) *acceptError {
 	// Check that the deal proposal is unique
 	if aerr := p.checkDealPropUnique(ds); aerr != nil {
 		return aerr
@@ -312,7 +311,7 @@ func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) *
 	return nil
 }
 
-func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptError {
+func (p *Provider) checkDealPropUnique(deal *types.ProviderDealState) *acceptError {
 	signedPropCid, err := deal.SignedProposalCid()
 	if err != nil {
 		return &acceptError{
@@ -347,7 +346,7 @@ func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptE
 	}
 }
 
-func (p *Provider) checkDealUuidUnique(deal *smtypes.ProviderDealState) *acceptError {
+func (p *Provider) checkDealUuidUnique(deal *types.ProviderDealState) *acceptError {
 	dl, err := p.dealsDB.ByID(p.ctx, deal.DealUuid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -559,7 +558,7 @@ func (p *Provider) startDealThread(dh *dealHandler, deal *types.ProviderDealStat
 
 // failPausedDeal moves a deal from the paused to the failed state and cleans
 // up the deal
-func (p *Provider) failPausedDeal(dh *dealHandler, deal *smtypes.ProviderDealState) error {
+func (p *Provider) failPausedDeal(dh *dealHandler, deal *types.ProviderDealState) error {
 	// Check if the deal is running
 	if dh.isRunning() {
 		return fmt.Errorf("the deal %s is running; cannot fail running deal", deal.DealUuid)
@@ -567,7 +566,7 @@ func (p *Provider) failPausedDeal(dh *dealHandler, deal *smtypes.ProviderDealSta
 
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	deal.Retry = smtypes.DealRetryFatal
+	deal.Retry = types.DealRetryFatal
 	var err error
 	if deal.Err == "" {
 		err = errors.New("user manually terminated the deal")

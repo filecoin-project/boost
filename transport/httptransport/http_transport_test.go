@@ -582,10 +582,10 @@ func TestTransferResumption(t *testing.T) {
 			}
 
 			w.WriteHeader(200)
-			w.Write([]byte(str[start:end])) //nolint:errcheck
+			_, _ = w.Write([]byte(str[start:end]))
 			// close the connection so user sees an error while reading the response
 			c := GetConn(r)
-			c.Close() //nolint:errcheck
+			_ = c.Close()
 		case http.MethodHead:
 			addContentLengthHeader(w, len(str))
 		}
@@ -633,10 +633,10 @@ func TestLibp2pTransferResumption(t *testing.T) {
 			}
 
 			w.WriteHeader(200)
-			w.Write([]byte(str[start:end])) //nolint:errcheck
+			_, _ = w.Write([]byte(str[start:end]))
 			// close the connection so user sees an error while reading the response
 			c := GetConn(r)
-			c.Close() //nolint:errcheck
+			_ = c.Close()
 		case http.MethodHead:
 			addContentLengthHeader(w, len(str))
 		}
@@ -775,9 +775,9 @@ func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host
 	}
 
 	closeServer := func() {
-		srvHost.Close()    //nolint:errcheck
-		clientHost.Close() //nolint:errcheck
-		srv.Stop(ctx)      //nolint:errcheck
+		_ = srvHost.Close()    //nolint:errcheck
+		_ = clientHost.Close() //nolint:errcheck
+		_ = srv.Stop(ctx)      //nolint:errcheck
 	}
 	return req, closeServer, clientHost
 }
@@ -821,9 +821,9 @@ type lip2pHttpServer struct {
 }
 
 func (l *lip2pHttpServer) Close() {
-	l.srvHost.Close()
-	l.clientHost.Close()
-	l.listener.Close()
+	_ = l.srvHost.Close()
+	_ = l.clientHost.Close()
+	_ = l.listener.Close()
 }
 
 func newTestLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.Request)) *lip2pHttpServer {
@@ -846,7 +846,7 @@ func newTestLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *ht
 		mux.HandleFunc("/", handler)
 		server := &http.Server{Handler: mux}
 		server.ConnContext = SaveConnInContext
-		server.Serve(listener) //nolint:errcheck
+		_ = server.Serve(listener)
 	}()
 
 	l.Req = newLibp2pHttpRequest(l.srvHost, "")

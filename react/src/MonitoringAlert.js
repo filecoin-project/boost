@@ -29,3 +29,18 @@ export function MonitoringAlert(props) {
         </div>
     )
 }
+
+export function DeprecationAlert(props) {
+    return (
+        <div id="monitoring-alert" className="showing">
+            <div className="message">
+                <img src={warnImg}  alt={"warning"}/>
+                <span>
+                    Boost is deprecated and will no longer be supported in the future. Please{' '}
+                    <a href="https://docs.curiostorage.org/curio-market/migrating-from-boost" target="_blank" rel="noopener noreferrer">migrate</a> to{' '}
+                    <a href="https://docs.curiostorage.org" target="_blank" rel="noopener noreferrer">Curio</a>.
+                </span>
+            </div>
+        </div>
+    )
+}

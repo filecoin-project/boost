@@ -80,7 +80,9 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	storageLogs := make([]StorageLog, 0, 16)
 	for rows.Next() {
@@ -131,7 +133,9 @@ func (s *StorageDB) totalTagged(ctx context.Context, host string) (uint64, error
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	total := big.NewIntUnsigned(0)
 

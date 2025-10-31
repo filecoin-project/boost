@@ -371,7 +371,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 	}()
 
 	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM PieceBlockOffsetSize WHERE PieceCid = ?`
-	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
+	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).PageSize(10_000).Iter()
 
 	scannedRecordCh := make(chan struct{}, 1)
 	records := make(chan types.IndexRecord)

@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/protocolproxy"
-	bsnetwork "github.com/ipfs/boxo/bitswap/network"
+	bsnetwork "github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/bitswap/server"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
-	nilrouting "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -66,7 +65,6 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo, opts *B
 	}
 
 	// Start a bitswap server on the provider
-	nilRouter := nilrouting.Null{}
 	bsopts := []server.Option{
 		server.EngineBlockstoreWorkerCount(opts.EngineBlockstoreWorkerCount),
 		server.EngineTaskWorkerCount(opts.EngineTaskWorkerCount),
@@ -84,7 +82,7 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo, opts *B
 			return fulfill
 		}),
 	}
-	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
+	net := bsnetwork.NewFromIpfsHost(host)
 	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
 
@@ -102,7 +100,8 @@ func (s *BitswapServer) Stop() error {
 		s.host.ConnManager().Unprotect(s.proxy.ID, protectTag)
 	}
 	s.cancel()
-	return s.server.Close()
+	s.server.Close()
+	return nil
 }
 
 func (s *BitswapServer) keepProxyConnectionAlive(ctx context.Context, proxy peer.AddrInfo) {

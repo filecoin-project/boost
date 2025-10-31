@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
@@ -81,7 +80,7 @@ func (t CommpThrottle) release() {
 
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
-func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle CommpThrottle, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
+func generatePieceCommitment(ctx context.Context, commpCalc types.CommpCalculator, throttle CommpThrottle, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
 	// Check whether to send commp to a remote process or do it locally
 	var pi *abi.PieceInfo
 	if doRemoteCommP {
@@ -129,7 +128,7 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 }
 
 // remoteCommP makes an API call to the sealing service to calculate commp
-func remoteCommP(ctx context.Context, commpCalc smtypes.CommpCalculator, filepath string) (*abi.PieceInfo, *dealMakingError) {
+func remoteCommP(ctx context.Context, commpCalc types.CommpCalculator, filepath string) (*abi.PieceInfo, *dealMakingError) {
 	// Open the CAR file
 	rd, err := os.Open(filepath)
 	if err != nil {

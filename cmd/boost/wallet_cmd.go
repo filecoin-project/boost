@@ -97,7 +97,7 @@ var walletList = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}
@@ -208,7 +208,7 @@ var walletList = &cli.Command{
 					if !cctx.Bool("json") && dcap == nil {
 						wallet[dataCapKey] = "X"
 					} else if dcap != nil {
-						wallet[dataCapKey] = humanize.IBytes(dcap.Int.Uint64())
+						wallet[dataCapKey] = humanize.IBytes(dcap.Uint64())
 					}
 				} else {
 					wallet[dataCapKey] = "n/a"
@@ -271,7 +271,7 @@ var walletBalance = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}

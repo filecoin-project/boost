@@ -56,7 +56,9 @@ func (qa *QueryAskHandler) Stop() {
 }
 
 func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
-	defer stream.Close()
+	defer func() {
+		_ = stream.Close()
+	}()
 
 	// Set a deadline on reading from the stream so it doesn't hang
 	_ = stream.SetReadDeadline(time.Now().Add(providerReadDeadline))
@@ -89,7 +91,9 @@ func (qa *QueryAskHandler) HandleQueryStream(stream network.Stream) {
 
 	// Set a deadline on writing to the stream so it doesn't hang
 	_ = stream.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
-	defer stream.SetWriteDeadline(time.Time{}) // nolint
+	defer func() {
+		_ = stream.SetWriteDeadline(time.Time{})
+	}()
 
 	if err := cborutil.WriteCborRPC(stream, answer); err != nil {
 		log.Infow("Retrieval query: writing query response", "peer", stream.Conn().RemotePeer(), "error", err)

@@ -1,6 +1,6 @@
 module github.com/filecoin-project/boost/extern/boostd-data
 
-go 1.23.7
+go 1.24.7
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2

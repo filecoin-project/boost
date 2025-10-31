@@ -44,7 +44,9 @@ var minerAddressCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("locking repo: %w. Please stop the boostd process to proceed", err)
 		}
-		defer lr.Close()
+		defer func() {
+			_ = lr.Close()
+		}()
 
 		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {

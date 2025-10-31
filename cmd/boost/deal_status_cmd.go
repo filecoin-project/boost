@@ -6,7 +6,6 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/node"
-	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -45,12 +44,12 @@ var dealStatusCmd = &cli.Command{
 			return err
 		}
 
-		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		api, closer, err := lcli.GetGatewayAPIV1(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}

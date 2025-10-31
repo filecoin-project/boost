@@ -19,7 +19,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -54,7 +53,7 @@ type DirectDealsProvider struct {
 	Address       address.Address
 	fullnodeApi   v1api.FullNode
 	pieceAdder    types.PieceAdder
-	commpCalc     smtypes.CommpCalculator
+	commpCalc     types.CommpCalculator
 	commpThrottle CommpThrottle
 	sps           sealingpipeline.API
 	directDealsDB *db.DirectDealsDB
@@ -67,7 +66,7 @@ type DirectDealsProvider struct {
 	ip *indexprovider.Wrapper
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc types.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		config:        cfg,
 		Address:       minerAddr,
@@ -196,7 +195,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}, nil
 }
 
-func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
+func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
 	piececid := params.PieceCid.String()
 	clientAddr := params.ClientAddr.String()
 	log.Infow("received direct data import", "piececid", piececid, "filepath", params.FilePath, "clientAddr", clientAddr, "allocationId", params.AllocationID)
@@ -217,7 +216,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 		AllocationID:     params.AllocationID,
 		KeepUnsealedCopy: !params.RemoveUnsealedCopy,
 		AnnounceToIPNI:   !params.SkipIPNIAnnounce,
-		Retry:            smtypes.DealRetryAuto,
+		Retry:            types.DealRetryAuto,
 	}
 
 	ddp.dealLogger.Infow(entry.ID, "executing direct deal import", "client", clientAddr, "piececid", piececid)
@@ -291,9 +290,9 @@ func (ddp *DirectDealsProvider) process(ctx context.Context, dealUuid uuid.UUID)
 	ddp.dealLogger.Infow(dealUuid, "deal execution initiated", "deal state", deal)
 
 	// Clear any error from a previous run
-	if deal.Err != "" || deal.Retry == smtypes.DealRetryAuto {
+	if deal.Err != "" || deal.Retry == types.DealRetryAuto {
 		deal.Err = ""
-		deal.Retry = smtypes.DealRetryAuto
+		deal.Retry = types.DealRetryAuto
 		ddp.saveDealToDB(deal)
 	}
 
@@ -317,7 +316,7 @@ func (ddp *DirectDealsProvider) process(ctx context.Context, dealUuid uuid.UUID)
 		ddp.dealLogger.Infow(dealUuid, "deal paused because boost was shut down",
 			"checkpoint", deal.Checkpoint.String())
 	} else {
-		ddp.dealLogger.Infow(dealUuid, "deal paused because of recoverable error", "err", err.error.Error(),
+		ddp.dealLogger.Infow(dealUuid, "deal paused because of recoverable error", "err", err.Error(),
 			"checkpoint", deal.Checkpoint.String(), "retry", err.retry)
 	}
 
@@ -326,7 +325,7 @@ func (ddp *DirectDealsProvider) process(ctx context.Context, dealUuid uuid.UUID)
 	ddp.saveDealToDB(deal)
 }
 
-func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.DirectDeal) (dmerr *dealMakingError) {
+func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *types.DirectDeal) (dmerr *dealMakingError) {
 	// Capture any panic as a manually retryable error
 	dealUuid := entry.ID
 	defer func() {
@@ -334,8 +333,8 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 			log.Errorw("caught panic executing deal", "id", dealUuid, "err", err)
 			fmt.Fprint(os.Stderr, string(debug.Stack()))
 			dmerr = &dealMakingError{
-				error: fmt.Errorf("Caught panic in deal execution: %s\n%s", err, debug.Stack()),
-				retry: smtypes.DealRetryManual,
+				error: fmt.Errorf("caught panic in deal execution: %s\n%s", err, debug.Stack()),
+				retry: types.DealRetryManual,
 			}
 		}
 	}()
@@ -350,7 +349,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		if err != nil {
 			return &dealMakingError{
 				error: fmt.Errorf("failed to open file '%s': %w", entry.InboundFilePath, err),
-				retry: smtypes.DealRetryFatal,
+				retry: types.DealRetryFatal,
 			}
 		}
 
@@ -501,7 +500,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 // watchSealingUpdates periodically checks the sealing status of the deal,
 // and returns once the deal is active (or boost is shutdown)
-func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *dealMakingError {
+func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *dealMakingError {
 	var lastSealingState lapi.SectorState
 	checkSealingFinalized := func() bool {
 		// Get the sector status
@@ -585,13 +584,13 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *smtypes.DirectDeal) *
 	}
 }
 
-func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *smtypes.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
+func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *types.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
 	prev := entry.Checkpoint
 	entry.Checkpoint = ckpt
 	err := ddp.directDealsDB.Update(ctx, entry)
 	if err != nil {
 		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
+			retry: types.DealRetryFatal,
 			error: fmt.Errorf("failed to persist deal state: %w", err),
 		}
 	}
@@ -602,7 +601,7 @@ func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *smt
 	return nil
 }
 
-func (ddp *DirectDealsProvider) saveDealToDB(deal *smtypes.DirectDeal) {
+func (ddp *DirectDealsProvider) saveDealToDB(deal *types.DirectDeal) {
 	// In the case that the provider has been shutdown, the provider's context
 	// will be cancelled, so use a background context when saving state to the
 	// DB to avoid this edge case.
@@ -615,10 +614,10 @@ func (ddp *DirectDealsProvider) saveDealToDB(deal *smtypes.DirectDeal) {
 	}
 }
 
-func (ddp *DirectDealsProvider) failDeal(deal *smtypes.DirectDeal, err error) {
+func (ddp *DirectDealsProvider) failDeal(deal *types.DirectDeal, err error) {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	deal.Retry = smtypes.DealRetryFatal
+	deal.Retry = types.DealRetryFatal
 	deal.Err = err.Error()
 	ddp.dealLogger.LogError(deal.ID, "deal failed", err)
 	ddp.saveDealToDB(deal)
@@ -669,7 +668,7 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	deal.Retry = smtypes.DealRetryFatal
+	deal.Retry = types.DealRetryFatal
 	if deal.Err == "" {
 		err = errors.New("user manually terminated the deal")
 	} else {
@@ -686,7 +685,7 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 	return nil
 }
 
-func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal) *dealMakingError {
+func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *types.DirectDeal) *dealMakingError {
 	// If this is Curio sealer then we should wait till sector finishes sealing
 	if ddp.config.Curio {
 		// Wait for sector to finish sealing

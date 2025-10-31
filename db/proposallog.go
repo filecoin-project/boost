@@ -81,7 +81,9 @@ func (p *ProposalLogsDB) List(ctx context.Context, accepted *bool, cursor *time.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	sz := limit
 	if sz == 0 {

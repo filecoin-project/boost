@@ -48,7 +48,7 @@ func (fs fileStore) Store(p Path, src File) (Path, error) {
 	}
 
 	if _, err = io.Copy(dest, src); err != nil {
-		dest.Close()
+		_ = dest.Close()
 		return Path(""), err
 	}
 	return p, dest.Close()

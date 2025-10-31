@@ -135,7 +135,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return err
 	}
 
-	api, closer, err := lcli.GetGatewayAPI(cctx)
+	api, closer, err := lcli.GetGatewayAPIV1(cctx)
 	if err != nil {
 		return fmt.Errorf("cant setup gateway connection: %w", err)
 	}
@@ -282,7 +282,9 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
 	}
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
 
 	var resp types.DealResponse
 	if err := doRpc(ctx, s, &dealParams, &resp); err != nil {

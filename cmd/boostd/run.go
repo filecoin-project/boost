@@ -44,6 +44,12 @@ var runCmd = &cli.Command{
 			Name:  "no-metrics",
 			Usage: "stops emitting information about the node as metrics (param is used by tests)",
 		},
+		&cli.BoolFlag{
+			Name:     "deprecated",
+			Usage:    "Boost is now deprecated. Please migrate to Curio instead. See https://docs.curiostorage.org/ and https://docs.curiostorage.org/curio-market/migrating-from-boost for more information.",
+			Required: true,
+			Value:    false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -56,7 +62,7 @@ var runCmd = &cli.Command{
 		}
 
 		subCh := gateway.NewEthSubHandler()
-		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscribtionHandler(subCh))
+		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscriptionHandler(subCh))
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
 		}
@@ -91,7 +97,7 @@ var runCmd = &cli.Command{
 		log.Debugw("Remote full node version", "version", v)
 
 		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-			return fmt.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
+			return fmt.Errorf("remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
 
 		log.Debug("Checking full node sync status")

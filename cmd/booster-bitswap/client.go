@@ -13,7 +13,6 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/traversal"
-	nilrouting "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/core/host"
 	mh "github.com/multiformats/go-multihash"
 
@@ -21,12 +20,13 @@ import (
 	lotus_blockstore "github.com/filecoin-project/lotus/blockstore"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/boxo/bitswap/client"
-	bsnetwork "github.com/ipfs/boxo/bitswap/network"
+	bsnetwork "github.com/ipfs/boxo/bitswap/network/bsnet"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	ipldlegacy "github.com/ipfs/go-ipld-legacy"
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/libp2p/go-libp2p"
+	nilrouting "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -97,7 +97,7 @@ var fetchCmd = &cli.Command{
 
 		// Create a bitswap client
 		nilRouter := nilrouting.Null{}
-		net := bsnetwork.NewFromIpfsHost(host, nilRouter)
+		net := bsnetwork.NewFromIpfsHost(host)
 		bs, err := blockstore.OpenReadWrite(outputCarPath, []cid.Cid{rootCid}, blockstore.UseWholeCIDs(true))
 		if err != nil {
 			return fmt.Errorf("creating blockstore at %s: %w", outputCarPath, err)
@@ -107,8 +107,10 @@ var fetchCmd = &cli.Command{
 		defer cancel()
 		idbs := lotus_blockstore.WrapIDStore(bs)
 		brn := &blockReceiver{bs: idbs, ctx: ctx, cancel: cancel}
-		bsClient := client.New(ctx, net, bs, client.WithBlockReceivedNotifier(brn))
-		defer bsClient.Close()
+		bsClient := client.New(ctx, net, nilRouter, idbs, client.WithBlockReceivedNotifier(brn))
+		defer func() {
+			_ = bsClient.Close()
+		}()
 		net.Start(bsClient)
 
 		// Connect to host
