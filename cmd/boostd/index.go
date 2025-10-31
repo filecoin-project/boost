@@ -22,6 +22,7 @@ var indexProvCmd = &cli.Command{
 		indexProvAnnounceLatestHttp,
 		indexProvAnnounceDealRemovalAd,
 		indexProvAnnounceDeal,
+		indexProvRemoveAllCmd,
 	},
 }
 
@@ -300,6 +301,32 @@ var indexProvAnnounceDeal = &cli.Command{
 			return nil
 		}
 		fmt.Printf("Legacy deal already announced\n")
+		return nil
+	},
+}
+
+var indexProvRemoveAllCmd = &cli.Command{
+	Name:  "remove-all",
+	Usage: "Announce all removal ad for all contextIDs",
+	Flags: []cli.Flag{},
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		// get boost api
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		// announce markets and boost deals
+		cids, err := napi.BoostIndexerRemoveAll(ctx)
+		if err != nil {
+			return err
+		}
+		for _, c := range cids {
+			fmt.Println("Published the removal ad with CID", c.String())
+		}
 		return nil
 	},
 }

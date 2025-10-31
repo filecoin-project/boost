@@ -20,6 +20,7 @@
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
   * [BoostIndexerAnnounceLegacyDeal](#boostindexerannouncelegacydeal)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
+  * [BoostIndexerRemoveAll](#boostindexerremoveall)
   * [BoostLegacyDealByProposalCid](#boostlegacydealbyproposalcid)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
 * [I](#i)
@@ -374,7 +375,7 @@ Response:
 ```
 
 ### BoostIndexerAnnounceAllDeals
-There are not yet any comments for this method.
+
 
 Perms: admin
 
@@ -510,6 +511,20 @@ Response:
 ```json
 [
   "Bw=="
+]
+```
+
+### BoostIndexerRemoveAll
+There are not yet any comments for this method.
+
+Perms: admin
+
+Inputs: `null`
+
+Response:
+```json
+[
+  null
 ]
 ```
 
