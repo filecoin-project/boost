@@ -73,7 +73,7 @@ func main() {
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {
-		os.Stderr.WriteString("Error: " + err.Error() + "\n")
+		_, _ = os.Stderr.WriteString("Error: " + err.Error() + "\n")
 	}
 }
 

@@ -428,7 +428,7 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 		}
 
 		// Skip expired legacy deals
-		if deal.ClientDealProposal.Proposal.EndEpoch < head.Height() {
+		if deal.Proposal.EndEpoch < head.Height() {
 			llog.Infow("Deal end epoch is lower than current height")
 			continue
 		}
@@ -456,17 +456,17 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 			continue
 		}
 
-		propJson, err := json.Marshal(deal.ClientDealProposal.Proposal)
+		propJson, err := json.Marshal(deal.Proposal)
 		if err != nil {
 			return fmt.Errorf("deal: %s: json.Marshal(piece.DealProposal): %s", deal.ProposalCid.String(), err)
 		}
 
-		sigByte, err := deal.ClientDealProposal.ClientSignature.MarshalBinary()
+		sigByte, err := deal.ClientSignature.MarshalBinary()
 		if err != nil {
 			return fmt.Errorf("deal: %s: marshal client signature: %s", deal.ProposalCid.String(), err)
 		}
 
-		prop := deal.ClientDealProposal.Proposal
+		prop := deal.Proposal
 
 		_, err = hdb.Exec(ctx, `INSERT INTO market_legacy_deals (signed_proposal_cid, sp_id, client_peer_id,
                                 proposal_signature, proposal, piece_cid, 

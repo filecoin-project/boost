@@ -50,7 +50,7 @@ var cleanupYugabyteDBCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Bool("i-know-what-i-am-doing") {
-			return fmt.Errorf("please use --i-know-what-i-am-doing flag to confirm. THIS CANNOT BE UNDONE.")
+			return fmt.Errorf("please use --i-know-what-i-am-doing flag to confirm. THIS CANNOT BE UNDONE")
 		}
 
 		// Create a yugabyte data service
