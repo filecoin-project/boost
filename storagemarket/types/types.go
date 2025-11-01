@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -98,6 +99,7 @@ type DirectDealParams struct {
 	DeleteAfterImport  bool
 	RemoveUnsealedCopy bool
 	SkipIPNIAnnounce   bool
+	Notifications      []miner.DataActivationNotification
 }
 
 // Transfer has the parameters for a data transfer
