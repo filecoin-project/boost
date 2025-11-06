@@ -332,7 +332,7 @@ func MigrateProviderDealState0To1(oldDs *ProviderDealState0) (*maptypes.Provider
 	}, nil
 }
 
-// MigrateProviderDealState0To1 migrates from v1 to v2 of a
+// MigrateProviderDealState1To2 migrates from v1 to v2 of a
 // MigrateProviderDealState.
 // The difference is that in v2 the ChannelID is a pointer, because the
 // ChannelID is not set until the data transfer has started, so it should

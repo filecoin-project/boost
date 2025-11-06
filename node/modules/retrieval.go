@@ -23,7 +23,7 @@ import (
 	"go.uber.org/fx"
 )
 
-// bitswapMultiaddrs is a utility function to determine the multi addrs for bitswap
+// bitswapMultiAddrs is a utility function to determine the multi addrs for bitswap
 // based off the host and boost config
 func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, error) {
 	// if BitswapPublicAddresses is empty, that means we'll be serving bitswap directly from this host, so just return host multiaddresses
