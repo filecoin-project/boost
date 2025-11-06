@@ -317,9 +317,9 @@ func migrateBoostDeals(ctx context.Context, activeSectors bitfield.BitField, mad
 
 			if !b {
 				// Add LID details to pieceDeal in HarmonyDB
-				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 					deal.DealUuid.String(), prop.PieceCID.String(), true, mid, deal.SectorID, deal.Offset,
-					prop.PieceSize, deal.NBytesReceived, false, false, deal.ChainDealID)
+					prop.PieceSize, deal.NBytesReceived, false, nil, false, deal.ChainDealID)
 				if err != nil {
 					return false, fmt.Errorf("deal: %s: failed to update piece metadata and piece deal: %w", deal.DealUuid.String(), err)
 				}
@@ -577,8 +577,8 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 
 			if !b {
 				// Add LID details to pieceDeal in HarmonyDB
-				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-					deal.ID.String(), deal.PieceCID.String(), false, mid, deal.SectorID, deal.Offset, deal.PieceSize, deal.InboundFileSize, false)
+				_, err = tx.Exec(`SELECT process_piece_deal($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+					deal.ID.String(), deal.PieceCID.String(), false, mid, deal.SectorID, deal.Offset, deal.PieceSize, deal.InboundFileSize, false, nil, false, 0)
 				if err != nil {
 					return false, fmt.Errorf("deal: %s: failed to update piece metadata and piece deal for DDO deal %s: %w", deal.ID.String(), deal.ID.String(), err)
 				}
