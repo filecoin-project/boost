@@ -66,6 +66,7 @@ func newDirectDealsAccessor(db *sql.DB, deal *types.DirectDeal) *directDealsAcce
 			"Retry":            &fielddef.FieldDef{F: &deal.Retry},
 			"KeepUnsealedCopy": &fielddef.FieldDef{F: &deal.KeepUnsealedCopy},
 			"AnnounceToIPNI":   &fielddef.FieldDef{F: &deal.AnnounceToIPNI},
+			"Notifications":    &fielddef.DDONotificationsFieldDef{F: deal.Notifications},
 		},
 	}
 }

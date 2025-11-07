@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -57,6 +58,9 @@ type DirectDeal struct {
 
 	//Announce deal to the IPNI(Index Provider)
 	AnnounceToIPNI bool
+
+	// Notify actors with payload info upon prove commit
+	Notifications []miner.DataActivationNotification
 }
 
 func (d *DirectDeal) String() string {
