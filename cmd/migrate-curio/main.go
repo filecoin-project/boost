@@ -65,8 +65,9 @@ func main() {
 				Value:   "5433",
 			},
 			&cli.StringFlag{
-				Name:  "api-lid",
-				Usage: "Boostd-data service API endpoint. Service must be running.",
+				Name:     "api-lid",
+				Usage:    "Boostd-data service API endpoint. Service must be running.",
+				Required: true,
 			},
 		},
 		Commands: []*cli.Command{
