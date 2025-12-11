@@ -64,6 +64,10 @@ func main() {
 				EnvVars: []string{"CURIO_DB_PORT", "CURIO_HARMONYDB_PORT"},
 				Value:   "5433",
 			},
+			&cli.StringFlag{
+				Name:  "api-lid",
+				Usage: "Boostd-data service API endpoint. Service must be running.",
+			},
 		},
 		Commands: []*cli.Command{
 			migrateCmd,
