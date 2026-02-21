@@ -17,7 +17,7 @@ Compile and install using the instructions at the `Building and installing` sect
 
 ## Running Boost devnet in Docker for development
 
-### Prerequisites
+### Pre-requisites
 * Install Docker - https://docs.docker.com/get-docker/
 
 ### Building Docker images
