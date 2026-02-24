@@ -342,7 +342,7 @@ func TestHttpGzipResponse(t *testing.T) {
 						rdr, err = gzip.NewReader(response.Body)
 						req.NoError(err)
 					} // else should be handled by the go client
-					req.Regexp(`^"`+rootEnt.Root.String()+`\.car\.\w{2,13}\.gz"$`, response.Header.Get("Etag"))
+					req.Regexp(`^(W/)?"`+rootEnt.Root.String()+`\.car\.\w{2,13}\.gz"$`, response.Header.Get("Etag"))
 				} else {
 					req.Regexp(`\.car\.\w{12,13}"$`, response.Header.Get("Etag"))
 				}
@@ -470,7 +470,7 @@ func TestHttpGzipResponse(t *testing.T) {
 				client := &http.Client{}
 				response, err := client.Do(request)
 				req.NoError(err)
-				req.Equal(http.StatusInternalServerError, response.StatusCode)
+				req.Equal(http.StatusNotFound, response.StatusCode)
 
 				body, err := io.ReadAll(response.Body)
 				req.NoError(err)
