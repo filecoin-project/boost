@@ -130,10 +130,13 @@ func dealTestCarInParts(ctx context.Context, t *testing.T, boostAndMiner *framew
 
 		// Make a storage deal on the first boost, which will store the index to
 		// LID and store the data on the first miner
-		res, err := boostAndMiner.MakeDummyDeal(dealUuid, file.Name(), rootCid, server.URL+"/"+filepath.Base(file.Name()), false)
+		res, err := boostAndMiner.MakeDummyDeal(dealUuid, file.Name(), rootCid, server.URL+"/"+filepath.Base(file.Name()), true)
 		req.NoError(err)
 		t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
 		req.True(res.Result.Accepted)
+		res1, err := boostAndMiner.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, file.Name(), false)
+		require.NoError(t, err)
+		require.True(t, res1.Accepted)
 		req.NoError(boostAndMiner.WaitForDealAddedToSector(dealUuid))
 	}
 }

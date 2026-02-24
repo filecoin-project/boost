@@ -98,10 +98,13 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 
 	// Make a storage deal on the first boost, which will store the index to
 	// LID and store the data on the first miner
-	res, err := boostAndMiner1.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
+	res, err := boostAndMiner1.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), true)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
+	res1, err := boostAndMiner1.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, carFilepath, false)
+	require.NoError(t, err)
+	require.True(t, res1.Accepted)
 
 	// Wait for the deal to be added to a sector
 	err = boostAndMiner1.WaitForDealAddedToSector(dealUuid)
