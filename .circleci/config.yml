@@ -74,6 +74,8 @@ jobs:
     executor: node
     steps:
       - checkout
+      - golang/install:
+          version: "1.24.7"
       - run:
           command: make react
 

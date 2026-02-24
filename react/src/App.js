@@ -27,13 +27,13 @@ import {
 } from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
-import {DeprecationAlert, MonitoringAlert} from "./MonitoringAlert";
+import {DeprecationAlert} from "./MonitoringAlert";
 import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
 import {DirectDealsPage} from "./DirectDeals";
 import {DirectDealDetail} from "./DirectDealDetail";
 import {MinerAddress} from "./MinerAddress";
 
-function App(props) {
+function App() {
     return (
         <BrowserRouter>
             <div id="content">
@@ -95,7 +95,7 @@ function App(props) {
     )
 }
 
-function AppRoot(props) {
+function AppRoot() {
     return (
         <ApolloProvider client={gqlClient}>
             <App />
