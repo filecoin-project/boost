@@ -109,7 +109,7 @@ require (
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor v0.0.0-20171005072247-63513f603b11
 	github.com/whyrusleeping/cbor-gen v0.3.1
-	github.com/yugabyte/pgx/v4 v4.14.5
+	github.com/yugabyte/pgx/v5 v5.7.6-yb-1
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
@@ -119,7 +119,6 @@ require (
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.48.0
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0
@@ -352,7 +351,7 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yugabyte/gocql v1.6.0-yb-1 // indirect
-	github.com/yugabyte/pgx/v5 v5.7.6-yb-1 // indirect
+	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zondax/golem v0.29.0 // indirect
 	github.com/zondax/hid v0.9.2 // indirect
@@ -375,6 +374,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260209163413-e7419c687ee4 // indirect
 	golang.org/x/time v0.14.0 // indirect

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -38,7 +39,6 @@ import (
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 )
 

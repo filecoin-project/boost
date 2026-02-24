@@ -16,7 +16,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/yugabyte/gocql"
-	"github.com/yugabyte/pgx/v4/pgxpool"
+	"github.com/yugabyte/pgx/v5/pgxpool"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"golang.org/x/sync/errgroup"
@@ -127,7 +127,7 @@ func (s *Store) Start(ctx context.Context) error {
 		s.session = session
 
 		// Create connection pool to postgres interface
-		db, err := pgxpool.Connect(ctx, s.settings.ConnectString)
+		db, err := pgxpool.New(ctx, s.settings.ConnectString)
 		if err != nil {
 			startErr = fmt.Errorf("connecting to database: %w", err)
 			return

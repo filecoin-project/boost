@@ -1,11 +1,11 @@
 package testutil
 
 import (
+	"context"
 	"testing"
 
 	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 )
 
 // StartAndWaitForReady is a utility function to start a module and verify it reaches the ready state
