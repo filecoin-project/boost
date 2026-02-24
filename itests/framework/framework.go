@@ -195,9 +195,9 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.AlwaysKeepUnsealedCopy = true
 					sc.WaitDealsDelay = time.Second
 					//sc.AggregateCommits = false
-					sc.CommitBatchWait = 2 * time.Second
+					sc.CommitBatchWait = time.Second
 					sc.StartEpochSealingBuffer = 30
-
+					sc.PreCommitBatchWait = time.Second
 					return sc, nil
 				}, nil
 			}),

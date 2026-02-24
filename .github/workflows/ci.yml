@@ -95,8 +95,8 @@ jobs:
             target: "./itests/dummydeal_offline_test.go"
           - name: test-itest-dummydeal
             target: "./itests/dummydeal_test.go"
-#          - name: test-graphsync_identity_cid
-#            target: "./itests/graphsync_identity_cid_test.go"
+          - name: test-graphsync_identity_cid
+            target: "./itests/graphsync_identity_cid_test.go"
           - name: test-itest-retrieval
             target: "./itests/graphsync_retrieval_test.go"
           - name: test-itest-direct_deal
