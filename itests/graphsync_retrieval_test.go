@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
@@ -92,14 +91,15 @@ func TestDealRetrieval(t *testing.T) {
 	dealUuid := uuid.New()
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, inPath, root, server.URL+"/"+filepath.Base(inPath), false)
+	res, err := f.MakeDummyDeal(dealUuid, inPath, root, server.URL+"/"+filepath.Base(inPath), true)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
 	require.NoError(t, err)
-
-	time.Sleep(2 * time.Second)
+	res1, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, inPath, false)
+	require.NoError(t, err)
+	require.True(t, res1.Accepted)
 
 	log.Debugw("got deal proposal cid", "cid", dealCid.String())
 

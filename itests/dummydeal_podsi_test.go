@@ -80,12 +80,13 @@ func TestDummyPodsiDealOnline(t *testing.T) {
 	dealUuid := uuid.New()
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, dataSegmentFile, rootCid, server.URL+"/"+filepath.Base(dataSegmentFile), false)
+	res, err := f.MakeDummyDeal(dealUuid, dataSegmentFile, rootCid, server.URL+"/"+filepath.Base(dataSegmentFile), true)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
-
-	time.Sleep(2 * time.Second)
+	res1, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, dataSegmentFile, false)
+	require.NoError(t, err)
+	require.True(t, res1.Accepted)
 
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
 	err = f.WaitForDealAddedToSector(dealUuid)
