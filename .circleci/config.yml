@@ -11,6 +11,9 @@ executors:
   ubuntu:
     docker:
       - image: ubuntu:default
+  node:
+    docker:
+      - image: cimg/node:20.18
 
 commands:
   install-deps:
@@ -66,6 +69,13 @@ jobs:
       - install-deps
       - prepare
       - go/mod-tidy-check
+
+  react-build:
+    executor: node
+    steps:
+      - checkout
+      - run:
+          command: make react
 
   build-all:
     executor: golang
@@ -307,6 +317,7 @@ workflows:
     jobs:
       - lint-all:
           concurrency: "16"   # expend all docker 2xlarge CPUs.
+      - react-build
       - mod-tidy-check
       - gofmt
       - cbor-check

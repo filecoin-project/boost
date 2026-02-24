@@ -184,7 +184,7 @@ dist-clean:
 	git submodule deinit --all -f
 .PHONY: dist-clean
 
-gen: cfgdoc-gen api-gen docsgen
+gen: api-gen cbor-gen cfgdoc-gen docsgen
 .PHONY: gen
 
 api-gen:
