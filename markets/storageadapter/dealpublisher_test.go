@@ -327,7 +327,14 @@ func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool
 		},
 	}
 
+	signedProp, err := cborutil.AsIpld(&deal)
+	require.NoError(t, err)
+	proposalCID := signedProp.Cid()
+
+	publishDone := make(chan struct{})
 	go func() {
+		defer close(publishDone)
+
 		_, err := dp.Publish(pctx, deal)
 
 		// If the test has completed just bail out without checking for errors
@@ -342,6 +349,23 @@ func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool
 		}
 	}()
 
+	// Ensure the async publish call has either queued the deal or completed
+	// before the caller proceeds with assertions.
+	if !ctxCancelled {
+		require.Eventuallyf(t, func() bool {
+			select {
+			case <-publishDone:
+				return true
+			default:
+			}
+
+			dp.lk.Lock()
+			defer dp.lk.Unlock()
+			_, queued := dp.pending[proposalCID]
+			return queued
+		}, time.Second, time.Millisecond, "deal publish did not queue or complete for %s", proposalCID)
+	}
+
 	return deal
 }
 
@@ -350,11 +374,11 @@ func checkPublishedDeals(t *testing.T, dpapi *dpAPI, dealsToPublish []markettype
 	var publishedDeals []markettypes.ClientDealProposal
 	for _, expectedDealsInMsg := range expectedDealsPerMsg {
 		// Should have called StateMinerInfo with the provider address
-		stateMinerInfoAddr := <-dpapi.stateMinerInfoCalls
+		stateMinerInfoAddr := waitForStateMinerInfoCall(t, dpapi.stateMinerInfoCalls)
 		require.Equal(t, getProviderActor(t), stateMinerInfoAddr)
 
 		// Check the fields of the message that was sent
-		msg := <-dpapi.pushedMsgs
+		msg := waitForPushedMsg(t, dpapi.pushedMsgs)
 		require.Equal(t, getWorkerActor(t), msg.From)
 		require.Equal(t, market.Address, msg.To)
 		require.Equal(t, market.Methods.PublishStorageDeals, msg.Method)
@@ -372,6 +396,30 @@ func checkPublishedDeals(t *testing.T, dpapi *dpAPI, dealsToPublish []markettype
 	// Verify that all deals that were submitted to be published were
 	// sent out (we do this by ensuring all the piece CIDs are present)
 	require.True(t, matchPieceCids(publishedDeals, dealsToPublish))
+}
+
+func waitForStateMinerInfoCall(t *testing.T, ch <-chan address.Address) address.Address {
+	t.Helper()
+
+	select {
+	case addr := <-ch:
+		return addr
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for StateMinerInfo call")
+		return address.Undef
+	}
+}
+
+func waitForPushedMsg(t *testing.T, ch <-chan *types.Message) *types.Message {
+	t.Helper()
+
+	select {
+	case msg := <-ch:
+		return msg
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for pushed publish message")
+		return nil
+	}
 }
 
 func matchPieceCids(sent []markettypes.ClientDealProposal, exp []markettypes.ClientDealProposal) bool {
