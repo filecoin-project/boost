@@ -3916,6 +3916,8 @@ github.com/ipni/go-libipni v0.2.0/go.mod h1:Ko+wQuMbUJ/DL+JHLPPeYP8bq5kWIU6taiwS
 github.com/ipni/go-libipni v0.5.0/go.mod h1:UnrhEqjVI2Z2HXlaieOBONJmtW557nZkYpB4IIsMD+s=
 github.com/ipni/go-libipni v0.5.1/go.mod h1:UnrhEqjVI2Z2HXlaieOBONJmtW557nZkYpB4IIsMD+s=
 github.com/ipni/go-libipni v0.5.2/go.mod h1:UnrhEqjVI2Z2HXlaieOBONJmtW557nZkYpB4IIsMD+s=
+github.com/ipni/go-libipni v0.5.30 h1:wAjkfXCF4lZF8qc+QRDgg06ul1/pfAIXLnxAVTyrXns=
+github.com/ipni/go-libipni v0.5.30/go.mod h1:zZqRIiPXzmm84Aa1Tyf9JFKgeappkrjBINVXuEO7FMg=
 github.com/ipni/go-libipni v0.6.11/go.mod h1:hHkfaG5zP8M8RQX8C84gTUre5KODHGPxEbI8E2SgCNw=
 github.com/ipni/index-provider v0.10.0/go.mod h1:InSXbZp2p/ZhAwiDElG/wzjnA1ea1iJ3hhyiAHrD+Vo=
 github.com/ipni/index-provider v0.12.0/go.mod h1:GhyrADJp7n06fqoc1djzkvL4buZYHzV8SoWrlxEo5F4=
