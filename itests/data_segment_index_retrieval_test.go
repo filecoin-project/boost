@@ -54,10 +54,13 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 
 	// Make a deal
 	//res, err := f.MakeDummyDeal(dealUuid, segmentDetails.CarPath, segmentDetails.Piece.PieceCID, server.URL+"/"+filepath.Base(segmentDetails.CarPath), false)
-	res, err := f.MakeDummyDeal(dealUuid, "fixtures/final.car", pieceCid, server.URL+"/"+filepath.Base("final.car"), false)
+	res, err := f.MakeDummyDeal(dealUuid, "fixtures/final.car", pieceCid, server.URL+"/"+filepath.Base("final.car"), true)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+	res1, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, "fixtures/final.car", false)
+	require.NoError(t, err)
+	require.True(t, res1.Accepted)
 
 	// Wait for the deal to be added to a sector
 	err = f.WaitForDealAddedToSector(dealUuid)

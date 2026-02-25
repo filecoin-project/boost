@@ -77,7 +77,7 @@ func FilestoreOf(bs bstore.Blockstore) (bstore.Blockstore, error) {
 	// PosInfo leaves to the datastore (which in our case is the coerced
 	// blockstore), and the intermediate nodes to the blockstore proper (since
 	// they cannot be mapped to the file.
-	fstore := filestore.NewFilestore(bs, fm)
+	fstore := filestore.NewFilestore(bs, fm, nil)
 	bs = bstore.NewIdStore(fstore)
 
 	return bs, nil

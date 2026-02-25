@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
 	"unicode/utf8"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/net/context"
 
 	"github.com/filecoin-project/go-address"
 	versioning "github.com/filecoin-project/go-ds-versioning/pkg"

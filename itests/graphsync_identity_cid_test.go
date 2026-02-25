@@ -103,13 +103,16 @@ func TestDealAndRetrievalWithIdentityCID(t *testing.T) {
 	root := rootLink.(cidlink.Link).Cid
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, carPath, root, server.URL+"/"+filepath.Base(carPath), false)
+	res, err := f.MakeDummyDeal(dealUuid, carPath, root, server.URL+"/"+filepath.Base(carPath), true)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 	dealCid, err := res.DealParams.ClientDealProposal.Proposal.Cid()
 	require.NoError(t, err)
 	log.Infof("deal ID is : %s", dealCid.String())
+	res1, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid, carPath, false)
+	require.NoError(t, err)
+	require.True(t, res1.Accepted)
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
 	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)

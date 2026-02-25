@@ -23,6 +23,7 @@ func TestDummydealOnline(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
+	//opts = append(opts, framework.SetMaxStagingBytes(3000000))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)
@@ -67,7 +68,7 @@ func TestDummydealOnline(t *testing.T) {
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	// Make a second deal - it should fail because the first deal took up all
 	// available space

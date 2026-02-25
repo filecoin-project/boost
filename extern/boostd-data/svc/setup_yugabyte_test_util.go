@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -11,8 +12,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"
-	"github.com/yugabyte/pgx/v4/pgxpool"
-	"golang.org/x/net/context"
+	"github.com/yugabyte/pgx/v5/pgxpool"
 )
 
 var tlog = logging.Logger("ybtest")
@@ -158,7 +158,7 @@ func awaitYugabyteUp(t *testing.T, duration time.Duration) {
 	for {
 		_, err := cluster.CreateSession()
 		if err == nil {
-			_, err = pgxpool.Connect(context.Background(), TestYugabyteSettings.ConnectString)
+			_, err := pgxpool.New(context.Background(), TestYugabyteSettings.ConnectString)
 			if err == nil {
 				return
 			}

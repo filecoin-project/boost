@@ -5,7 +5,7 @@ import (
 
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/urfave/cli/v2"
-	"github.com/yugabyte/pgx/v4/pgxpool"
+	"github.com/yugabyte/pgx/v5/pgxpool"
 )
 
 var cleanupLIDCmd = &cli.Command{
@@ -119,7 +119,7 @@ var cleanupYugabyteDBCmd = &cli.Command{
 		fmt.Println("Keyspace dropped successfully.")
 
 		// Create connection pool to postgres interface
-		db, err := pgxpool.Connect(cctx.Context, settings.ConnectString)
+		db, err := pgxpool.New(cctx.Context, settings.ConnectString)
 		if err != nil {
 			return err
 		}

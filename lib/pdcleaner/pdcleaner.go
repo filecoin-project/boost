@@ -1,6 +1,7 @@
 package pdcleaner
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -21,7 +22,6 @@ import (
 	cbor "github.com/ipfs/go-ipld-cbor"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -124,20 +124,22 @@ func TestLIDCleanup(t *testing.T) {
 	dealUuid1 := uuid.New()
 
 	// Make a deal
-	res1, err := f.MakeDummyDeal(dealUuid1, carFilepath1, rootCid1, server.URL+"/"+filepath.Base(carFilepath1), false)
+	res1, err := f.MakeDummyDeal(dealUuid1, carFilepath1, rootCid1, server.URL+"/"+filepath.Base(carFilepath1), true)
 	require.NoError(t, err)
 	require.True(t, res1.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res1))
-
-	time.Sleep(2 * time.Second)
+	res11, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid1, carFilepath1, false)
+	require.NoError(t, err)
+	require.True(t, res11.Accepted)
 
 	dealUuid2 := uuid.New()
-	res2, err := f.MakeDummyDeal(dealUuid2, carFilepath2, rootCid2, server.URL+"/"+filepath.Base(carFilepath2), false)
+	res2, err := f.MakeDummyDeal(dealUuid2, carFilepath2, rootCid2, server.URL+"/"+filepath.Base(carFilepath2), true)
 	require.NoError(t, err)
 	require.True(t, res2.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res2))
-
-	time.Sleep(2 * time.Second)
+	res21, err := f.Boost.BoostOfflineDealWithData(context.Background(), dealUuid2, carFilepath2, false)
+	require.NoError(t, err)
+	require.True(t, res21.Accepted)
 
 	// Create a CAR file for DDO deal
 	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
