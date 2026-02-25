@@ -14,7 +14,7 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.20.0)
 endif
 
-ALLOWED_NODE_VERSIONS := 16 18 20 22 24
+ALLOWED_NODE_VERSIONS := 22 24
 validate-node-version:
 ifeq ($(filter $(shell node -v | cut -c2-3),$(ALLOWED_NODE_VERSIONS)),)
 	@echo "Unsupported Node.js version. Please install one of the following versions: $(ALLOWED_NODE_VERSIONS)"
