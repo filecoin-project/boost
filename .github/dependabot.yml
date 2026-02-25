@@ -1,9 +1,3 @@
-# This file is currently restricting to just Lotus, and is
-# running daily to help catch any unexpected releases for API compat
-# checks. If we decide to add more modules later, we could switch this
-# to run on Wednesday's UTC mornings, to catch the Tuesday RC releases from
-# lotus, and avoid daily dependabot spam.
-
 version: 2
 updates:
   - package-ecosystem: "gomod"
@@ -13,3 +7,13 @@ updates:
     allow:
       - dependency-name: "github.com/filecoin-project/lotus"
         dependency-type: "direct"
+  - package-ecosystem: "npm"
+    directory: "/react"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

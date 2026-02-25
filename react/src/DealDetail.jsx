@@ -1,7 +1,7 @@
 /* global BigInt */
 
 import React, {useEffect} from "react";
-import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
+import {useMutation, useQuery, useSubscription} from "@apollo/client";
 import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -90,17 +90,17 @@ export function DealDetail(props) {
     try {
         const fields = JSON.parse(transferParams)
         transferParams = Object.keys(fields).map(k => (
-            <div className="param">{k}: {fields[k]}</div>
+            <div key={k} className="param">{k}: {fields[k]}</div>
         ))
     } catch (e) {
         console.error("parsing transfer params: "+e.message)
     }
 
     var logRowData = []
-    var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
+    var logs = [...(deal.Logs || [])].sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
     for (var i = 0; i < logs.length; i++) {
-        var log = deal.Logs[i]
-        var prev = i === 0 ? null : deal.Logs[i - 1]
+        var log = logs[i]
+        var prev = i === 0 ? null : logs[i - 1]
         logRowData.push({log: log, prev: prev})
     }
 

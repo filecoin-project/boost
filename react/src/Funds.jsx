@@ -1,5 +1,5 @@
 /* global BigInt */
-import {useMutation, useQuery} from "@apollo/react-hooks";
+import {useMutation, useQuery} from "@apollo/client";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, useEffect, React}  from "react";
 import moment from "moment";

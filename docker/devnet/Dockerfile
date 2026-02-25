@@ -4,7 +4,7 @@
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
 FROM ${LOTUS_TEST_IMAGE} AS lotus-test
 #########################################################################################
-FROM node:20.11.1-alpine3.19 AS react-builder
+FROM node:24-trixie AS react-builder
 
 WORKDIR /src
 COPY react /src/react
@@ -13,80 +13,70 @@ COPY gql /src/gql
 RUN npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react&& \
       npm run --prefix react build
 #########################################################################################
-FROM golang:1.24-bullseye AS builder
+FROM rust:1.86.0-slim-bookworm AS rust-toolchain
+#########################################################################################
+FROM golang:1.25-trixie AS builder
+LABEL Maintainer="Boost Development Team"
 
-RUN apt update && apt install -y \
-      build-essential \
-      bzr pkg-config \
-      clang \
-      curl \
-      gcc git \
-      hwloc \
-      jq \
-      libhwloc-dev wget \
-      mesa-opencl-icd \
-      ocl-icd-opencl-dev
+RUN apt-get update && apt-get install -y ca-certificates build-essential clang ocl-icd-opencl-dev ocl-icd-libopencl1 jq libhwloc-dev pkg-config gcc git hwloc mesa-opencl-icd
 
-### taken from https://github.com/rust-lang/docker-rust/blob/master/1.63.0/buster/Dockerfile
+WORKDIR /opt/boost
+
+ENV XDG_CACHE_HOME="/tmp"
+
+# Copy prebuilt Rust from the rust image (arch-matched by buildx)
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
+
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.76.0
+    PATH=/usr/local/cargo/bin:$PATH
 
-RUN set -eux; \
-    dpkgArch="$(dpkg --print-architecture)"; \
-    case "${dpkgArch##*-}" in \
-        amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='0b2f6c8f85a3d02fde2efc0ced4657869d73fccfce59defb4e8d29233116e6db' ;; \
-        armhf) rustArch='armv7-unknown-linux-gnueabihf'; rustupSha256='f21c44b01678c645d8fbba1e55e4180a01ac5af2d38bcbd14aa665e0d96ed69a' ;; \
-        arm64) rustArch='aarch64-unknown-linux-gnu'; rustupSha256='673e336c81c65e6b16dcdede33f4cc9ed0f08bde1dbe7a935f113605292dc800' ;; \
-        i386) rustArch='i686-unknown-linux-gnu'; rustupSha256='e7b0f47557c1afcd86939b118cbcf7fb95a5d1d917bdd355157b63ca00fc4333' ;; \
-        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
-    esac; \
-    url="https://static.rust-lang.org/rustup/archive/1.26.0/${rustArch}/rustup-init"; \
-    wget "$url"; \
-    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
-    chmod +x rustup-init; \
-    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
-    rm rustup-init; \
-    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
-    rustup --version; \
-    cargo --version; \
-    rustc --version;
-### end rust
+RUN rustc --version && cargo --version
 
-WORKDIR /go/src/
-
-COPY Makefile /go/src/
-### make configurable filecoin-ffi build
-ARG FFI_BUILD_FROM_SOURCE=0
-ENV FFI_BUILD_FROM_SOURCE=${FFI_BUILD_FROM_SOURCE}
-##############################################
-# prebuild filecoin-ffi
-COPY extern /go/src/extern
-COPY build /go/src/build
-COPY .git/modules/extern/filecoin-ffi /go/src/.git/modules/extern/filecoin-ffi
-
-RUN make build/.filecoin-install
-##############################################
-COPY . /go/src
-##############################################
-COPY --from=react-builder /src/react/build /go/src/react/build
 RUN go install github.com/ipld/go-car/cmd/car@latest \
  && cp $GOPATH/bin/car /usr/local/bin/
 
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-      make debug
+COPY go.mod go.sum ./
+COPY extern/boostd-data/go.mod extern/boostd-data/go.sum ./extern/boostd-data/
+COPY extern/filecoin-ffi/go.mod extern/filecoin-ffi/go.sum ./extern/filecoin-ffi/
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+COPY . .
+
+RUN git submodule update --init
+
+### make configurable filecoin-ffi build
+ARG FFI_BUILD_FROM_SOURCE=0
+ENV FFI_BUILD_FROM_SOURCE=${FFI_BUILD_FROM_SOURCE}
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make clean deps
+
+COPY --from=react-builder /src/react/build /go/src/react/build
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make debug
 #########################################################################################
-FROM ubuntu:22.04 AS runner
+FROM ubuntu:24.04 AS runner
 
-RUN apt update && apt install -y \
-      curl \
-      hwloc \
-      jq
+RUN apt-get update && apt-get install -y dnsutils vim curl aria2 jq git wget
 
-## Fix missing lib libhwloc.so.5
-RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhwloc.so.5
+## Copy libs
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+COPY --from=builder /lib/*/libdl.so.2 /lib/
+COPY --from=builder /lib/*/librt.so.1 /lib/
+COPY --from=builder /lib/*/libgcc_s.so.1 /lib/
+COPY --from=builder /lib/*/libutil.so.1 /lib/
+COPY --from=builder /usr/lib/*/libltdl.so.7 /lib/
+COPY --from=builder /usr/lib/*/libnuma.so.1 /lib/
+COPY --from=builder /usr/lib/*/libhwloc.so.* /lib/
+COPY --from=builder /usr/lib/*/libOpenCL.so.1 /lib/
 
 WORKDIR /app
 
@@ -113,14 +103,14 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 ENV BOOST_PATH /var/lib/boost
 ENV BOOSTD_DATA_PATH /var/lib/boostd-data
 ENV BOOST_CLIENT_REPO /var/lib/boost/boost-client
-env LID_LEVELDB_PATH /var/lib/boost
+ENV LID_LEVELDB_PATH /var/lib/boost
 VOLUME /var/lib/boost
 EXPOSE 8080
 
-COPY --from=builder /go/src/boostd /usr/local/bin/
-COPY --from=builder /go/src/boost /usr/local/bin/
-COPY --from=builder /go/src/boostx /usr/local/bin/
-COPY --from=builder /go/src/boostd-data /usr/local/bin/
+COPY --from=builder /opt/boost/boostd /usr/local/bin/
+COPY --from=builder /opt/boost/boost /usr/local/bin/
+COPY --from=builder /opt/boost/boostx /usr/local/bin/
+COPY --from=builder /opt/boost/boostd-data /usr/local/bin/
 COPY --from=builder /usr/local/bin/car /usr/local/bin/
 COPY docker/devnet/boost/entrypoint.sh /app/
 COPY docker/devnet/boost/sample/* /app/sample/
@@ -144,8 +134,8 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 
 EXPOSE 7777
 
-COPY --from=builder /go/src/boostd /usr/local/bin/
-COPY --from=builder /go/src/booster-http /usr/local/bin/
+COPY --from=builder /opt/boost/boostd /usr/local/bin/
+COPY --from=builder /opt/boost/booster-http /usr/local/bin/
 COPY docker/devnet/booster-http/entrypoint.sh /app/
 
 ENTRYPOINT ["./entrypoint.sh"]
@@ -166,8 +156,8 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 
 EXPOSE 8888
 
-COPY --from=builder /go/src/boostd /usr/local/bin/
-COPY --from=builder /go/src/booster-bitswap /usr/local/bin/
+COPY --from=builder /opt/boost/boostd /usr/local/bin/
+COPY --from=builder /opt/boost/booster-bitswap /usr/local/bin/
 COPY docker/devnet/booster-bitswap/entrypoint.sh /app/
 
 ENTRYPOINT ["./entrypoint.sh"]

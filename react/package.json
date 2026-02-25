@@ -3,34 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@apollo/client": "^3.4.16",
-    "@apollo/react-hooks": "^4.0.0",
+    "@apollo/client": "^3.14.0",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
-    "apollo-boost": "^0.4.9",
-    "apollo-cache-inmemory": "^1.6.6",
-    "apollo-client": "^2.6.10",
-    "apollo-link-ws": "^1.0.20",
     "bootstrap-icons": "^1.11.0",
-    "graphql-tag": "^2.12.5",
-    "graphql-ws": "^5.11.2",
+    "graphql": "^15.7.1",
+    "graphql-ws": "^5.16.2",
     "jquery": "^3.6.0",
     "moment": "^2.29.4",
     "react": "^17.0.2",
     "react-debounce-input": "^3.2.5",
     "react-dom": "^17.0.2",
-    "react-google-charts": "^3.0.15",
-    "react-relay": "^12.0.0",
-    "react-router-dom": "^6.30.3",
-    "react-scripts": "5.0.1",
-    "relay-runtime": "^12.0.0",
+    "react-google-charts": "^5.2.1",
+    "react-router-dom": "^6.2.1",
     "web-vitals": "^1.0.1"
   },
   "scripts": {
-    "start": "npm run relay && react-scripts start",
-    "build": "npm run relay && react-scripts build",
-    "relay": "npx relay-compiler --schema ../gql/schema.graphql --src ./src/ --watchman false $@"
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deps:outdated": "npm outdated",
+    "deps:update": "npm update --omit=peer"
   },
   "eslintConfig": {
     "extends": [
@@ -51,8 +45,7 @@
     ]
   },
   "devDependencies": {
-    "babel-plugin-relay": "^12.0.0",
-    "graphql": "^15.7.1",
-    "relay-compiler": "^12.0.0"
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^7.1.7"
   }
 }

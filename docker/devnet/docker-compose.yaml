@@ -59,6 +59,7 @@ services:
       - "8080:8080"
       - "1288:1288" # For the /metrics endpoint
       - "50000:50000" # Exposed libp2p port
+      - "3104:3104" # Exposed http port for IPNI
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
       - LOTUS_PATH=/var/lib/lotus
@@ -124,14 +125,15 @@ services:
 
   yugabytedb:
     container_name: yugabytedb
-    image: filecoin/yugabytedb:dev
+    image: yugabytedb/yugabyte:2024.1.0.0-b129
     init: true
     ports:
       - "5433:5433"
       - "9000:9000"
       - "9042:9042"
+      - "15433:15433"
     restart: unless-stopped
     logging: *default-logging
     volumes:
-      - ./data/yugabytedb-data:/root/var/data
-      - ./data/yugabytedb-logs:/root/var/logs
+      - ./data/yugabyte:/home/yugabyte/yb_data
+    command: [ "bin/yugabyted", "start", "--base_dir=/home/yugabyte/yb_data", "--background=false" ]

@@ -10,13 +10,11 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/react"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
-	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/rs/cors"
 )
@@ -88,13 +86,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// GraphQL handler
 	queryHandler := &relay.Handler{Schema: schema}
-	wsOpts := []graphqlws.Option{
-		// Add a 5 second timeout for writing responses to the web socket.
-		// A lot of people will expose Boost over an ssh tunnel so the
-		// connection may be quite laggy.
-		graphqlws.WithWriteTimeout(5 * time.Second),
-	}
-	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
+	wsHandler := newGraphQLTransportWSHandler(schema)
 
 	listenAddr := fmt.Sprintf("%s:%d", bindAddress, port)
 	s.srv = &http.Server{Addr: listenAddr, Handler: c.Handler(mux)}

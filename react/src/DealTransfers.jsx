@@ -1,6 +1,6 @@
 import React from "react";
 import {Chart} from "react-google-charts";
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {TransfersQuery, TransferStatsQuery} from "./gql";
 import moment from "moment"
 import {PageContainer} from "./Components";

@@ -17,13 +17,37 @@ func graphiql(httpPort int) func(w http.ResponseWriter, r *http.Request) {
                <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.5.4/react.min.js"></script>
                <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.5.4/react-dom.min.js"></script>
                <script src="https://cdnjs.cloudflare.com/ajax/libs/graphiql/0.11.10/graphiql.js"></script>
-               <script src="//unpkg.com/subscriptions-transport-ws@0.8.3/browser/client.js"></script>
-               <script src="//unpkg.com/graphiql-subscriptions-fetcher@0.0.2/browser/client.js"></script>
+               <script src="https://unpkg.com/graphql-ws@5.16.2/umd/graphql-ws.min.js"></script>
        </head>
        <body style="width: 100%; height: 100%; margin: 0; overflow: hidden;">
                <div id="graphiql" style="height: 100vh;">Loading...</div>
                <script>
+                       function isSubscriptionOperation(query) {
+                               if (typeof query !== "string") {
+                                       return false;
+                               }
+                               return /^\s*subscription[\s({]/m.test(query);
+                       }
+
+                       var wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+                       var wsClient = window.graphqlWs.createClient({
+                               url: wsProtocol + "://" + window.location.host + "/graphql/subscription",
+                               lazy: true,
+                               retryAttempts: Number.MAX_SAFE_INTEGER,
+                       });
+
                        function graphQLFetcher(graphQLParams) {
+                               if (isSubscriptionOperation(graphQLParams.query)) {
+                                       return {
+                                               subscribe: function (sink) {
+                                                       var dispose = wsClient.subscribe(graphQLParams, sink);
+                                                       return {
+                                                               unsubscribe: dispose,
+                                                       };
+                                               },
+                                       };
+                               }
+
                                return fetch("/graphql/query", {
                                        method: "post",
                                        body: JSON.stringify(graphQLParams),
@@ -39,11 +63,8 @@ func graphiql(httpPort int) func(w http.ResponseWriter, r *http.Request) {
                                });
                        }
 
-                       var subscriptionsClient = new window.SubscriptionsTransportWs.SubscriptionClient('ws://localhost:{{ . }}/graphql', { reconnect: true });
-                       var subscriptionsFetcher = window.GraphiQLSubscriptionsFetcher.graphQLFetcher(subscriptionsClient, graphQLFetcher);
-
                        ReactDOM.render(
-                               React.createElement(GraphiQL, {fetcher: subscriptionsFetcher}),
+                               React.createElement(GraphiQL, {fetcher: graphQLFetcher}),
                                document.getElementById("graphiql")
                        );
                </script>

@@ -1,5 +1,5 @@
 /* global BigInt */
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {
     ProposalLogsCountQuery,
     ProposalLogsListQuery,
@@ -68,7 +68,7 @@ function ProposalLogsContent(props) {
     var res = data.proposalLogs
     var logs = res.logs
     if (pageNum === 1) {
-        logs.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
+        logs = [...logs].sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
         logs = logs.slice(0, rowsPerPage)
     }
     const totalCount = res.totalCount
@@ -225,4 +225,3 @@ const RowsPerPage = {
         localStorage.setItem(RowsPerPage.settingsKey, JSON.stringify(val));
     }
 }
-

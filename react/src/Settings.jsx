@@ -1,6 +1,6 @@
 /* global BigInt */
 
-import {useMutation, useQuery} from "@apollo/react-hooks";
+import {useMutation, useQuery} from "@apollo/client";
 import {Libp2pAddrInfoQuery, StorageAskQuery, StorageAskUpdate} from "./gql";
 import React, {useState} from "react";
 import {PageContainer} from "./Components";

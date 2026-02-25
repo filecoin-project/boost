@@ -1,4 +1,4 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {
     IpniAdEntriesCountQuery,
     IpniAdEntriesQuery,
@@ -51,7 +51,7 @@ function ProviderIpniInfo({peerId}) {
 
     // When running boost on a local devnet, hard-code the peer ID to
     // sofiaminer's peer ID so we get real provider info back from the indexer
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
         peerId = '12D3KooWE8yt84RVwW3sFcd6WMjbUdWrZer2YtT4dmtj3dHdahSZ'
     }
     useEffect(() => {
@@ -80,7 +80,7 @@ function ProviderIpniInfoRender(props){
     const idxHost = props.idxHost
     const lad = props.lad
     let adCid = data.LastAdvertisement['/']
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
         adCid = 'baguqeera4d4mgsbukpnlwu4bxuwir2pbchhdar4gmz3ti75cxuwhiviyowua'
     }
     const distance = useQuery(IpniDistanceFromLatestAdQuery, {
@@ -401,4 +401,3 @@ const RowsPerPage = {
         localStorage.setItem(RowsPerPage.settingsKey, JSON.stringify(val));
     }
 }
-

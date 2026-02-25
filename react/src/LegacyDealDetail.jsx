@@ -1,5 +1,5 @@
 import React, {useEffect} from "react";
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {EpochQuery, LegacyDealQuery} from "./gql";
 import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";

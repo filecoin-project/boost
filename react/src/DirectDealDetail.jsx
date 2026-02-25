@@ -1,5 +1,5 @@
 import React, {useEffect} from "react";
-import {useQuery,} from "@apollo/react-hooks";
+import {useQuery,} from "@apollo/client";
 import {DirectDealQuery, EpochQuery} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -77,14 +77,10 @@ export function DirectDealDetail(props) {
     }
 
     var logRowData = []
-    var logs = (deal.Logs || [])
-    // deal.Logs is read-only. So make a copy of logs so that we can modify
-    // the order in the sort function
-    logs = [...logs]
-    logs = logs.sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
+    var logs = [...(deal.Logs || [])].sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
     for (var i = 0; i < logs.length; i++) {
-        var log = deal.Logs[i]
-        var prev = i === 0 ? null : deal.Logs[i - 1]
+        var log = logs[i]
+        var prev = i === 0 ? null : logs[i - 1]
         logRowData.push({log: log, prev: prev})
     }
 

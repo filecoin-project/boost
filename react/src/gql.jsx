@@ -1,14 +1,14 @@
-import gql from "graphql-tag";
-import { ApolloClient, ApolloLink, HttpLink, InMemoryCache, split, from } from "@apollo/client";
-import { getMainDefinition } from '@apollo/client/utilities';
-import { WebSocketLink } from "@apollo/client/link/ws";
+import { gql, ApolloClient, ApolloLink, HttpLink, InMemoryCache, split, from } from "@apollo/client";
+import { getMainDefinition } from "@apollo/client/utilities";
+import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
+import { createClient } from "graphql-ws";
 import Observable from 'zen-observable';
 import { transformResponse } from "./transform";
 
 var graphqlEndpoint = window.location.host
 var graphqlHttpEndpoint = window.location.origin
 
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
     graphqlEndpoint = 'localhost:8080'
     graphqlHttpEndpoint = 'http://' + graphqlEndpoint
 }
@@ -28,14 +28,13 @@ const httpLink = new HttpLink({
 });
 
 // WebSocket Link
-const wsLink = new WebSocketLink({
-    uri: `ws://${graphqlEndpoint}/graphql/subscription`,
-    options: {
-        reconnect: true,
-        minTimeout: 5000,
-        lazy: true,
-    },
-});
+const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+const wsLink = new GraphQLWsLink(createClient({
+    url: `${wsProtocol}://${graphqlEndpoint}/graphql/subscription`,
+    lazy: true,
+    retryAttempts: Number.MAX_SAFE_INTEGER,
+    retryWait: async () => new Promise((resolve) => setTimeout(resolve, 5000)),
+}));
 
 // Send query request based on the type definition
 const link = from([
