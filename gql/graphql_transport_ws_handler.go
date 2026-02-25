@@ -63,7 +63,9 @@ func (h *graphQLTransportWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	if conn.Subprotocol() != transportWSProtocol {
 		_ = h.closeWithCode(conn, transportWSCloseBadRequest, "unsupported websocket subprotocol")
