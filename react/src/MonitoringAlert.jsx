@@ -2,7 +2,7 @@ import React from "react";
 import './MonitoringAlert.css'
 import warnImg from "./bootstrap-icons/icons/exclamation-circle.svg"
 import {Link} from "react-router-dom";
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {MpoolQuery} from "./gql";
 
 export function MonitoringAlert(props) {

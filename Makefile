@@ -14,7 +14,7 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.20.0)
 endif
 
-ALLOWED_NODE_VERSIONS := 16 18 20 22 24
+ALLOWED_NODE_VERSIONS := 22 24
 validate-node-version:
 ifeq ($(filter $(shell node -v | cut -c2-3),$(ALLOWED_NODE_VERSIONS)),)
 	@echo "Unsupported Node.js version. Please install one of the following versions: $(ALLOWED_NODE_VERSIONS)"
@@ -139,12 +139,12 @@ migrate-curio: $(BUILD_DEPS)
 .PHONY: boostci
 
 react: validate-node-version
-	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
+	npm ci --omit=peer --prefix react
 	npm run --prefix react build
 .PHONY: react
 
 update-react: validate-node-version
-	npm_config_legacy_peer_deps=yes npm install --no-audit --prefix react
+	npm install --omit=peer --prefix react
 	npm run --prefix react build
 .PHONY: react
 
@@ -223,7 +223,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.34.0-rc2
+lotus_version?=v1.35.0
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
@@ -267,28 +267,27 @@ docker/mainnet/boost-client: build/.update-modules
 docker/%:
 	cd docker/devnet/$* && DOCKER_BUILDKIT=1 $(docker_build_cmd) -t $(docker_user)/$*-dev:dev \
 		--build-arg BUILD_VERSION=dev .
+
 docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/Dockerfile.source --target boost-dev .
+		-f docker/devnet/Dockerfile --target boost-dev .
 .PHONY: docker/boost
+
 docker/booster-http:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/Dockerfile.source --target booster-http-dev .
+		-f docker/devnet/Dockerfile --target booster-http-dev .
 .PHONY: docker/booster-http
+
 docker/booster-bitswap:
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
-docker/yugabytedb:
-	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
-		-t $(docker_user)/yugabytedb:dev \
-		-f docker/Dockerfile.yugabyte .
-.PHONY: docker/booster-http
+		-f docker/devnet/Dockerfile --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
+
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
-	docker/lotus docker/lotus-miner docker/yugabytedb
+	docker/lotus docker/lotus-miner
 .PHONY: docker/all
 
 test-lid:

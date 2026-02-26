@@ -1,4 +1,4 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {
     DealsCountQuery,
     DealsListQuery, LegacyDealsCountQuery,
@@ -108,7 +108,7 @@ function StorageDealsContent(props) {
     var res = data.deals
     var deals = res.deals
     if (pageNum === 1) {
-        deals.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
+        deals = [...deals].sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
         deals = deals.slice(0, dealsPerPage)
     }
     const totalCount = data.deals.totalCount

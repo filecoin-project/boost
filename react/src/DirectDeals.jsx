@@ -1,4 +1,4 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {
     DealsListQuery, DirectDealsCountQuery, DirectDealsListQuery,
 } from "./gql";
@@ -102,7 +102,7 @@ function DirectDealsContent() {
     var res = data.directDeals
     var deals = res.deals
     if (pageNum === 1) {
-        deals.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
+        deals = [...deals].sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
         deals = deals.slice(0, dealsPerPage)
     }
     const totalCount = res.totalCount
@@ -333,4 +333,3 @@ function scrollTop() {
          </Info>
      </span>
 }
-

@@ -1,5 +1,5 @@
 import './MinerAddress.css';
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {MinerAddressQuery} from "./gql";
 
 export function MinerAddress() {

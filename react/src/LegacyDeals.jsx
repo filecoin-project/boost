@@ -1,4 +1,4 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {LegacyDealsCountQuery, LegacyDealsListQuery} from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";

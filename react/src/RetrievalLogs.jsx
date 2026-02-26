@@ -1,5 +1,5 @@
 /* global BigInt */
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {
     GraphsyncRetrievalMinerAddressesQuery,
     MinerAddressQuery,
@@ -99,7 +99,7 @@ function RetrievalLogsList() {
     var res = data.retrievalLogs
     var logs = res.logs
     if (pageNum === 1) {
-        logs.sort((a, b) => Number(b.RowID - a.RowID))
+        logs = [...logs].sort((a, b) => Number(b.RowID - a.RowID))
         logs = logs.slice(0, rowsPerPage)
     }
     const totalCount = res.totalCount
@@ -272,4 +272,3 @@ const RowsPerPage = {
         localStorage.setItem(RowsPerPage.settingsKey, JSON.stringify(val));
     }
 }
-

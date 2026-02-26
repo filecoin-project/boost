@@ -1,6 +1,70 @@
 #!/usr/bin/env bash
 set -e
 
+set_toml_section_key() {
+	local file="$1"
+	local section="$2"
+	local key="$3"
+	local value="$4"
+
+	awk -v section="$section" -v key="$key" -v value="$value" '
+		BEGIN {
+			target = "[" section "]"
+			in_target = 0
+			saw_section = 0
+			updated = 0
+			key_indent = "  "
+		}
+		function print_value() {
+			if (!updated) {
+				printf("%s%s = %s\n", key_indent, key, value)
+				updated = 1
+			}
+		}
+		/^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
+			section_line = $0
+			sub(/^[[:space:]]+/, "", section_line)
+			sub(/[[:space:]]+$/, "", section_line)
+
+			if (in_target) {
+				print_value()
+				in_target = 0
+			}
+
+			header_indent = ""
+			if (match($0, /^[[:space:]]*/)) {
+				header_indent = substr($0, RSTART, RLENGTH)
+			}
+
+			if (section_line == target) {
+				saw_section = 1
+				in_target = 1
+				key_indent = header_indent "  "
+			}
+			print
+			next
+		}
+		{
+			if (in_target && $0 ~ ("^[[:space:]]*#?[[:space:]]*" key "[[:space:]]*=")) {
+				print_value()
+				next
+			}
+			print
+		}
+		END {
+			if (in_target) {
+				print_value()
+			} else if (!saw_section) {
+				print ""
+				print target
+				key_indent = "  "
+				print_value()
+			}
+		}
+	' "$file" > "$file.tmp"
+	mv "$file.tmp" "$file"
+}
+
 echo Wait for lotus is ready ...
 lotus wait-api
 echo Wait for lotus-miner is ready ...
@@ -10,6 +74,9 @@ echo BOOSTD_DATA_PATH=$BOOSTD_DATA_PATH
 export DEFAULT_WALLET=`lotus wallet default`
 export FULLNODE_API_INFO=`lotus auth api-info --perm=admin | cut -f2 -d=`
 export MINER_API_INFO=`lotus-miner auth api-info --perm=admin | cut -f2 -d=`
+
+INDEXPROVIDER_HTTP_HOST="${INDEXPROVIDER_HTTP_HOST:-boost}"
+INDEXPROVIDER_HTTP_PORT="${INDEXPROVIDER_HTTP_PORT:-3104}"
 
 if [ ! -f $BOOST_PATH/.init.boost ]; then
 	echo Init wallets ...
@@ -39,9 +106,15 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 
 	# echo exit code: $?
 
-	echo Setting port in boost config...
-	sed 's|#ListenAddresses = \["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"\]|ListenAddresses = \["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"\]|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-	sed 's|#ListenAddress = "127.0.0.1"|ListenAddress = "0.0.0.0"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	## Override config options
+  echo Updating config values
+  set_toml_section_key "$BOOST_PATH/config.toml" "LocalIndexDirectory" "ServiceApiInfo" "\"ws://localhost:8044\""
+  set_toml_section_key "$BOOST_PATH/config.toml" "Dealmaking" "ExpectedSealDuration" "\"0h0m10s\""
+  set_toml_section_key "$BOOST_PATH/config.toml" "IndexProvider.HttpPublisher" "Enabled" "true"
+  set_toml_section_key "$BOOST_PATH/config.toml" "IndexProvider.HttpPublisher" "PublicHostname" "\"${INDEXPROVIDER_HTTP_HOST}\""
+  set_toml_section_key "$BOOST_PATH/config.toml" "IndexProvider.HttpPublisher" "Port" "${INDEXPROVIDER_HTTP_PORT}"
+	set_toml_section_key "$BOOST_PATH/config.toml" "Libp2p" "ListenAddresses" "[\"/ip4/0.0.0.0/tcp/50000\", \"/ip6/::/tcp/0\"]"
+	set_toml_section_key "$BOOST_PATH/config.toml" "Graphql" "ListenAddress" "\"0.0.0.0\""
 
   echo Setting up FIL+ wallets
   ROOT_KEY_1=`cat $LOTUS_PATH/rootkey-1`
@@ -74,14 +147,6 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	touch $BOOST_PATH/.init.boost
 fi
 
-## Override config options
-echo Updating config values
-sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8044"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-
-## run boostd-data
-#boostd-data -vv run leveldb --repo=$BOOSTD_DATA_PATH --addr=0.0.0.0:8044 &>$BOOSTD_DATA_PATH/boostd-data-ldb.log &
-
 ## run boostd-data for yugabytedb
 boostd-data -vv run yugabyte --hosts yugabytedb --connect-string="postgresql://yugabyte:yugabyte@yugabytedb:5433?sslmode=disable" --addr 0.0.0.0:8044 &>$BOOSTD_DATA_PATH/boostd-data-yugabyte.log &
 
@@ -91,7 +156,7 @@ mkdir -p $BOOST_PATH/deal-staging
 if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Temporary starting boost to get maddr...
 
-	boostd -vv run &> $BOOST_PATH/boostd.log &
+	boostd -vv run --deprecated &> $BOOST_PATH/boostd.log &
 	BOOST_PID=`echo $!`
 	echo Got boost PID = $BOOST_PID
 

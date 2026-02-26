@@ -1,7 +1,7 @@
 import './App.css';
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import {ApolloProvider} from "@apollo/react-hooks";
+import {ApolloProvider} from "@apollo/client";
 import {gqlClient} from "./gql";
 import {Menu} from "./Menu";
 import {StorageSpacePage} from "./StorageSpace";
@@ -44,7 +44,6 @@ function App() {
                             <td className="main-content">
                                 <div className="page-content">
                                     <DeprecationAlert />
-                                    {/*<MonitoringAlert />*/}
                                     <MinerAddress />
                                     <Epoch />
                                     <Banner />

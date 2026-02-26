@@ -1,4 +1,4 @@
-import {useMutation, useQuery} from "@apollo/react-hooks";
+import {useMutation, useQuery} from "@apollo/client";
 import {
     LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
@@ -19,8 +19,10 @@ import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas} from "./util";
 import closeImg from "./bootstrap-icons/icons/x-circle.svg";
+import {getServerHttpEndpoint} from "./config";
 
 const lidBasePath = '/piece-doctor'
+const downloadBlockHref = (cid) => `${getServerHttpEndpoint()}/download/block/${cid}`
 
 export function LIDMenuItem(props) {
     return (
@@ -577,7 +579,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <td>
                             <span><strong>{searchQuery}</strong></span>
                             &nbsp;
-                            <a className="download" target="_blank" href={"/download/block/"+searchQuery} rel="noreferrer">
+                            <a className="download" target="_blank" href={downloadBlockHref(searchQuery)} rel="noreferrer">
                                 Download block
                             </a>
                         </td>
@@ -824,7 +826,7 @@ export function PiecePayloadCids() {
                                     {payload.Multihash}
                                 </td>
                                 <td>
-                                    <a className="download" target="_blank" href={"/download/block/"+payload.PayloadCid} rel="noreferrer">
+                                    <a className="download" target="_blank" href={downloadBlockHref(payload.PayloadCid)} rel="noreferrer">
                                         Download block
                                     </a>
                                 </td>

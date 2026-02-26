@@ -1,10 +1,11 @@
 var config
+var serverHttpEndpoint = window.location.origin
 
 export async function initConfig() {
     var serverEndpoint = window.location.host
-    var serverHttpEndpoint = window.location.origin
+    serverHttpEndpoint = window.location.origin
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
         serverEndpoint = 'localhost:8080'
         serverHttpEndpoint = 'http://' + serverEndpoint
     }
@@ -19,4 +20,8 @@ export function setConfig(cfg) {
 
 export function getConfig() {
     return config
+}
+
+export function getServerHttpEndpoint() {
+    return serverHttpEndpoint
 }

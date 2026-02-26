@@ -1,5 +1,5 @@
 import './Epoch.css';
-import {useQuery} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/client";
 import {EpochQuery} from "./gql";
 import {addCommas} from "./util";
 import {Info} from "./Info";
