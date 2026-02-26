@@ -7,7 +7,7 @@
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
-    "bootstrap-icons": "^1.11.0",
+    "bootstrap-icons": "^1.13.1",
     "graphql": "^15.7.1",
     "graphql-ws": "^5.16.2",
     "jquery": "^3.6.0",
