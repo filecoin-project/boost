@@ -216,6 +216,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectD
 		AllocationID:     params.AllocationID,
 		KeepUnsealedCopy: !params.RemoveUnsealedCopy,
 		AnnounceToIPNI:   !params.SkipIPNIAnnounce,
+		Notifications:    params.Notifications,
 		Retry:            types.DealRetryAuto,
 	}
 
@@ -424,7 +425,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *types.Direc
 					Client: abi.ActorID(clientId),
 					ID:     verifreg13types.AllocationId(entry.AllocationID),
 				},
-				Notify: nil,
+				Notify: entry.Notifications,
 			},
 
 			// Best-effort deal asks

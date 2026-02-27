@@ -1,15 +1,18 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
@@ -51,6 +54,10 @@ var importDirectDataCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "start-epoch",
 			Usage: "start epoch by when the deal should be proved by provider on-chain (default: 2 days from now)",
+		},
+		&cli.StringSliceFlag{
+			Name:  "notify",
+			Usage: "DDO notifications in format 'address:payload",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -127,6 +134,31 @@ var importDirectDataCmd = &cli.Command{
 		// Since StartEpoch is more than Head+StartEpochSealingBuffer, we can set end epoch as start+TermMin
 		endEpoch := startEpoch + alloc.TermMin
 
+		var notifications []miner.DataActivationNotification
+		for _, notifyStr := range cctx.StringSlice("notify") {
+			parts := strings.SplitN(notifyStr, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid notify format '%s': expected 'address:payload'", notifyStr)
+			}
+
+			// Parse address
+			addr, err := address.NewFromString(parts[0])
+			if err != nil {
+				return fmt.Errorf("invalid address in notify '%s': %w", parts[0], err)
+			}
+
+			// Parse payload (hex string)
+			payload, err := hex.DecodeString(strings.TrimPrefix(parts[1], "0x"))
+			if err != nil {
+				return fmt.Errorf("invalid hex payload in notify '%s': %w", parts[1], err)
+			}
+
+			notifications = append(notifications, miner.DataActivationNotification{
+				Address: addr,
+				Payload: payload,
+			})
+		}
+
 		ddParams := types.DirectDealParams{
 			DealUUID:           uuid.New(),
 			AllocationID:       verifreg.AllocationId(allocationId),
@@ -138,6 +170,7 @@ var importDirectDataCmd = &cli.Command{
 			DeleteAfterImport:  cctx.Bool("delete-after-import"),
 			RemoveUnsealedCopy: cctx.Bool("remove-unsealed-copy"),
 			SkipIPNIAnnounce:   cctx.Bool("skip-ipni-announce"),
+			Notifications:      notifications,
 		}
 		rej, err := napi.BoostDirectDeal(cctx.Context, ddParams)
 		if err != nil {
