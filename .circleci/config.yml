@@ -16,10 +16,6 @@ executors:
       - image: cimg/node:24.12
 
 commands:
-  install-deps:
-    steps:
-      - go/install-ssh
-      - go/install: {package: git}
   prepare:
     parameters:
       linux:
@@ -74,8 +70,6 @@ jobs:
     executor: node
     steps:
       - checkout
-      - golang/install:
-          version: "1.25.7"
       - run:
           command: make react
 
@@ -176,9 +170,9 @@ jobs:
   build-macos:
     description: build darwin boost binary
     macos:
-      xcode: "15.0.0"
+      xcode: 26.3.0
     working_directory: ~/go/src/github.com/filecoin-project/boost
-    resource_class: macos.m1.medium.gen1
+    resource_class: m4pro.medium
     steps:
       - prepare:
           linux: false
