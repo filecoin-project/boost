@@ -1,6 +1,7 @@
 package fielddef
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/ipfs/go-cid"
@@ -354,5 +356,36 @@ func (fd *SignedPropFieldDef) Unmarshall() error {
 	}
 
 	*fd.F = c
+	return nil
+}
+
+type DDONotificationsFieldDef struct {
+	Marshalled string
+	F          []miner.DataActivationNotification
+}
+
+func (fd *DDONotificationsFieldDef) FieldPtr() interface{} {
+	return &fd.Marshalled
+}
+
+func (fd *DDONotificationsFieldDef) Marshall() (interface{}, error) {
+	b, err := cborutil.Dump(fd.F)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cbor dump DataActivationNotification: %w", err)
+	}
+	hexStr := fmt.Sprintf("%x", b)
+	return hexStr, nil
+}
+
+func (fd *DDONotificationsFieldDef) Unmarshall() error {
+	b, err := hex.DecodeString(fd.Marshalled)
+	if err != nil {
+		return fmt.Errorf("failed to decode hex string for DataActivationNotification: %w", err)
+	}
+	var out []miner.DataActivationNotification
+	if err := cborutil.ReadCborRPC(bytes.NewReader(b), &out); err != nil {
+		return fmt.Errorf("failed to cbor unmarshal DataActivationNotification: %w", err)
+	}
+	fd.F = out
 	return nil
 }
