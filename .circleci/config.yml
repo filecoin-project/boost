@@ -62,7 +62,6 @@ jobs:
   mod-tidy-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - go/mod-tidy-check
 
@@ -76,7 +75,6 @@ jobs:
   build-all:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: sudo apt-get update
       - run: sudo apt-get install npm
@@ -146,7 +144,6 @@ jobs:
         description: Test suite name to report to CircleCI.
     executor: << parameters.executor >>
     steps:
-      - install-deps
       - prepare
       - run:
           command: make boostci
@@ -199,7 +196,6 @@ jobs:
       - restore_cache:
           name: restore cargo cache
           key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/boost/go.sum" }}
-      - install-deps
       - run:
           command: make debug
           no_output_timeout: 30m
@@ -223,7 +219,6 @@ jobs:
   gofmt:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run:
           command: "! go fmt ./... 2>&1 | read"
@@ -231,7 +226,6 @@ jobs:
   cbor-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: go install golang.org/x/tools/cmd/goimports
       - run: go install github.com/hannahhoward/cbor-gen-for
@@ -242,7 +236,6 @@ jobs:
   gen-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: make deps
       - run: go install golang.org/x/tools/cmd/goimports
@@ -257,7 +250,6 @@ jobs:
   docs-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: go install golang.org/x/tools/cmd/goimports
       - run: zcat build/openrpc/boost.json.gz | jq > ../pre-openrpc-boost
@@ -291,7 +283,6 @@ jobs:
           Arguments to pass to golangci-lint
     executor: << parameters.executor >>
     steps:
-      - install-deps
       - prepare
       - run:
           command: make debug deps
