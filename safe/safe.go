@@ -10,11 +10,15 @@ import (
 var log = logging.Logger("safe")
 
 func Handle(h network.StreamHandler) network.StreamHandler {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error("panic occurred", "stack", debug.Stack())
-		}
-	}()
-
-	return h
+	return func(s network.Stream) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorw("panic in stream handler", "panic", r, "stack", string(debug.Stack()))
+				if s != nil {
+					_ = s.Reset()
+				}
+			}
+		}()
+		h(s)
+	}
 }
