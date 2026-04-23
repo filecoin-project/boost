@@ -3,7 +3,6 @@ package docgen
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"path/filepath"
 	"reflect"
@@ -30,6 +29,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"golang.org/x/tools/go/packages"
 )
 
 var ExampleValues = map[reflect.Type]interface{}{
@@ -241,20 +241,54 @@ func ParseApiASTInfo(apiFile, iface, pkg, dir string) (comments map[string]strin
 		fmt.Println("filepath absolute error: ", err, "file:", apiFile)
 		return
 	}
-	pkgs, err := parser.ParseDir(fset, apiDir, nil, parser.AllErrors|parser.ParseComments)
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedSyntax,
+		Dir:  apiDir,
+		Fset: fset,
+	}, ".")
 	if err != nil {
-		fmt.Println("parse error: ", err)
+		fmt.Println("package load error: ", err)
+		return
+	}
+	if len(pkgs) == 0 {
+		fmt.Println("package load error: no packages found in", apiDir)
 		return
 	}
 
-	ap := pkgs[pkg]
+	var ap *packages.Package
+	for _, loaded := range pkgs {
+		if loaded.Name == pkg {
+			ap = loaded
+			break
+		}
+	}
+	if ap == nil {
+		fmt.Println("package load error: package", pkg, "not found in", apiDir)
+		return
+	}
+	if len(ap.Errors) > 0 {
+		fmt.Println("package load error: ", ap.Errors[0])
+		return
+	}
 
-	f := ap.Files[apiFile]
+	var f *ast.File
+	for i, filename := range ap.CompiledGoFiles {
+		if filename == apiFile && i < len(ap.Syntax) {
+			f = ap.Syntax[i]
+			break
+		}
+	}
+	if f == nil {
+		fmt.Println("package load error: file", apiFile, "not found in compiled files for", pkg)
+		return
+	}
 
 	cmap := ast.NewCommentMap(fset, f, f.Comments)
 
 	v := &Visitor{iface, make(map[string]ast.Node)}
-	ast.Walk(v, ap)
+	for _, syntax := range ap.Syntax {
+		ast.Walk(v, syntax)
+	}
 
 	comments = make(map[string]string)
 	groupDocs = make(map[string]string)

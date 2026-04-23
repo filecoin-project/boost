@@ -936,8 +936,7 @@ func TestDealVerification(t *testing.T) {
 				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
 			},
 			expect: func(h *ProviderHarness) {
-				sp := abi.NewStoragePower(1)
-				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&sp,
+				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(abi.NewStoragePower(1)),
 					nil)
 			},
 			expectedErr: "verified deal DataCap 1 too small",

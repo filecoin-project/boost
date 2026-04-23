@@ -123,8 +123,7 @@ func (r *resolver) IpniAdvertisementEntries(ctx context.Context, args struct{ Ad
 		return nil, err
 	}
 	for entry, err := it.Next(); err == nil; entry, err = it.Next() {
-		str := entry.B58String()
-		entries = append(entries, &str)
+		entries = append(entries, new(entry.B58String()))
 	}
 
 	return entries, nil

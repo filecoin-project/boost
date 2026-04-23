@@ -10,8 +10,8 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	protocol "github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,11 +31,10 @@ func TestRoundtripForwardingRequest(t *testing.T) {
 
 func TestRoundtripForwardingResponse(t *testing.T) {
 	buf := new(bytes.Buffer)
-	protocol := protocol.ID("applesauce/cheese")
 	expectedMessage := &messages.ForwardingResponse{
 		Code:       messages.ResponseOk,
 		Message:    "",
-		ProtocolID: &protocol,
+		ProtocolID: new(protocol.ID("applesauce/cheese")),
 	}
 	err := messages.BindnodeRegistry.TypeToWriter(expectedMessage, buf, dagcbor.Encode)
 	require.NoError(t, err)

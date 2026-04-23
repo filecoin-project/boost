@@ -190,8 +190,7 @@ func (r *legacyDealResolver) TransferChannelID() *string {
 	if r.TransferChannelId == nil {
 		return nil
 	}
-	chid := r.TransferChannelId.String()
-	return &chid
+	return new(r.TransferChannelId.String())
 }
 
 func (r *legacyDealResolver) Transferred() gqltypes.Uint64 {

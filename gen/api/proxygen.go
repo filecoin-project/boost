@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"io"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 	"unicode"
+
+	"golang.org/x/tools/go/packages"
 )
 
 type methodMeta struct {
@@ -133,15 +134,36 @@ func generate(path, pkg, outpkg, outfile string) error {
 	if err != nil {
 		return err
 	}
-	pkgs, err := parser.ParseDir(fset, apiDir, nil, parser.AllErrors|parser.ParseComments)
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedSyntax,
+		Dir:  apiDir,
+		Fset: fset,
+	}, ".")
 	if err != nil {
 		return err
 	}
+	if len(pkgs) == 0 {
+		return fmt.Errorf("no packages found in %s", apiDir)
+	}
 
-	ap := pkgs[pkg]
+	var ap *packages.Package
+	for _, loaded := range pkgs {
+		if loaded.Name == pkg {
+			ap = loaded
+			break
+		}
+	}
+	if ap == nil {
+		return fmt.Errorf("package %s not found in %s", pkg, apiDir)
+	}
+	if len(ap.Errors) > 0 {
+		return ap.Errors[0]
+	}
 
 	v := &Visitor{make(map[string]map[string]*methodMeta), map[string][]string{}}
-	ast.Walk(v, ap)
+	for _, syntax := range ap.Syntax {
+		ast.Walk(v, syntax)
+	}
 
 	type methodInfo struct {
 		Name                                     string
@@ -168,7 +190,11 @@ func generate(path, pkg, outpkg, outfile string) error {
 		Imports: map[string]string{},
 	}
 
-	for fn, f := range ap.Files {
+	for i, fn := range ap.CompiledGoFiles {
+		if i >= len(ap.Syntax) {
+			continue
+		}
+		f := ap.Syntax[i]
 		if strings.HasSuffix(fn, "gen.go") {
 			continue
 		}

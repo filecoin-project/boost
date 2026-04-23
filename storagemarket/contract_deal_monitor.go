@@ -269,9 +269,8 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
-	latestID := "latest"
 	latest := ethtypes.EthBlockNumberOrHash{
-		PredefinedBlock: &latestID,
+		PredefinedBlock: new("latest"),
 	}
 
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
@@ -309,9 +308,8 @@ func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAdd
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
-	latestID := "latest"
 	latest := ethtypes.EthBlockNumberOrHash{
-		PredefinedBlock: &latestID,
+		PredefinedBlock: new("latest"),
 	}
 
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
