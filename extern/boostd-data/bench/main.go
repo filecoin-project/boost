@@ -63,7 +63,7 @@ func before(cctx *cli.Context) error {
 }
 
 func metricsSetup() {
-	metrics.Enabled = true
+	metrics.Enable()
 
 	hostname, _ := os.Hostname()
 	tags := make(map[string]string)
