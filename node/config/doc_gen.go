@@ -987,7 +987,7 @@ of filters per connection.`,
 			Type: "uint64",
 
 			Comment: `MaxFilterHeightRange specifies the maximum range of heights that can be used in a filter (to avoid querying
-the entire chain)`,
+the entire chain). Applies to eth_getLogs and trace_filter block range limits.`,
 		},
 	},
 	"lotus_config.FaultReporterConfig": []DocField{
@@ -1025,6 +1025,14 @@ rewards. This address should have adequate funds to cover gas fees.`,
 			Type: "types.FIL",
 
 			Comment: ``,
+		},
+		{
+			Name: "FIP0115Height",
+			Type: "int64",
+
+			Comment: `FIP0115Height sets the epoch at which FIP-0115 base fee calculation activates.
+Set to -1 to disable.
+WARNING: This is a consensus-breaking change and should only be used for testing.`,
 		},
 	},
 	"lotus_config.FevmConfig": []DocField{

@@ -166,8 +166,7 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 	}
 	var cursor *uint64
 	if args.Cursor != nil {
-		cursorptr := uint64(*args.Cursor)
-		cursor = &cursorptr
+		cursor = new(uint64(*args.Cursor))
 	}
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit

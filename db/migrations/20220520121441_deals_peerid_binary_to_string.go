@@ -51,13 +51,11 @@ func pidToString(input []byte) (*string, error) {
 	}
 
 	if bytes.Equal(input, []byte("")) {
-		emptyStr := ""
-		return &emptyStr, nil
+		return new(""), nil
 	}
 
 	if bytes.Equal(input, []byte("dummy")) {
-		str := "dummy"
-		return &str, nil
+		return new("dummy"), nil
 	}
 
 	var pid peer.ID
@@ -69,8 +67,7 @@ func pidToString(input []byte) (*string, error) {
 		}
 	}
 
-	updated := pid.String()
-	return &updated, nil
+	return new(pid.String()), nil
 }
 
 func downDealsPeeridBinaryToString(ctx context.Context, tx *sql.Tx) error {

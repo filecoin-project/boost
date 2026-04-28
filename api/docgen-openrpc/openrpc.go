@@ -102,11 +102,9 @@ func NewLotusOpenRPCDocument(Comments, GroupDocs map[string]string) *go_openrpc_
 		},
 		GetInfoFn: func() (info *meta_schema.InfoObject) {
 			info = &meta_schema.InfoObject{}
-			title := "Boost RPC API"
-			info.Title = (*meta_schema.InfoObjectProperties)(&title)
+			info.Title = (*meta_schema.InfoObjectProperties)(new("Boost RPC API"))
 
-			version := build.BuildVersion
-			info.Version = (*meta_schema.InfoObjectVersion)(&version)
+			info.Version = (*meta_schema.InfoObjectVersion)(new(build.BuildVersion))
 			return info
 		},
 		GetExternalDocsFn: func() (exdocs *meta_schema.ExternalDocumentationObject) {

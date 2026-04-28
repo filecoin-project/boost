@@ -271,8 +271,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			// New deal
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
-				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(r.mpool, &di, r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio)
+				rsv := newDealResolver(r.mpool, new(evti.(types.ProviderDealState)), r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio)
 				totalCount, err := r.dealsDB.Count(ctx, "", nil)
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
@@ -798,8 +797,7 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 		updates := s.sub.Out()
 	loop:
 		for {
-			di := lastUpdate.(types.ProviderDealState)
-			rsv := newDealResolver(s.mpool, &di, s.provider, s.dealsDB, s.logsDB, s.spApi, s.curio)
+			rsv := newDealResolver(s.mpool, new(lastUpdate.(types.ProviderDealState)), s.provider, s.dealsDB, s.logsDB, s.spApi, s.curio)
 
 			select {
 			case <-ctx.Done():

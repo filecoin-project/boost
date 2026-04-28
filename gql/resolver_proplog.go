@@ -96,8 +96,7 @@ func (r *resolver) ProposalLogsCount(ctx context.Context) (*propLogCount, error)
 		return nil, err
 	}
 
-	accepted := true
-	acceptCount, err := r.plDB.Count(ctx, &accepted)
+	acceptCount, err := r.plDB.Count(ctx, new(true))
 	if err != nil {
 		return nil, err
 	}

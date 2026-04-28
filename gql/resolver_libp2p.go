@@ -11,14 +11,12 @@ type libp2pAddrInfoResolver struct {
 func (r *resolver) Libp2pAddrInfo() (*libp2pAddrInfoResolver, error) {
 	addrs := make([]*string, 0, len(r.h.Addrs()))
 	for _, a := range r.h.Addrs() {
-		addr := a.String()
-		addrs = append(addrs, &addr)
+		addrs = append(addrs, new(a.String()))
 	}
 
 	protos := make([]*string, 0, len(r.h.Mux().Protocols()))
 	for _, proto := range r.h.Mux().Protocols() {
-		cp := string(proto)
-		protos = append(protos, &cp)
+		protos = append(protos, new(string(proto)))
 	}
 
 	sort.Slice(protos, func(i, j int) bool {

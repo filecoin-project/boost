@@ -64,8 +64,7 @@ func addrToString(input []byte) (*string, error) {
 		}
 	}
 
-	updated := addr.String()
-	return &updated, nil
+	return new(addr.String()), nil
 }
 
 func downDealsAddrBinaryToString(ctx context.Context, tx *sql.Tx) error {

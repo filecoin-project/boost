@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
-	blockstore "github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -701,8 +701,7 @@ func (t *Libp2pTransfer) cancel(ctx context.Context) (*types.TransferState, erro
 	case <-t.eventsDrained:
 		t.lk.Lock()
 		defer t.lk.Unlock()
-		st := t.state()
-		return &st, nil
+		return new(t.state()), nil
 	}
 }
 

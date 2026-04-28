@@ -45,7 +45,6 @@ func GenerateNDeals(count int) ([]types.ProviderDealState, error) {
 
 			startEpoch := abi.ChainEpoch(rand.Intn(100000))
 			endEpoch := abi.ChainEpoch(rand.Intn(5000)) + startEpoch
-			publishCid := testutil.GenerateCid()
 			clientAddr, err := address.NewIDAddress(clientNum)
 			if err != nil {
 				return nil, err
@@ -87,7 +86,7 @@ func GenerateNDeals(count int) ([]types.ProviderDealState, error) {
 					Size:   uint64(rand.Intn(10000)),
 				},
 				ChainDealID:    abi.DealID(rand.Intn(10000)),
-				PublishCID:     &publishCid,
+				PublishCID:     new(testutil.GenerateCid()),
 				SectorID:       abi.SectorNumber(rand.Intn(10000)),
 				Offset:         abi.PaddedPieceSize(rand.Intn(1000000)),
 				Length:         abi.PaddedPieceSize(rand.Intn(1000000)),

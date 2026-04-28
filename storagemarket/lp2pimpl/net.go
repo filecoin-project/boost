@@ -307,14 +307,13 @@ func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	reqLog = reqLog.With("id", req.DealUUID)
 	reqLog.Debugw("received deal status request")
 
-	resp := p.getDealStatus(req, reqLog)
 	reqLog.Debugw("processed deal status request")
 
 	// Set a deadline on writing to the stream so it doesn't hang
 	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
 	defer s.SetWriteDeadline(time.Time{}) // nolint
 
-	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+	if err := cborutil.WriteCborRPC(s, new(p.getDealStatus(req, reqLog))); err != nil {
 		reqLog.Errorw("failed to write deal status response", "err", err)
 	}
 }

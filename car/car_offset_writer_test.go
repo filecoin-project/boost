@@ -100,8 +100,7 @@ func TestCarOffsetWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	fullCar := fullBuff.Bytes()
-	header := carHeader(nd.Cid())
-	headerSize, err := car.HeaderSize(&header)
+	headerSize, err := car.HeaderSize(new(carHeader(nd.Cid())))
 
 	testCases := []struct {
 		name   string

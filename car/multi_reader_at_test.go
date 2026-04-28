@@ -53,7 +53,7 @@ func TestMultiReaderAt(t *testing.T) {
 			if ii > 0 {
 				sb.WriteString("_")
 			}
-			sb.WriteString(fmt.Sprintf("%d", sz))
+			fmt.Fprintf(&sb, "%d", sz)
 		}
 
 		t.Run(sb.String(), func(t *testing.T) {

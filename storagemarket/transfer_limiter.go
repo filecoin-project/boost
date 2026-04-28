@@ -116,8 +116,7 @@ func (tl *transferLimiter) check(now time.Time) {
 	tl.lk.Lock()
 	xfers := make(map[uuid.UUID]*transfer, len(tl.xfers))
 	for id, xfer := range tl.xfers {
-		cp := *xfer
-		xfers[id] = &cp
+		xfers[id] = new(*xfer)
 	}
 	tl.lk.Unlock()
 

@@ -126,7 +126,7 @@ func TestDealRetrieval(t *testing.T) {
 			request: trustless.Request{
 				Root:  root,
 				Scope: trustless.DagScopeEntity,
-				Bytes: &trustless.ByteRange{From: 0, To: ptrInt(7 << 20)},
+				Bytes: &trustless.ByteRange{From: 0, To: new(int64(7 << 20))},
 			},
 			expectCids: append([]cid.Cid{root}, leaves...),
 		},
@@ -135,7 +135,7 @@ func TestDealRetrieval(t *testing.T) {
 			request: trustless.Request{
 				Root:  root,
 				Scope: trustless.DagScopeEntity,
-				Bytes: &trustless.ByteRange{From: 1 << 20, To: ptrInt(2 << 20)},
+				Bytes: &trustless.ByteRange{From: 1 << 20, To: new(int64(2 << 20))},
 			},
 			expectCids: append([]cid.Cid{root}, leaves[4:9]...),
 		},
@@ -144,7 +144,7 @@ func TestDealRetrieval(t *testing.T) {
 			request: trustless.Request{
 				Root:  root,
 				Scope: trustless.DagScopeEntity,
-				Bytes: &trustless.ByteRange{From: 0, To: ptrInt(1)},
+				Bytes: &trustless.ByteRange{From: 0, To: new(int64(1))},
 			},
 			expectCids: append([]cid.Cid{root}, leaves[0]),
 		},
@@ -153,7 +153,7 @@ func TestDealRetrieval(t *testing.T) {
 			request: trustless.Request{
 				Root:  root,
 				Scope: trustless.DagScopeEntity,
-				Bytes: &trustless.ByteRange{From: 7340031, To: ptrInt(7340032)},
+				Bytes: &trustless.ByteRange{From: 7340031, To: new(int64(7340032))},
 			},
 			expectCids: append([]cid.Cid{root}, leaves[len(leaves)-1]),
 		},
@@ -218,8 +218,4 @@ func TestDealRetrieval(t *testing.T) {
 			require.Equal(t, toStr(tc.expectCids), toStr(gotCids))
 		})
 	}
-}
-
-func ptrInt(i int64) *int64 {
-	return &i
 }
