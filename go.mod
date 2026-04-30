@@ -18,7 +18,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/etclabscore/go-openrpc-reflect v0.0.37
 	github.com/ethereum/go-ethereum v1.17.2
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/filecoin-project/boost-graphsync v0.13.13
 	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20231124125934-3233c510357f
 	github.com/filecoin-project/curio v1.25.0
@@ -34,10 +34,10 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.10.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.5
-	github.com/filecoin-project/go-state-types v0.18.0-dev
+	github.com/filecoin-project/go-state-types v0.18.0
 	github.com/filecoin-project/go-statemachine v1.0.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.35.1
+	github.com/filecoin-project/lotus v1.36.0-rc1
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -89,7 +89,7 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.5
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/manifoldco/promptui v0.9.0
-	github.com/mattn/go-sqlite3 v1.14.34
+	github.com/mattn/go-sqlite3 v1.14.42
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/multiformats/go-multibase v0.3.0
@@ -111,8 +111,8 @@ require (
 	github.com/whyrusleeping/cbor-gen v0.3.2-0.20250409092040-76796969edea
 	github.com/yugabyte/pgx/v5 v5.7.6-yb-1
 	go.opencensus.io v0.24.0
-	go.opentelemetry.io/otel v1.40.0
-	go.opentelemetry.io/otel/trace v1.40.0
+	go.opentelemetry.io/otel v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/multierr v1.11.0
@@ -174,7 +174,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/etclabscore/go-jsonschema-walk v0.0.6 // indirect
-	github.com/filecoin-project/filecoin-ffi v1.34.0 // indirect
+	github.com/filecoin-project/filecoin-ffi v1.36.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.1 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.4.0 // indirect
@@ -182,7 +182,7 @@ require (
 	github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20240802040721-2a04ffc8ffe8 // indirect
 	github.com/filecoin-project/go-commp-utils/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-crypto v0.1.0 // indirect
-	github.com/filecoin-project/go-f3 v0.8.12 // indirect
+	github.com/filecoin-project/go-f3 v0.8.13 // indirect
 	github.com/filecoin-project/go-hamt-ipld v0.1.5 // indirect
 	github.com/filecoin-project/go-hamt-ipld/v2 v2.0.0 // indirect
 	github.com/filecoin-project/go-hamt-ipld/v3 v3.4.1 // indirect
@@ -369,9 +369,9 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.62.0 // indirect
-	go.opentelemetry.io/otel/metric v1.40.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
