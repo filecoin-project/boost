@@ -1,16 +1,10 @@
-name: 'Setup Go'
-description: 'Setup Go environment'
-
-inputs:
-  go-version:
-    description: 'Go version to use'
-    required: true
-
+name: install-go
+description: install-go
 runs:
   using: 'composite'
   steps:
-    - name: Set up Go
+    - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ inputs.go-version }}
+        go-version-file: 'go.mod'
         cache: false
