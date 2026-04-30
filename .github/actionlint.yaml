@@ -2,3 +2,8 @@ self-hosted-runner:
   # Labels of self-hosted runner in array of string
   labels:
     - docker
+    - 2xlarge
+    - 2xlarge+curio
+    - 4xlarge+curio
+    - 2xlarge+amd+curio
+    - 4xlarge+amd+curio
