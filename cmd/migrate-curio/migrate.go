@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/ipfs/go-datastore"
@@ -34,7 +35,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	transportTypes "github.com/filecoin-project/boost/transport/types"
 
-	"github.com/filecoin-project/curio/deps"
 	"github.com/filecoin-project/curio/harmony/harmonydb"
 
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -104,7 +104,7 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	defer closer()
 
 	// Connect to Harmony DB
-	hdb, err := deps.MakeDB(cctx)
+	hdb, err := makeDB(cctx)
 	if err != nil {
 		return xerrors.Errorf("failed to connect to harmony DB: %w", err)
 	}
@@ -707,4 +707,16 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 	}
 
 	return nil
+}
+
+func makeDB(cctx *cli.Context) (*harmonydb.DB, error) {
+	dbConfig := harmonydb.Config{
+		Username:    cctx.String("db-user"),
+		Password:    cctx.String("db-password"),
+		Hosts:       strings.Split(cctx.String("db-host"), ","),
+		Database:    cctx.String("db-name"),
+		Port:        cctx.String("db-port"),
+		LoadBalance: cctx.Bool("db-load-balance"),
+	}
+	return harmonydb.NewFromConfig(dbConfig)
 }

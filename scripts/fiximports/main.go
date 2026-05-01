@@ -23,6 +23,7 @@ var (
 	groupByPrefixes = []string{
 		"github.com/filecoin-project",
 		"github.com/filecoin-project/lotus",
+		"github.com/filecoin-project/curio",
 		"github.com/filecoin-project/boost",
 	}
 	newline                  = []byte("\n")
