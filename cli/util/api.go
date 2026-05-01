@@ -8,17 +8,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/filecoin-project/boost/node/repo"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 
 	"github.com/filecoin-project/go-jsonrpc"
 
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/api/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/node/repo"
+
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 

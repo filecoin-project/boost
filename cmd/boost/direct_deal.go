@@ -7,26 +7,28 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds_sync "github.com/ipfs/go-datastore/sync"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
-	"github.com/ipfs/go-cid"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 var directDealAllocate = &cli.Command{

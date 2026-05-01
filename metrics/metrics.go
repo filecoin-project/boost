@@ -4,11 +4,13 @@ import (
 	"context"
 	"time"
 
-	rpcmetrics "github.com/filecoin-project/go-jsonrpc/metrics"
-	lotusmetrics "github.com/filecoin-project/lotus/metrics"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
+
+	rpcmetrics "github.com/filecoin-project/go-jsonrpc/metrics"
+
+	lotusmetrics "github.com/filecoin-project/lotus/metrics"
 )
 
 // Distribution

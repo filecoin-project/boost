@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-jsonrpc/auth"
+
 	apitypes "github.com/filecoin-project/lotus/api/types"
 )
 

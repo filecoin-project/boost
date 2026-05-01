@@ -4,17 +4,20 @@ import (
 	"context"
 	"time"
 
+	"github.com/graph-gophers/graphql-go"
+
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type directDealResolver struct {

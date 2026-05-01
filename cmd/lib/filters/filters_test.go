@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/cmd/lib/filters"
 )
 
 func TestMultiFilter(t *testing.T) {

@@ -5,14 +5,16 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
 type FieldDefinition interface {

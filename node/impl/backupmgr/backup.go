@@ -9,13 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	"github.com/mitchellh/go-homedir"
+
 	boostdb "github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/repo"
+
 	"github.com/filecoin-project/lotus/lib/backupds"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-datastore"
-	"github.com/mitchellh/go-homedir"
 )
 
 const MetadataFileName = "metadata"

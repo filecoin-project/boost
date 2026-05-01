@@ -5,15 +5,18 @@ import (
 	"errors"
 	"fmt"
 
-	gqltypes "github.com/filecoin-project/boost/gql/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/graph-gophers/graphql-go"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
+	gqltypes "github.com/filecoin-project/boost/gql/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/graph-gophers/graphql-go"
 )
 
 // query: sealingpipeline: [SealingPipeline]

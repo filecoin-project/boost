@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("rtrvlog")

@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/pressly/goose/v3"
+
+	"github.com/filecoin-project/go-address"
 )
 
 func init() {

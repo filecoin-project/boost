@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"github.com/filecoin-project/go-statemachine/fsm"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
+
+	"github.com/filecoin-project/go-statemachine/fsm"
+
+	"github.com/filecoin-project/boost/datatransfer/encoding"
 )
 
 //go:generate cbor-gen-for ChannelID ChannelStages ChannelStage Log

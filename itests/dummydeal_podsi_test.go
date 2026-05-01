@@ -13,13 +13,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-data-segment/datasegment"
-	commcid "github.com/filecoin-project/go-fil-commcid"
-	commp "github.com/filecoin-project/go-fil-commp-hashhash"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -32,6 +25,16 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-data-segment/datasegment"
+	commcid "github.com/filecoin-project/go-fil-commcid"
+	commp "github.com/filecoin-project/go-fil-commp-hashhash"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 func TestDummyPodsiDealOnline(t *testing.T) {

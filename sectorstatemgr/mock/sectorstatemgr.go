@@ -8,8 +8,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	storiface "github.com/filecoin-project/lotus/storage/sealer/storiface"
 	gomock "github.com/golang/mock/gomock"
+
+	storiface "github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
 // MockStorageAPI is a mock of StorageAPI interface.

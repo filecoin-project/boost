@@ -6,8 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/message"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -19,6 +17,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/message"
 )
 
 var log = logging.Logger("data_transfer_network")

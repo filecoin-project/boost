@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/itests/shared"
-	"github.com/filecoin-project/lotus/itests/kit"
 	trustlessutils "github.com/ipld/go-trustless-utils"
+
+	"github.com/filecoin-project/boost/itests/shared"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 func TestMultiMinerRetrievalGraphsync(t *testing.T) {

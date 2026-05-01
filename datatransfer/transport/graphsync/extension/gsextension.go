@@ -3,12 +3,12 @@ package extension
 import (
 	"errors"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/message"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	graphsync "github.com/filecoin-project/boost-graphsync"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/message"
 )
 
 const (

@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/car"
-	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
@@ -21,6 +19,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/gostream"
 	"github.com/multiformats/go-multiaddr"
+
+	"github.com/filecoin-project/boost/car"
+	"github.com/filecoin-project/boost/transport/types"
 )
 
 var log = logging.Logger("libp2p-server")

@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 

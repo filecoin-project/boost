@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/fundmanager"
 )
 
 type Status struct {

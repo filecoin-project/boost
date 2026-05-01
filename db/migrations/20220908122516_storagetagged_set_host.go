@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/pressly/goose/v3"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 func init() {

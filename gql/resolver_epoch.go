@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+
 	"github.com/filecoin-project/lotus/build"
 )
 

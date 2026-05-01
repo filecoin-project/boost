@@ -14,15 +14,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/logs"
-	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/httptransport/util"
-	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
 	"github.com/jpillora/backoff"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	"github.com/libp2p/go-libp2p/core/host"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/boost/storagemarket/logs"
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/httptransport/util"
+	"github.com/filecoin-project/boost/transport/types"
 )
 
 const (

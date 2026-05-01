@@ -9,6 +9,15 @@ import (
 	"os"
 	"path"
 
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/policy"
@@ -16,14 +25,8 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
 	types2 "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/go-address"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
-	"github.com/urfave/cli/v2"
 )
 
 var dummydealCmd = &cli.Command{

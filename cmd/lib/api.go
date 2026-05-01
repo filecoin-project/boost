@@ -8,16 +8,20 @@ import (
 	"sync"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/lib/sa"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/go-state-types/abi"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -29,7 +33,6 @@ import (
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	logging "github.com/ipfs/go-log/v2"
 )
 
 func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger) (v1api.FullNode, jsonrpc.ClientCloser, error) {

@@ -8,6 +8,9 @@ on:
     branches:
       - '**'
 
+env:
+  FFI_USE_OPENCL: 1
+
 concurrency:
   group: >-
     ${{

@@ -4,10 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/libp2p/go-libp2p"
+
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
+
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
-	"github.com/libp2p/go-libp2p"
 )
 
 func UserAgent(sps sealingpipeline.API) (opts lp2p.Libp2pOpts, err error) {

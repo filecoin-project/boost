@@ -3,9 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/filecoin-project/boost/build"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/boost/build"
 )
 
 var log = logging.Logger("migrate-curio")

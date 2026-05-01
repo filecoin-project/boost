@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/boost/protocolproxy/messages"
-	"github.com/filecoin-project/boost/safe"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+
+	"github.com/filecoin-project/boost/protocolproxy/messages"
+	"github.com/filecoin-project/boost/safe"
 )
 
 // ForwardingHost is a host that behaves as a service node connected to a proxy

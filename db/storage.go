@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/db/fielddef"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/google/uuid"
+
+	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/db/fielddef"
 )
 
 type StorageLog struct {

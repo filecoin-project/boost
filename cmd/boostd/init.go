@@ -8,18 +8,21 @@ import (
 	"path"
 	"strings"
 
+	"github.com/ipfs/go-datastore"
+	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	scliutil "github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/repo"
-	"github.com/filecoin-project/go-address"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-datastore"
-	"github.com/urfave/cli/v2"
 )
 
 const metadataNamespace = "/metadata"

@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
-	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
+
+	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 )
 
 type legacyDealResolver struct {

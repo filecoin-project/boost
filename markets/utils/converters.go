@@ -1,13 +1,14 @@
 package utils
 
 import (
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 
 	"github.com/filecoin-project/lotus/api"
 )

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/bitswap/server"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/filecoin-project/boost/protocolproxy"
 )
 
 type Filter interface {

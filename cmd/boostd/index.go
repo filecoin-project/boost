@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	bcli "github.com/filecoin-project/boost/cli"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
+
+	bcli "github.com/filecoin-project/boost/cli"
+
+	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var indexProvCmd = &cli.Command{

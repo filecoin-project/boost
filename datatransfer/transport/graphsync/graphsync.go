@@ -7,14 +7,15 @@ import (
 	"sync"
 	"time"
 
-	graphsync "github.com/filecoin-project/boost-graphsync"
-	"github.com/filecoin-project/boost-graphsync/donotsendfirstblocks"
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/transport/graphsync/extension"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/sync/errgroup"
+
+	graphsync "github.com/filecoin-project/boost-graphsync"
+	"github.com/filecoin-project/boost-graphsync/donotsendfirstblocks"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/transport/graphsync/extension"
 )
 
 var log = logging.Logger("dt_graphsync")

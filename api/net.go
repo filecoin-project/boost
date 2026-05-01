@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	lotus_api "github.com/filecoin-project/lotus/api"
-	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
 	metrics "github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+
+	lotus_api "github.com/filecoin-project/lotus/api"
+	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
 )
 
 //                       MODIFYING THE API INTERFACE

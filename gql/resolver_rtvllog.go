@@ -3,9 +3,10 @@ package gql
 import (
 	"context"
 
+	"github.com/graph-gophers/graphql-go"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type retrievalStateResolver struct {

@@ -6,26 +6,29 @@ import (
 	"fmt"
 	"strings"
 
-	clinode "github.com/filecoin-project/boost/cli/node"
-	"github.com/filecoin-project/boost/markets/piecestore"
-	piecestoreimpl "github.com/filecoin-project/boost/markets/piecestore/impl"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/go-statemachine/fsm"
-	lapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/chain/messagesigner"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/lib/backupds"
-	"github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	ds_sync "github.com/ipfs/go-datastore/sync"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v2"
+
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-statemachine/fsm"
+
+	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	piecestoreimpl "github.com/filecoin-project/boost/markets/piecestore/impl"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/messagesigner"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/lib/backupds"
+	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/repo"
 )
 
 func OpenDataStore(path string) (*backupds.Datastore, error) {

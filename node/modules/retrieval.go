@@ -7,6 +7,12 @@ import (
 	"path"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
@@ -15,12 +21,8 @@ import (
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
+
 	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/multiformats/go-multiaddr"
-	"go.uber.org/fx"
 )
 
 // bitswapMultiaddrs is a utility function to determine the multi addrs for bitswap

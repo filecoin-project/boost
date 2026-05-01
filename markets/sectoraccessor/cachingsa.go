@@ -6,13 +6,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/lib/sa"
+	"github.com/jellydator/ttlcache/v2"
+
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/lib/sa"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
-	"github.com/jellydator/ttlcache/v2"
 )
 
 // sync.Mutex uses 8 bytes of memory

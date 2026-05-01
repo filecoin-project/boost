@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 )
 
 func TestSetStreamHandler(t *testing.T) {

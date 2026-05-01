@@ -10,6 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
+	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
@@ -18,13 +27,6 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/google/uuid"
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-car/v2"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPieceDoctor(t *testing.T) {

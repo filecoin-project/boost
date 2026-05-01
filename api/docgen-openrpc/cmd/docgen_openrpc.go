@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/filecoin-project/boost/api/docgen"
-
 	docgen_openrpc "github.com/filecoin-project/boost/api/docgen-openrpc"
 )
 

@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/boost/db"
 )
 
 var baseLogger = logging.Logger("boost-storage-deal")

@@ -17,11 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/storagemarket/logs"
-
-	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
@@ -44,6 +39,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storagemarket/logs"
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/types"
 )
 
 type serverTest struct {

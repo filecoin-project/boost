@@ -7,11 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	"github.com/filecoin-project/go-statemachine/fsm"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/go-statemachine/fsm"
+
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/legacy_manager_mock.go . LegacyDealManager

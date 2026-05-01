@@ -4,13 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boost/indexprovider"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/util"
-	"github.com/filecoin-project/go-address"
-	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	provider "github.com/ipni/index-provider"
@@ -19,6 +12,16 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-address"
+
+	"github.com/filecoin-project/boost/build"
+	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/util"
+
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 type IdxProv struct {

@@ -9,10 +9,12 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/filecoin-project/boost/db"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/boost/db"
+
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
 var log = logging.Logger("storagemanager")

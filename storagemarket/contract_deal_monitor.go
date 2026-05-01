@@ -8,18 +8,21 @@ import (
 	mbig "math/big"
 	"time"
 
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/chain/types/ethtypes"
-	"github.com/filecoin-project/lotus/gateway"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/exp/slices"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+	"github.com/filecoin-project/go-state-types/crypto"
+
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/storagemarket/types"
+
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/filecoin-project/lotus/gateway"
 )
 
 var (

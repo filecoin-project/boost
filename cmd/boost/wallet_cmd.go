@@ -11,16 +11,19 @@ import (
 	"syscall"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost/cli/node"
-	"github.com/filecoin-project/boost/cmd"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/term"
 )
 
 var walletCmd = &cli.Command{

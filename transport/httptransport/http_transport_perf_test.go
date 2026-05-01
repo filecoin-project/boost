@@ -13,8 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/transport/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/transport/types"
 )
 
 func TestHttpTransportMultistreamPerformance(t *testing.T) {

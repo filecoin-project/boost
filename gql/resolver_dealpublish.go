@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/gql/types"
-	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
+
+	cborutil "github.com/filecoin-project/go-cbor-util"
+
+	"github.com/filecoin-project/boost/gql/types"
 )
 
 // basicDealResolver just has simple types (as opposed to dealResolver which

@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/db/migrations"
 )
 
 func TestDealFastRetrieval(t *testing.T) {

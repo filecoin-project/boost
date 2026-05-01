@@ -7,14 +7,17 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 type RetrievalTest struct {

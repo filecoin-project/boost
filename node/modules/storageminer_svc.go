@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/lotus/storage/sectorblocks"
-
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/boost/api"
@@ -15,6 +13,7 @@ import (
 	lclient "github.com/filecoin-project/lotus/api/client"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
+	"github.com/filecoin-project/lotus/storage/sectorblocks"
 )
 
 type MinerSealingService lapi.StorageMiner

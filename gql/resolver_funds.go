@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/graph-gophers/graphql-go"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	smfunds "github.com/filecoin-project/boost/storagemarket/funds"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type fundsEscrow struct {

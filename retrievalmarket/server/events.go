@@ -4,9 +4,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/hannahhoward/go-pubsub"
+
 	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/hannahhoward/go-pubsub"
 )
 
 func (g *GraphsyncUnpaidRetrieval) SubscribeToDataTransferEvents(subscriber datatransfer2.Subscriber) datatransfer2.Unsubscribe {

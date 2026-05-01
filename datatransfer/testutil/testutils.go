@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/datatransfer"
 )
 
 // StartAndWaitForReady is a utility function to start a module and verify it reaches the ready state

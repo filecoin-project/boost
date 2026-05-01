@@ -5,17 +5,20 @@ import (
 	"os"
 	"path/filepath"
 
-	bcli "github.com/filecoin-project/boost/cli"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
+	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/storagemarket/types"
+
+	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var importDirectDataCmd = &cli.Command{

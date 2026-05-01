@@ -10,6 +10,13 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/google/uuid"
+	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
+	provider "github.com/ipni/index-provider"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
@@ -29,15 +36,10 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/build"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/google/uuid"
-	"github.com/graph-gophers/graphql-go"
-	"github.com/ipfs/go-cid"
-	provider "github.com/ipni/index-provider"
-	"github.com/libp2p/go-libp2p/core/event"
-	"github.com/libp2p/go-libp2p/core/host"
 )
 
 type dealListResolver struct {

@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSimpleOfflineDealHappy(t *testing.T) {

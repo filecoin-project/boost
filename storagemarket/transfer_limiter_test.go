@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport/types"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 )
 
 func generateDeal() *smtypes.ProviderDealState {

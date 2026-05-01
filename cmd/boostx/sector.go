@@ -5,10 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/go-state-types/abi"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/cmd/lib"
+
+	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var sectorCmd = &cli.Command{

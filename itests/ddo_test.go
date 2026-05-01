@@ -5,22 +5,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/itests/kit"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDirectDeal(t *testing.T) {

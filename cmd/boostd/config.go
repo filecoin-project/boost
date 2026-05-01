@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/boost/node/config"
 )
 
 var configCmd = &cli.Command{

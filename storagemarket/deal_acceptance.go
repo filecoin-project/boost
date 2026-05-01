@@ -5,15 +5,15 @@ import (
 	"fmt"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
-
-	"github.com/filecoin-project/boost/markets/utils"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	ctypes "github.com/filecoin-project/lotus/chain/types"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v12/market"
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
+
+	"github.com/filecoin-project/boost/markets/utils"
+	"github.com/filecoin-project/boost/storagemarket/types"
+
+	ctypes "github.com/filecoin-project/lotus/chain/types"
 )
 
 const DealMaxLabelSize = 256

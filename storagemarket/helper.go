@@ -6,15 +6,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	market8 "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/exitcode"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs/go-cid"
 )
 
 type ChainDealManagerCfg struct {

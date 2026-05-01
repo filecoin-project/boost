@@ -8,17 +8,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
 )
 
 var doclog = logging.Logger("piecedoc")

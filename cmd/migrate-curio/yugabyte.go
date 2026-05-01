@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/urfave/cli/v2"
 	"github.com/yugabyte/pgx/v5/pgxpool"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 )
 
 var cleanupLIDCmd = &cli.Command{

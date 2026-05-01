@@ -8,12 +8,14 @@ import (
 	context "context"
 	reflect "reflect"
 
-	address "github.com/filecoin-project/go-address"
-	abi "github.com/filecoin-project/go-state-types/abi"
-	api "github.com/filecoin-project/lotus/api"
-	storiface "github.com/filecoin-project/lotus/storage/sealer/storiface"
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
+
+	address "github.com/filecoin-project/go-address"
+	abi "github.com/filecoin-project/go-state-types/abi"
+
+	api "github.com/filecoin-project/lotus/api"
+	storiface "github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
 // MockAPI is a mock of API interface.

@@ -5,10 +5,11 @@ import (
 	"sort"
 	"time"
 
-	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+
+	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket"
 )
 
 type transferPoint struct {

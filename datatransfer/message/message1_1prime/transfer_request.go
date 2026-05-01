@@ -3,15 +3,16 @@ package message1_1
 import (
 	"io"
 
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"github.com/filecoin-project/boost/datatransfer/message/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"golang.org/x/xerrors"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/encoding"
+	"github.com/filecoin-project/boost/datatransfer/message/types"
 )
 
 // TransferRequest1_1 is a struct for the 1.1 Data Transfer Protocol that fulfills the datatransfer.Request interface.

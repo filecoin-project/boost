@@ -4,13 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/cmd/lib/filters/mock"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/golang/mock/gomock"
 	ds "github.com/ipfs/go-datastore"
 	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/cmd/lib/filters/mock"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/blockstore"
 )
 
 func TestFilteredBlockstore(t *testing.T) {

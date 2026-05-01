@@ -8,8 +8,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
+
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/storage/pipeline/piece"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
@@ -17,14 +23,10 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-car/v2"
+	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 )
 
 type MinerStub struct {

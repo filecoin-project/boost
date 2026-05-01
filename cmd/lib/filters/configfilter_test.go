@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/cmd/lib/filters"
 )
 
 func TestConfigFilter(t *testing.T) {

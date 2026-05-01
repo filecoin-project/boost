@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/boost/safe"
-	"github.com/filecoin-project/go-address"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/filecoin-project/boost/safe"
+
+	"github.com/filecoin-project/lotus/api/v1api"
 )
 
 // The time limit to read a message from the client when the client opens a stream

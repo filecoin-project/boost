@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 
 //go:embed create_retrieval_db.sql

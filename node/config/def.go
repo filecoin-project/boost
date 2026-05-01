@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
-	"github.com/ipfs/go-cid"
 )
 
 // MaxTraversalLinks configures the maximum number of links to traverse in a DAG while calculating

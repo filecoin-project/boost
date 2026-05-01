@@ -9,6 +9,21 @@ import (
 	"path"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
+	"github.com/libp2p/go-libp2p/core/host"
+	"go.uber.org/fx"
+	"go.uber.org/multierr"
+
+	"github.com/filecoin-project/go-address"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v9/account"
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	"github.com/filecoin-project/go-statemachine/fsm"
+
 	"github.com/filecoin-project/boost/cmd/lib"
 	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 	dtgstransport "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
@@ -34,13 +49,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	"github.com/filecoin-project/go-address"
-	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
-	"github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/go-state-types/builtin/v9/account"
-	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/go-state-types/exitcode"
-	"github.com/filecoin-project/go-statemachine/fsm"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/build"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -50,12 +59,6 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	"github.com/libp2p/go-libp2p/core/host"
-	"go.uber.org/fx"
-	"go.uber.org/multierr"
 )
 
 var (

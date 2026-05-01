@@ -7,8 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/whyrusleeping/base32"
+
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 type DiskKeyStore struct {

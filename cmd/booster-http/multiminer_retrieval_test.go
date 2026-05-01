@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
-	"github.com/filecoin-project/boost/itests/shared"
-	"github.com/filecoin-project/boost/testutil"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/itests/shared"
+	"github.com/filecoin-project/boost/testutil"
 )
 
 func TestMultiMinerHttpRetrieval(t *testing.T) {

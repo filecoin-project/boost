@@ -11,10 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/ipfs/go-cid"
 	testcmd "github.com/ipfs/go-test/cmd"
 	"github.com/ipld/go-car/v2"
@@ -22,6 +18,13 @@ import (
 	unixfsgen "github.com/ipld/go-fixtureplate/generator"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 // Test a full deal -> booster-http serve via lassie trustless and fronted with

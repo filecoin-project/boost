@@ -11,6 +11,20 @@ import (
 	"path"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
+	cbor "github.com/ipfs/go-ipld-cbor"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-state-types/abi"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-statemachine/fsm"
+
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/lib/legacy"
@@ -19,14 +33,10 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	transportTypes "github.com/filecoin-project/boost/transport/types"
+
 	"github.com/filecoin-project/curio/deps"
 	"github.com/filecoin-project/curio/harmony/harmonydb"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-bitfield"
-	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
-	"github.com/filecoin-project/go-state-types/abi"
-	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/go-statemachine/fsm"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -34,12 +44,6 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	cbor "github.com/ipfs/go-ipld-cbor"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var migrateCmd = &cli.Command{

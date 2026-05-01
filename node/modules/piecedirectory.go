@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/fx"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-jsonrpc"
+
 	"github.com/filecoin-project/boost/cmd/lib"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/svc"
@@ -12,13 +17,11 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-jsonrpc"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"go.uber.org/fx"
 )
 
 func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr dtypes.MinerAddress) *bdclient.Store {

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
+
+	"github.com/filecoin-project/boost/datatransfer"
 )
 
 //go:generate cbor-gen-for --map-encoding TransferMessage1_1

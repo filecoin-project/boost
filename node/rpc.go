@@ -17,10 +17,10 @@ import (
 	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/node/impl"
-
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/metrics/proxy"
+	"github.com/filecoin-project/boost/node/impl"
+
 	"github.com/filecoin-project/lotus/lib/rpcenc"
 )
 

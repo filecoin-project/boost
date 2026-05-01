@@ -9,14 +9,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/filecoin-project/boost/lib/keystore"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/mitchellh/go-homedir"
+
+	"github.com/filecoin-project/go-address"
+
+	"github.com/filecoin-project/boost/lib/keystore"
+
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/wallet"
 )
 
 type Node struct {

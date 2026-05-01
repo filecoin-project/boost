@@ -8,10 +8,12 @@ import (
 	context "context"
 	reflect "reflect"
 
-	types "github.com/filecoin-project/boost/piecedirectory/types"
+	gomock "github.com/golang/mock/gomock"
+
 	address "github.com/filecoin-project/go-address"
 	abi "github.com/filecoin-project/go-state-types/abi"
-	gomock "github.com/golang/mock/gomock"
+
+	types "github.com/filecoin-project/boost/piecedirectory/types"
 )
 
 // MockPieceReader is a mock of PieceReader interface.

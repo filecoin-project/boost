@@ -6,16 +6,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
-
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/hannahhoward/go-pubsub"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
 )
 
 var allSelectorBytes []byte

@@ -5,18 +5,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/markets/piecestore"
-	"github.com/filecoin-project/boost/markets/piecestore/migrations"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	versioning "github.com/filecoin-project/go-ds-versioning/pkg"
-	versioned "github.com/filecoin-project/go-ds-versioning/pkg/statestore"
 	"github.com/hannahhoward/go-pubsub"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
 
+	versioning "github.com/filecoin-project/go-ds-versioning/pkg"
+	versioned "github.com/filecoin-project/go-ds-versioning/pkg/statestore"
+
+	"github.com/filecoin-project/boost/markets/piecestore"
+	"github.com/filecoin-project/boost/markets/piecestore/migrations"
 	"github.com/filecoin-project/boost/markets/shared"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 
 var log = logging.Logger("piecestore")
