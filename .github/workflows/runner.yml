@@ -1,0 +1,10 @@
+name: Self-hosted Runners Test
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ["self-hosted", "linux", "x64", "2xlarge+amd+curio"]
+    steps:
+      - run: echo "OK"
