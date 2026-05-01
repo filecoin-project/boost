@@ -74,7 +74,7 @@ jobs:
         shell: bash
 
   test:
-    runs-on: ["self-hosted", "linux", "x64", "2xlarge+curio"]
+    runs-on: ["self-hosted", "linux", "x64", "4xlarge+curio"]
     needs: [ci-lint]
     strategy:
       fail-fast: false  # Continue running even if one test fails
@@ -126,14 +126,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           make deps
-        shell: bash
-
-      - name: Go version
-        run: go version
-        shell: bash
-
-      - name: Go Build
-        run: make build-go
         shell: bash
 
       - name: Run tests
@@ -264,3 +256,9 @@ jobs:
       - name: Run mod tidy check
         run: go mod tidy -v
         shell: bash
+
+  required-checks-passed:
+    needs: [ ci-lint, react-build, build-all, test, lint, gofmt, gen-check, lid-docker-compose, mod-tidy-check ]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required checks passed"
