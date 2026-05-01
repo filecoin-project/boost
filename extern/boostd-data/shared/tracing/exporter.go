@@ -2,9 +2,12 @@ package tracing
 
 import (
 	"context"
+	"net"
+	"net/url"
+	"strings"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -35,12 +38,13 @@ func New(service, endpoint string) (func(context.Context) error, error) {
 }
 
 // tracerProvider returns an OpenTelemetry TracerProvider configured to use
-// the Jaeger exporter that will send spans to the provided url. The returned
-// TracerProvider will also use a Resource configured with all the information
-// about the application.
+// an OTLP HTTP exporter that will send spans to the provided endpoint. Legacy
+// Jaeger collector URLs are translated to the equivalent OTLP HTTP endpoint so
+// the existing tracing flag default keeps working. The returned TracerProvider
+// will also use a Resource configured with all the information about the
+// application.
 func tracerProvider(url, service string) (*sdktrace.TracerProvider, error) {
-	// Create the Jaeger exporter
-	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
+	exp, err := newExporter(context.Background(), url)
 	if err != nil {
 		return nil, err
 	}
@@ -54,4 +58,50 @@ func tracerProvider(url, service string) (*sdktrace.TracerProvider, error) {
 		)),
 	)
 	return tp, nil
+}
+
+func newExporter(ctx context.Context, endpoint string) (sdktrace.SpanExporter, error) {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return otlptracehttp.New(ctx)
+	}
+
+	if strings.Contains(endpoint, "://") {
+		return newExporterFromURL(ctx, normalizeTracingEndpoint(endpoint))
+	}
+
+	return otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(endpoint))
+}
+
+func newExporterFromURL(ctx context.Context, endpoint string) (sdktrace.SpanExporter, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpoint(u.Host),
+	}
+	if u.Scheme == "http" {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+	if u.Path != "" && u.Path != "/" {
+		opts = append(opts, otlptracehttp.WithURLPath(u.Path))
+	}
+
+	return otlptracehttp.New(ctx, opts...)
+}
+
+func normalizeTracingEndpoint(endpoint string) string {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Path != "/api/traces" {
+		return endpoint
+	}
+
+	u.Path = "/v1/traces"
+	if u.Port() == "14268" {
+		u.Host = net.JoinHostPort(u.Hostname(), "4318")
+	}
+
+	return u.String()
 }

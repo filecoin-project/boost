@@ -2,6 +2,7 @@ package yugabyte
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
-	"github.com/jackc/pgtype"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"go.opentelemetry.io/otel/attribute"
@@ -59,14 +59,14 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 
 	// Get the time at which pieces were last copied from the piece metadata
 	// to the piece tracker table
-	var lastCopiedRes pgtype.Timestamptz
+	var lastCopiedRes sql.NullTime
 	err := s.db.QueryRow(ctx, `SELECT MAX(CreatedAt) FROM PieceTracker`).Scan(&lastCopiedRes)
 	if err != nil {
 		return nil, fmt.Errorf("getting time piece tracker was last updated: %w", err)
 	}
 
 	lastCopied := lastCopiedRes.Time
-	if lastCopiedRes.Status&pgtype.Present == 0 {
+	if !lastCopiedRes.Valid {
 		// If there are no results, set last updated to the zero value of time,
 		// so that we copy across all rows from piece metadata to piece tracker
 		lastCopied = time.UnixMilli(0)
@@ -318,7 +318,7 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 		return nil, fmt.Errorf("getting total pieces count: %w", err)
 	}
 
-	var lastScanRes pgtype.Timestamptz
+	var lastScanRes sql.NullTime
 	qry = `SELECT MAX(UpdatedAt) FROM PieceTracker WHERE MinerAddr = $1`
 	err = s.db.QueryRow(ctx, qry, maddr.String()).Scan(&lastScanRes)
 	if err != nil {
