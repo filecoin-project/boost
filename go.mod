@@ -58,7 +58,7 @@ require (
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipld-cbor v0.2.1
 	github.com/ipfs/go-ipld-format v0.6.3
-	github.com/ipfs/go-ipld-legacy v0.2.2
+	github.com/ipfs/go-ipld-legacy v0.3.0
 	github.com/ipfs/go-libipfs v0.7.0
 	github.com/ipfs/go-log/v2 v2.9.1
 	github.com/ipfs/go-metrics-interface v0.3.0
