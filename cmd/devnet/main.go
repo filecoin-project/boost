@@ -5,11 +5,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/filecoin-project/boost/pkg/devnet"
-
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 
-	logging "github.com/ipfs/go-log/v2"
+	"github.com/filecoin-project/boost/pkg/devnet"
 )
 
 func init() {

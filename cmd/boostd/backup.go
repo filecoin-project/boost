@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	bcli "github.com/filecoin-project/boost/cli"
-	"github.com/filecoin-project/boost/node/impl/backupmgr"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/cheggaaa/pb.v1"
+
+	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
+	"github.com/filecoin-project/boost/node/repo"
 
 	"github.com/filecoin-project/lotus/lib/backupds"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"

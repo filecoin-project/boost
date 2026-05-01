@@ -7,9 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/markets/piecestore"
-	"github.com/filecoin-project/boost/markets/shared"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -24,6 +21,10 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	paychtypes "github.com/filecoin-project/go-state-types/builtin/v8/paych"
+
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	"github.com/filecoin-project/boost/markets/shared"
 )
 
 //go:generate cbor-gen-for --map-encoding Query QueryResponse DealProposal DealResponse Params QueryParams DealPayment ClientDealState ProviderDealState PaymentInfo RetrievalPeer Ask

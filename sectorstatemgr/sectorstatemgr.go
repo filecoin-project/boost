@@ -8,17 +8,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/node/config"
+	logging "github.com/ipfs/go-log/v2"
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/config"
+
 	"github.com/filecoin-project/lotus/api"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	logging "github.com/ipfs/go-log/v2"
-	"go.uber.org/fx"
 )
 
 var log = logging.Logger("sectorstatemgr")

@@ -3,9 +3,10 @@ package gql
 import (
 	"context"
 
+	"github.com/graph-gophers/graphql-go"
+
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type proposalLogResolver struct {

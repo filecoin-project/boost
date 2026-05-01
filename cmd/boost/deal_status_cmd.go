@@ -4,16 +4,19 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/go-address"
+
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/google/uuid"
-	"github.com/urfave/cli/v2"
 )
 
 var dealStatusCmd = &cli.Command{

@@ -5,15 +5,17 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/stretchr/testify/require"
 
-	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+
+	"github.com/filecoin-project/boost/db"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFundManager(t *testing.T) {

@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
-
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/stretchr/testify/require"
 
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	"github.com/stretchr/testify/require"
 )
 
 const testFileSize = (10 * 1048576) + 75 // ~10Mib

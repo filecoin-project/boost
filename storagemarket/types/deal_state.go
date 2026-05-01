@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
 // ProviderDealState is the local state tracked for a deal by the StorageProvider.

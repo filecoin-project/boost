@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
+
+	"github.com/filecoin-project/go-address"
+
+	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
+	"github.com/filecoin-project/boost/storagemarket/types"
+
+	"github.com/filecoin-project/lotus/api/v1api"
 )
 
 // StorageClient starts storage deals with Boost over libp2p

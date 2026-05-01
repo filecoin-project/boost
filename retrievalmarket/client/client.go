@@ -9,23 +9,6 @@ import (
 	"sync"
 	"time"
 
-	gsimpl "github.com/filecoin-project/boost-graphsync/impl"
-	gsnet "github.com/filecoin-project/boost-graphsync/network"
-	"github.com/filecoin-project/boost-graphsync/storeutil"
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	dtnet "github.com/filecoin-project/boost/datatransfer/network"
-	gst "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
-	"github.com/filecoin-project/boost/markets/shared"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/go-address"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-
-	"github.com/filecoin-project/boost/datatransfer/channelmonitor"
-	dtimpl "github.com/filecoin-project/boost/datatransfer/impl"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -41,6 +24,25 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	gsimpl "github.com/filecoin-project/boost-graphsync/impl"
+	gsnet "github.com/filecoin-project/boost-graphsync/network"
+	"github.com/filecoin-project/boost-graphsync/storeutil"
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/channelmonitor"
+	dtimpl "github.com/filecoin-project/boost/datatransfer/impl"
+	dtnet "github.com/filecoin-project/boost/datatransfer/network"
+	gst "github.com/filecoin-project/boost/datatransfer/transport/graphsync"
+	"github.com/filecoin-project/boost/markets/shared"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/wallet"
 )
 
 var (

@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	boostcliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/node/repo"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/lotus/api"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 )

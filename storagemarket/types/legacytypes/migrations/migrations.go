@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -18,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	marketOld "github.com/filecoin-project/specs-actors/actors/builtin/market"
 
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
 )
 

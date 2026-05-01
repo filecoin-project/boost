@@ -7,11 +7,12 @@ import (
 	"reflect"
 
 	"github.com/alecthomas/jsonschema"
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
-	"github.com/filecoin-project/boost/api/docgen"
-	"github.com/filecoin-project/boost/build"
+	go_openrpc_reflect "github.com/curiostorage/go-openrpc-reflect"
 	"github.com/ipfs/go-cid"
 	meta_schema "github.com/open-rpc/meta-schema"
+
+	"github.com/filecoin-project/boost/api/docgen"
+	"github.com/filecoin-project/boost/build"
 )
 
 // schemaDictEntry represents a type association passed to the jsonschema reflector.

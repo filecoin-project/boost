@@ -5,8 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/urfave/cli/v2"
+
+	bcli "github.com/filecoin-project/boost/cli"
 )
 
 var logCmd = &cli.Command{

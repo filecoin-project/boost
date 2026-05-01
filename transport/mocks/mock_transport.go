@@ -8,9 +8,10 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	transport "github.com/filecoin-project/boost/transport"
 	types "github.com/filecoin-project/boost/transport/types"
-	gomock "github.com/golang/mock/gomock"
 )
 
 // MockTransport is a mock of Transport interface.

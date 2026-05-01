@@ -3,9 +3,10 @@ package storagemarket
 import (
 	"fmt"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 // newDealPS provides a nicer interface to keep track of "new deal" events

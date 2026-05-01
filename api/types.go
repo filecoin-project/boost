@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 // TODO: check if this exists anywhere else

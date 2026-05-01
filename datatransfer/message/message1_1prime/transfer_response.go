@@ -3,14 +3,15 @@ package message1_1
 import (
 	"io"
 
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"github.com/filecoin-project/boost/datatransfer/message/types"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"golang.org/x/xerrors"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/encoding"
+	"github.com/filecoin-project/boost/datatransfer/message/types"
 )
 
 // TransferResponse1_1 is a private struct that satisfies the datatransfer.Response interface

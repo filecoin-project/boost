@@ -3,9 +3,10 @@ package registry
 import (
 	"sync"
 
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"golang.org/x/xerrors"
 )
 
 // Processor is an interface that processes a certain type of encodable objects

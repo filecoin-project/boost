@@ -8,9 +8,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	legacytypes "github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
+
+	legacytypes "github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 )
 
 // MockLegacyDealManager is a mock of LegacyDealManager interface.

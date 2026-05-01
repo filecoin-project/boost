@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
 // DirectDeal is the local state tracked for direct data onboard.

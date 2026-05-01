@@ -9,7 +9,22 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strings"
 	"time"
+
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
+	cbor "github.com/ipfs/go-ipld-cbor"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-bitfield"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-state-types/abi"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-statemachine/fsm"
 
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
@@ -19,14 +34,9 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	transportTypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/curio/deps"
+
 	"github.com/filecoin-project/curio/harmony/harmonydb"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-bitfield"
-	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
-	"github.com/filecoin-project/go-state-types/abi"
-	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/go-statemachine/fsm"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -34,12 +44,6 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	cbor "github.com/ipfs/go-ipld-cbor"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var migrateCmd = &cli.Command{
@@ -100,7 +104,7 @@ func migrate(cctx *cli.Context, repoDir string) error {
 	defer closer()
 
 	// Connect to Harmony DB
-	hdb, err := deps.MakeDB(cctx)
+	hdb, err := makeDB(cctx)
 	if err != nil {
 		return xerrors.Errorf("failed to connect to harmony DB: %w", err)
 	}
@@ -703,4 +707,16 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 	}
 
 	return nil
+}
+
+func makeDB(cctx *cli.Context) (*harmonydb.DB, error) {
+	dbConfig := harmonydb.Config{
+		Username:    cctx.String("db-user"),
+		Password:    cctx.String("db-password"),
+		Hosts:       strings.Split(cctx.String("db-host"), ","),
+		Database:    cctx.String("db-name"),
+		Port:        cctx.String("db-port"),
+		LoadBalance: cctx.Bool("db-load-balance"),
+	}
+	return harmonydb.NewFromConfig(dbConfig)
 }

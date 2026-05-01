@@ -3,9 +3,9 @@ package types
 import (
 	"testing"
 
-	stbig "github.com/filecoin-project/go-state-types/big"
-
 	"github.com/stretchr/testify/require"
+
+	stbig "github.com/filecoin-project/go-state-types/big"
 )
 
 func TestBigIntMarshall(t *testing.T) {

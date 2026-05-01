@@ -8,14 +8,6 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	clinode "github.com/filecoin-project/boost/cli/node"
-	"github.com/filecoin-project/boost/cmd"
-	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
-	"github.com/filecoin-project/boost/markets/utils"
-	rc "github.com/filecoin-project/boost/retrievalmarket/client"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/types"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/exchange/offline"
@@ -37,6 +29,17 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/term"
 	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-address"
+
+	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/markets/utils"
+	rc "github.com/filecoin-project/boost/retrievalmarket/client"
+
+	"github.com/filecoin-project/lotus/chain/types"
+	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var flagProvider = &cli.StringFlag{

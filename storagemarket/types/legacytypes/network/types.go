@@ -1,11 +1,13 @@
 package network
 
 import (
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 )
 
 //go:generate cbor-gen-for --map-encoding AskRequest AskResponse Proposal Response SignedResponse DealStatusRequest DealStatusResponse

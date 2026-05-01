@@ -5,6 +5,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/kubo/core/node/helpers"
+	"github.com/libp2p/go-libp2p/core/host"
+	"go.opencensus.io/stats"
+	"go.uber.org/fx"
+
 	graphsync "github.com/filecoin-project/boost-graphsync/impl"
 	gsnet "github.com/filecoin-project/boost-graphsync/network"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
@@ -15,11 +20,8 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
+
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
-	"github.com/ipfs/kubo/core/node/helpers"
-	"github.com/libp2p/go-libp2p/core/host"
-	"go.opencensus.io/stats"
-	"go.uber.org/fx"
 )
 
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.

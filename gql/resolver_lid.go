@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/graph-gophers/graphql-go"
+
 	"github.com/filecoin-project/boost/db"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type resolverScanProgress struct {

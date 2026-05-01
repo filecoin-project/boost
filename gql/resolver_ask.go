@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/graph-gophers/graphql-go"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/lotus/build"
-	"github.com/graph-gophers/graphql-go"
 )
 
 type storageAskResolver struct {

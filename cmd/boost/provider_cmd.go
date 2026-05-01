@@ -5,6 +5,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ipni/go-libipni/maurl"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
@@ -12,12 +18,8 @@ import (
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/network"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/ipni/go-libipni/maurl"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/urfave/cli/v2"
 )
 
 const (

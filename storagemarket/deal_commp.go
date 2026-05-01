@@ -6,14 +6,16 @@ import (
 	"io"
 	"os"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/ipfs/go-cid"
+	carv2 "github.com/ipld/go-car/v2"
+
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/ipfs/go-cid"
-	carv2 "github.com/ipld/go-car/v2"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 var ErrCommpMismatch = fmt.Errorf("commp mismatch")

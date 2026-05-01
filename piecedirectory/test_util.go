@@ -7,17 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/piecedirectory/types"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-commp-utils/writer"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-commp-utils/writer"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/piecedirectory/types"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	"github.com/filecoin-project/boost/testutil"
 )
 
 // Get the index records from the CAR file

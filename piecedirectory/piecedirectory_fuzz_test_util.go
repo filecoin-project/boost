@@ -8,14 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/client"
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/extern/boostd-data/svc"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 )
 
 func testPieceDirectoryFuzz(ctx context.Context, t *testing.T, bdsvc *svc.Service) {

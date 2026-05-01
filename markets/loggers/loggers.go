@@ -1,11 +1,12 @@
 package marketevents
 
 import (
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-state-types/abi"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 
 var log = logging.Logger("markets")

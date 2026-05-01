@@ -5,9 +5,10 @@ import (
 	"errors"
 	"io"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . PieceReader

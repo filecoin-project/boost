@@ -15,9 +15,6 @@ import (
 	"testing"
 	"time"
 
-	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"
 	unixfstestutil "github.com/ipfs/go-unixfsnode/testutil"
@@ -27,6 +24,10 @@ import (
 	"github.com/ipld/go-ipld-prime/storage/memstore"
 	trustlesstestutil "github.com/ipld/go-trustless-utils/testutil"
 	"github.com/stretchr/testify/require"
+
+	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/testutil"
 )
 
 const (

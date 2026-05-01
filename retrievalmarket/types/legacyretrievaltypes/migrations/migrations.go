@@ -1,10 +1,6 @@
 package migrations
 
 import (
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/markets/piecestore"
-	piecemigrations "github.com/filecoin-project/boost/markets/piecestore/migrations"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -15,6 +11,10 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	paychtypes "github.com/filecoin-project/go-state-types/builtin/v8/paych"
 
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/markets/piecestore"
+	piecemigrations "github.com/filecoin-project/boost/markets/piecestore/migrations"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations/maptypes"
 )
 

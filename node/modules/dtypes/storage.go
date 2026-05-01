@@ -1,15 +1,16 @@
 package dtypes
 
 import (
-	graphsync "github.com/filecoin-project/boost-graphsync"
-	"github.com/filecoin-project/boost/datatransfer"
-	dtnet "github.com/filecoin-project/boost/datatransfer/network"
-	"github.com/filecoin-project/go-statestore"
 	bserv "github.com/ipfs/boxo/blockservice"
+	ipfsblockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/exchange"
 	"github.com/ipfs/go-datastore"
 
-	ipfsblockstore "github.com/ipfs/boxo/blockstore"
+	"github.com/filecoin-project/go-statestore"
+
+	graphsync "github.com/filecoin-project/boost-graphsync"
+	"github.com/filecoin-project/boost/datatransfer"
+	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 
 	"github.com/filecoin-project/lotus/blockstore"
 )

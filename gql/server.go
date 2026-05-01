@@ -11,12 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/react"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/rs/cors"
+
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/react"
 )
 
 var log = logging.Logger("gql")

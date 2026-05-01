@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
 )
 
 func TestFundsDB(t *testing.T) {

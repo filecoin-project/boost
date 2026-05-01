@@ -1,14 +1,14 @@
 package maptypes
 
 import (
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 

@@ -7,20 +7,23 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	"github.com/filecoin-project/boost/transport/httptransport/util"
-	"github.com/filecoin-project/boost/transport/types"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/ipni/go-libipni/maurl"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/crypto"
+
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/filecoin-project/boost/transport/httptransport/util"
+	"github.com/filecoin-project/boost/transport/types"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/storage/pipeline/piece"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
-	"github.com/ipni/go-libipni/maurl"
 )
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams DirectDealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus

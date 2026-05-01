@@ -11,6 +11,14 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
+	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
@@ -20,11 +28,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
-	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
-	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
@@ -32,7 +36,6 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	lotuspiece "github.com/filecoin-project/lotus/storage/pipeline/piece"
-	"github.com/google/uuid"
 )
 
 //var log = logging.Logger("direct-deals-providers")

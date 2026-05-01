@@ -12,6 +12,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2/index"
+	"github.com/mitchellh/go-homedir"
+	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
+	"github.com/schollz/progressbar/v3"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/ldb"
@@ -22,19 +35,9 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
+
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/node/modules"
-	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-car/v2/index"
-	"github.com/mitchellh/go-homedir"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
-	"github.com/schollz/progressbar/v3"
-	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
 // The methods on the store that are used for migration

@@ -11,17 +11,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/ipfs/go-cid"
+	testcmd "github.com/ipfs/go-test/cmd"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/storage"
 	unixfsgen "github.com/ipld/go-fixtureplate/generator"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipni/storetheindex/test"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 // Test a full deal -> booster-http serve via lassie trustless and fronted with
@@ -32,7 +35,7 @@ func TestE2E(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tr := test.NewTestIpniRunner(t, ctx, t.TempDir())
+	tr := testcmd.NewRunner(t, t.TempDir())
 
 	t.Log("Running in test directory:", tr.Dir)
 
@@ -87,30 +90,27 @@ func TestE2E(t *testing.T) {
 	dealTestCarInParts(ctx, t, boostAndMiner, carFilepath, rootEnt.Root)
 
 	bifrostGateway := filepath.Join(tr.Dir, "bifrost-gateway")
-	tr.Run("go", "install", "github.com/ipfs/bifrost-gateway@latest")
+	tr.Run(ctx, "go", "install", "github.com/ipfs/bifrost-gateway@latest")
 
 	t.Log("Install lassie to perform a fetch of our content")
 	lassie := filepath.Join(tr.Dir, "lassie")
-	tr.Run("go", "install", "github.com/filecoin-project/lassie/cmd/lassie@latest")
+	tr.Run(ctx, "go", "install", "github.com/filecoin-project/lassie/cmd/lassie@latest")
 
 	t.Log("Start bifrost-gateway")
 	bifrostPort, err := testutil.FreePort()
 	req.NoError(err)
 	bifrostMetricsPort, err := testutil.FreePort()
 	req.NoError(err)
-	bifrostReady := test.NewStdoutWatcher("Path gateway listening on ")
+	bifrostReady := testcmd.NewStderrWatcher("Path gateway listening on ")
 	tr.Env = append(tr.Env,
 		fmt.Sprintf("PROXY_GATEWAY_URL=http://0.0.0.0:%d", boosterHttpPort),
 		"GRAPH_BACKEND=true", // enable "graph" mode, instead of blockstore mode which just fetches raw blocks
 	)
 
-	cmdBifrost := tr.Start(test.NewExecution(bifrostGateway,
-		"--gateway-port", fmt.Sprintf("%d", bifrostPort),
-		"--metrics-port", fmt.Sprintf("%d", bifrostMetricsPort),
-	).WithWatcher(bifrostReady))
+	cmdBifrost := tr.Start(ctx, testcmd.Args(bifrostGateway, "--gateway-port", fmt.Sprintf("%d", bifrostPort), "--metrics-port", fmt.Sprintf("%d", bifrostMetricsPort)), bifrostReady)
 
 	select {
-	case <-bifrostReady.Signal:
+	case <-bifrostReady.Signal():
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for bifrost-gateway to start")
 	}
@@ -152,7 +152,7 @@ func TestE2E(t *testing.T) {
 	req.Equal("text/plain; charset=utf-8", ct)
 
 	t.Log("Perform a direct CAR fetch with lassie")
-	tr.Run(lassie,
+	tr.Run(ctx, lassie,
 		"fetch",
 		"--provider", fmt.Sprintf("http://0.0.0.0:%d", boosterHttpPort),
 		"--output", "lassie.car",

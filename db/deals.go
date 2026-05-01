@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/filecoin-project/boost/db/fielddef"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
+	"github.com/filecoin-project/boost/db/fielddef"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
 // Used for SELECT statements: "ID, CreatedAt, ..."

@@ -10,17 +10,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/datatransfer"
-	types2 "github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-jsonrpc/auth"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/go-state-types/crypto"
-	apitypes "github.com/filecoin-project/lotus/api/types"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -30,6 +19,20 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/crypto"
+
+	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/datatransfer"
+	types2 "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
+
+	apitypes "github.com/filecoin-project/lotus/api/types"
 )
 
 var ExampleValues = map[reflect.Type]interface{}{

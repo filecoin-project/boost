@@ -5,12 +5,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/filecoin-project/boost/cli/node"
-	"github.com/filecoin-project/boost/cmd"
-	"github.com/filecoin-project/lotus/chain/types"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/mitchellh/go-homedir"
 	cli "github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
+
+	"github.com/filecoin-project/lotus/chain/types"
+	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var initCmd = &cli.Command{

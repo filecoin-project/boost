@@ -9,13 +9,16 @@ import (
 	io "io"
 	reflect "reflect"
 
-	types "github.com/filecoin-project/boost/storagemarket/types"
-	abi "github.com/filecoin-project/go-state-types/abi"
-	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
-	api "github.com/filecoin-project/lotus/api"
-	piece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
+
+	abi "github.com/filecoin-project/go-state-types/abi"
+	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
+
+	types "github.com/filecoin-project/boost/storagemarket/types"
+
+	api "github.com/filecoin-project/lotus/api"
+	piece "github.com/filecoin-project/lotus/storage/pipeline/piece"
 )
 
 // MockPieceAdder is a mock of PieceAdder interface.

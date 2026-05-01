@@ -8,14 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/client"
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/extern/boostd-data/svc"
-	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
-	pdTypes "github.com/filecoin-project/boost/piecedirectory/types"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -23,6 +15,16 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	pdTypes "github.com/filecoin-project/boost/piecedirectory/types"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 )
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {

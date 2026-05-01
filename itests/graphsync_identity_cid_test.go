@@ -10,11 +10,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	gstestutil "github.com/filecoin-project/boost-graphsync/testutil"
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
@@ -27,6 +22,14 @@ import (
 	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	gstestutil "github.com/filecoin-project/boost-graphsync/testutil"
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 func TestDealAndRetrievalWithIdentityCID(t *testing.T) {

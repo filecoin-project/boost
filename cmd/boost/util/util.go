@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ipfs/go-cid"
+	"github.com/manifoldco/promptui"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -13,13 +16,12 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v13/datacap"
 	verifreg13 "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	datacap2 "github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs/go-cid"
-	"github.com/manifoldco/promptui"
 )
 
 func CreateAllocationRequests(ctx context.Context, api api.Gateway, infos []PieceInfos) (*big.Int, []verifreg9.AllocationRequest, error) {

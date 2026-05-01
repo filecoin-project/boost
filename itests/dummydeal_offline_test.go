@@ -4,13 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/itests/framework"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/itests/kit"
 )
 
 func TestDummydealOffline(t *testing.T) {

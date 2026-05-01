@@ -3,9 +3,6 @@ package message1_1
 import (
 	"io"
 
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"github.com/filecoin-project/boost/datatransfer/message/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -13,6 +10,10 @@ import (
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"golang.org/x/xerrors"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/encoding"
+	"github.com/filecoin-project/boost/datatransfer/message/types"
 )
 
 // NewRequest generates a new request for the data transfer protocol

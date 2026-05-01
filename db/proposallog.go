@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/db/fielddef"
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/boost/db/fielddef"
+	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 type ProposalLog struct {

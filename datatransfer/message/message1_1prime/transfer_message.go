@@ -3,11 +3,12 @@ package message1_1
 import (
 	"io"
 
-	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
+
+	"github.com/filecoin-project/boost/datatransfer"
 )
 
 // TransferMessage1_1 is the transfer message for the 1.1 Data Transfer Protocol.

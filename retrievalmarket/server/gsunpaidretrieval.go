@@ -6,6 +6,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hannahhoward/go-pubsub"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p/core/peer"
+	cbg "github.com/whyrusleeping/cbor-gen"
+	"go.opencensus.io/stats"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
 	graphsync "github.com/filecoin-project/boost-graphsync"
 	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/datatransfer/encoding"
@@ -17,12 +25,6 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes/migrations"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/hannahhoward/go-pubsub"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-libp2p/core/peer"
-	cbg "github.com/whyrusleeping/cbor-gen"
-	"go.opencensus.io/stats"
 )
 
 var (

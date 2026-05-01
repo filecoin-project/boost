@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 
+	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes/filestore"
 )
 

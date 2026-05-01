@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/filecoin-project/boost/db/fielddef"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/pressly/goose/v3"
+
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
+	"github.com/filecoin-project/boost/db/fielddef"
 )
 
 func init() {

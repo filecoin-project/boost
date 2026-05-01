@@ -179,7 +179,7 @@ dist-clean:
 	git submodule deinit --all -f
 .PHONY: dist-clean
 
-gen: api-gen cbor-gen cfgdoc-gen docsgen
+gen: api-gen cbor-gen cfgdoc-gen docsgen fix-imports
 .PHONY: gen
 
 api-gen:
@@ -215,6 +215,9 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 	./docgen-openrpc "api/api.go" "Boost" "api" "./api" -gzip > build/openrpc/boost.json.gz
 
 .PHONY: docsgen docsgen-md-bin docsgen-openrpc-bin
+
+fix-imports:
+	$(GOCC) run $(GOFLAGS) ./scripts/fiximports
 
 ## DOCKER IMAGES
 docker_user?=filecoin

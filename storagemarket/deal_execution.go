@@ -9,20 +9,23 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/google/uuid"
+	carv2 "github.com/ipld/go-car/v2"
+	"github.com/libp2p/go-libp2p/core/event"
+
+	"github.com/filecoin-project/go-padreader"
+	"github.com/filecoin-project/go-state-types/abi"
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
+
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/go-padreader"
-	"github.com/filecoin-project/go-state-types/abi"
-	acrypto "github.com/filecoin-project/go-state-types/crypto"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	types2 "github.com/filecoin-project/lotus/chain/types"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-	"github.com/google/uuid"
-	carv2 "github.com/ipld/go-car/v2"
-	"github.com/libp2p/go-libp2p/core/event"
 )
 
 const (

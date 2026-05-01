@@ -6,25 +6,24 @@ import (
 	_ "net/http/pprof"
 	"time"
 
+	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/gateway"
-
 	lcliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/gateway"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-
-	"github.com/urfave/cli/v2"
 )
 
 var runCmd = &cli.Command{

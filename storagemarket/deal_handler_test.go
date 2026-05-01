@@ -5,9 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 // TestCancellationSimple tests that we are able to cancel an ongoing transfer.

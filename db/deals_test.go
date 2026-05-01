@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	cborutil "github.com/filecoin-project/go-cbor-util"
+
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/stretchr/testify/require"
 )
 
 func ToFilterOptions(filters map[string]interface{}) *FilterOptions {

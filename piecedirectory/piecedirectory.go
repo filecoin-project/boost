@@ -12,18 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	carutil "github.com/filecoin-project/boost/car"
-	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
-	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
-	"github.com/filecoin-project/boost/lib/sa"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-data-segment/datasegment"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/lib/readerutil"
 	"github.com/hashicorp/go-multierror"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
@@ -39,6 +27,21 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-data-segment/datasegment"
+	"github.com/filecoin-project/go-state-types/abi"
+
+	carutil "github.com/filecoin-project/boost/car"
+	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/lib/sa"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/piecedirectory/types"
+
+	"github.com/filecoin-project/lotus/lib/readerutil"
 )
 
 var log = logging.Logger("piecedirectory")

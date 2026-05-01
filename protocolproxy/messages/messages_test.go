@@ -7,12 +7,13 @@ import (
 	"io"
 	"testing"
 
-	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 )
 
 func TestRoundtripForwardingRequest(t *testing.T) {

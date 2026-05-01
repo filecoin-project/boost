@@ -4,18 +4,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/db/migrations"
-	mocks_legacy "github.com/filecoin-project/boost/lib/legacy/mocks"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/golang/mock/gomock"
 	"github.com/ipni/go-libipni/metadata"
 	mock_provider "github.com/ipni/index-provider/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/db/migrations"
+	mocks_legacy "github.com/filecoin-project/boost/lib/legacy/mocks"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
 func TestWrapperEmptyStorageListAndNoUpdates(t *testing.T) {

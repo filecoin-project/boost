@@ -7,32 +7,33 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/filecoin-project/boost/lib/legacy"
-	"github.com/filecoin-project/boost/lib/pdcleaner"
-	"github.com/filecoin-project/boost/node/impl/backupmgr"
-	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/fx"
+
+	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/lib/legacy"
+	"github.com/filecoin-project/boost/lib/pdcleaner"
 	"github.com/filecoin-project/boost/markets/storageadapter"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
+	"github.com/filecoin-project/boost/piecedirectory"
 	retmarket "github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/gateway"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/host"
-	"go.uber.org/fx"
 )
 
 type BoostAPI struct {

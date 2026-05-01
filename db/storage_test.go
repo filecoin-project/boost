@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost/db/migrations"
 )
 
 func TestStorageDB(t *testing.T) {

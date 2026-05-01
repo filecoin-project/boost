@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/filecoin-project/boost-graphsync/storeutil"
-	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 	"github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/exchange/offline"
@@ -19,6 +17,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/filecoin-project/boost-graphsync/storeutil"
+	dtnet "github.com/filecoin-project/boost/datatransfer/network"
 )
 
 type Libp2pTestData struct {

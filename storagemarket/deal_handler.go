@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"go.uber.org/atomic"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) (*dealHandler, error) {

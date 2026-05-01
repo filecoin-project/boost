@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	blockstore "github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -14,6 +13,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"go.opencensus.io/stats"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 )
 
 var log = logging.Logger("remote-blockstore")

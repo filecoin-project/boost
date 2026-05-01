@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"io"
 
-	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/datatransfer/encoding"
-	"github.com/filecoin-project/boost/datatransfer/message/types"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/xerrors"
+
+	datatransfer2 "github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/datatransfer/encoding"
+	"github.com/filecoin-project/boost/datatransfer/message/types"
 )
 
 //go:generate cbor-gen-for --map-encoding TransferResponse1_1

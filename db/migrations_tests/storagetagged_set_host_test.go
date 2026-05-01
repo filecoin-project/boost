@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pressly/goose/v3"
+	"github.com/stretchr/testify/require"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/pressly/goose/v3"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStorageTaggedSetHost(t *testing.T) {

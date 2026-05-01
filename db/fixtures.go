@@ -5,17 +5,19 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/boost/testutil"
+	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p/core/peer"
-	mh "github.com/multiformats/go-multihash"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/testutil"
 )
 
 var clientAddrs = []uint64{01312, 42134, 01322, 43242, 04212}

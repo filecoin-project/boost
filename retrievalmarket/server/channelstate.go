@@ -3,15 +3,16 @@ package server
 import (
 	"bytes"
 
-	graphsync "github.com/filecoin-project/boost-graphsync"
-	"github.com/filecoin-project/boost/datatransfer"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
+
+	graphsync "github.com/filecoin-project/boost-graphsync"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 
 type RetrievalType string

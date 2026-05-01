@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/filecoin-project/boost/extern/boostd-data/model"
-	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipld/frisbii"
 	"go.opencensus.io/stats"
+
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 )
 
 func (s *HttpServer) pieceHandler() http.HandlerFunc {

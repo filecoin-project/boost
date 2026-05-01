@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 
-	"github.com/filecoin-project/boost/node/repo"
-	"github.com/filecoin-project/go-address"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/go-address"
+
+	"github.com/filecoin-project/boost/node/repo"
+
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
 const metadataNamespace = "/metadata"

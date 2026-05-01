@@ -10,6 +10,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+
+	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
@@ -20,16 +31,8 @@ import (
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
+
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/ipfs/go-cid"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
 )
 
 const (

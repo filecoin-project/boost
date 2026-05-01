@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
-	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/gbrlsnchs/jwt/v3"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/go-jsonrpc/auth"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 
+	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/filecoin-project/lotus/journal/alerting"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 )

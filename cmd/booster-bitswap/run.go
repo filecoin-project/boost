@@ -6,6 +6,13 @@ import (
 	_ "net/http/pprof"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
@@ -15,13 +22,8 @@ import (
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
+
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
 )
 
 var runCmd = &cli.Command{

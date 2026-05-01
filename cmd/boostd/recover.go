@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/boost/node/config"
 )
 
 //var (

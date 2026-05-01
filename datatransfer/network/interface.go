@@ -3,9 +3,10 @@ package network
 import (
 	"context"
 
-	"github.com/filecoin-project/boost/datatransfer"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+
+	"github.com/filecoin-project/boost/datatransfer"
 )
 
 // DataTransferNetwork provides network connectivity for GraphSync.

@@ -7,13 +7,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/google/uuid"
 )
 
 type acceptDealReq struct {

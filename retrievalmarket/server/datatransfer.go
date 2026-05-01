@@ -5,15 +5,17 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/boost/datatransfer"
 	dtimpl "github.com/filecoin-project/boost/datatransfer/impl"
 	marketevents "github.com/filecoin-project/boost/markets/loggers"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	"go.uber.org/fx"
 )
 
 type ProviderDataTransfer datatransfer.Manager

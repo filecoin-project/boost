@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+
+	bcli "github.com/filecoin-project/boost/cli"
 )
 
 var importDataCmd = &cli.Command{

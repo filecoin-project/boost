@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
+
+	"github.com/filecoin-project/boost/db"
 )
 
 var dplcLog = logging.Logger("dplc")
