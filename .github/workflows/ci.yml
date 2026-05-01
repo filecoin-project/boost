@@ -226,7 +226,7 @@ jobs:
         shell: bash
 
   lid-docker-compose:
-    runs-on: ["self-hosted", "linux", "x64", "2xlarge+amd+curio"]
+    runs-on: ["self-hosted", "linux", "x64", "4xlarge+curio"]
     needs: [ci-lint]
     steps:
       - uses: actions/checkout@v6
