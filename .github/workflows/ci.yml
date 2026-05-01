@@ -91,7 +91,7 @@ jobs:
           - name: test-itest-direct_deal
             target: "./itests/ddo_test.go"
           - name: test-all
-            target: "`go list ./... | grep -v boost/db | grep -v boost/storagemarket | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
+            target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
           - name: test-itest-data-segment-index
             target: "./itests/data_segment_index_retrieval_test.go"
           - name: test-itest-ipni
@@ -104,10 +104,6 @@ jobs:
             target: "./cmd/booster-bitswap"
           - name: test-itest-lid-cleanup
             target: "./itests/lid_cleanup_test.go"
-          - name: test-provider
-            target: "./storagemarket"
-          - name: test-sql-db
-            target: "./db"
         
     steps:
       - uses: actions/checkout@v6
@@ -125,9 +121,16 @@ jobs:
           make deps
         shell: bash
 
+      - name: Go version
+        run: go version
+        shell: bash
+
+      - name: Go Build
+        run: make build-go
+        shell: bash
+
       - name: Run tests
-        run: |
-          go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
+        run: go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
         shell: bash
 
   lint:
