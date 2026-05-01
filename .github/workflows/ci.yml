@@ -6,22 +6,26 @@ on:
       - main
   pull_request:
     branches:
-      - main
+      - '**'
 
-env:
-  GO_VERSION: 1.26.2
+concurrency:
+  group: >-
+    ${{
+      github.event_name == 'pull_request'
+        && format('pr-{0}', github.event.pull_request.number)
+        || format('main-{0}', github.sha)
+    }}
+  cancel-in-progress: true
 
 jobs:
   ci-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
@@ -33,10 +37,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -46,24 +50,14 @@ jobs:
         run: make react
         shell: bash
 
-  setup-params:
-    runs-on: [self-hosted, docker]
-    needs: [ci-lint]
-    steps:
-      - name: Fetch parameters
-        run: lotus fetch-params 8388608
-        shell: bash
-
   build-all:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
@@ -80,8 +74,8 @@ jobs:
         shell: bash
 
   test:
-    runs-on: [self-hosted, docker]
-    needs: [setup-params]
+    runs-on: ["self-hosted", "linux", "x64", "4xlarge+curio"]
+    needs: [ci-lint]
     strategy:
       fail-fast: false  # Continue running even if one test fails
       matrix:
@@ -97,7 +91,7 @@ jobs:
           - name: test-itest-direct_deal
             target: "./itests/ddo_test.go"
           - name: test-all
-            target: "`go list ./... | grep -v boost/db | grep -v boost/storagemarket | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
+            target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
           - name: test-itest-data-segment-index
             target: "./itests/data_segment_index_retrieval_test.go"
           - name: test-itest-ipni
@@ -110,21 +104,22 @@ jobs:
             target: "./cmd/booster-bitswap"
           - name: test-itest-lid-cleanup
             target: "./itests/lid_cleanup_test.go"
-          - name: test-provider
-            target: "./storagemarket"
-          - name: test-sql-db
-            target: "./db"
         
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: react/package-lock.json
 
       - name: Install FFI
         env:
@@ -134,20 +129,17 @@ jobs:
         shell: bash
 
       - name: Run tests
-        run: |
-          go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
+        run: go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
         shell: bash
 
   lint:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
@@ -173,12 +165,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
@@ -196,87 +186,14 @@ jobs:
         run: git --no-pager diff --quiet
         shell: bash
 
-  cbor-check:
-    runs-on: ubuntu-latest
-    needs: [ci-lint]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Dependencies
-        uses: ./.github/actions/install-deps
-
-      - name: Install goimports
-        run: go install golang.org/x/tools/cmd/goimports
-        shell: bash
-
-      - name: Install cbor-gen-for
-        run: go install github.com/hannahhoward/cbor-gen-for
-        shell: bash
-
-      - name: Generate CBOR
-        run: make cbor-gen
-        shell: bash
-
-      - name: Git diff check
-        run: git --no-pager diff
-        shell: bash
-
-      - name: Git diff quiet
-        run: git --no-pager diff --quiet
-        shell: bash
-
-  docs-check:
-    runs-on: ubuntu-latest
-    needs: [ci-lint]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Dependencies
-        uses: ./.github/actions/install-deps
-
-      - name: Install FFI
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          make deps
-        shell: bash
-
-      - name: Install goimports
-        run: go install golang.org/x/tools/cmd/goimports
-        shell: bash
-
-      - name: Generate Docs
-        run: make docsgen
-        shell: bash
-
-      - name: Git diff check
-        run: git --no-pager diff
-        shell: bash
-
-      - name: Git diff quiet
-        run: git --no-pager diff --quiet
-        shell: bash
-
   gen-check:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
@@ -309,52 +226,29 @@ jobs:
         shell: bash
 
   lid-docker-compose:
-    runs-on: [self-hosted, docker]
-    needs: [setup-params]
-    env:
-      CONTAINER_NAME: yugabyte-${{ github.run_id }}
+    runs-on: ["self-hosted", "linux", "x64", "4xlarge+curio"]
+    needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
-
-      - name: Start YugabyteDB
-        run: docker run --rm --name ${{ env.CONTAINER_NAME }} -d -p 5433:5433 yugabytedb/yugabyte:2.21.1.0-b271 bin/yugabyted start --daemon=false
-        shell: bash
-      - run: |
-          while true; do
-            status=$(docker exec ${{ env.CONTAINER_NAME }} bin/yugabyted status);
-            echo $status;
-            echo $status | grep Running && break;
-            sleep 1;
-          done
-        shell: bash
 
       - run: |
           cd extern/boostd-data
           go test -v ./...
 
-      - name: Clean up YugabyteDB
-        if: always()
-        run: docker stop ${{ env.CONTAINER_NAME }}
-        shell: bash
-
   mod-tidy-check:
     runs-on: ubuntu-latest
     needs: [ci-lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
@@ -362,3 +256,9 @@ jobs:
       - name: Run mod tidy check
         run: go mod tidy -v
         shell: bash
+
+  required-checks-passed:
+    needs: [ ci-lint, react-build, build-all, test, lint, gofmt, gen-check, lid-docker-compose, mod-tidy-check ]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required checks passed"

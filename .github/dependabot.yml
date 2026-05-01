@@ -3,10 +3,7 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
-    allow:
-      - dependency-name: "github.com/filecoin-project/lotus"
-        dependency-type: "direct"
+      interval: "weekly"
   - package-ecosystem: "npm"
     directory: "/react"
     schedule:
