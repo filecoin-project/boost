@@ -114,6 +114,13 @@ jobs:
       - name: Install Dependencies
         uses: ./.github/actions/install-deps
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: react/package-lock.json
+
       - name: Install FFI
         env:
           GITHUB_TOKEN: ${{ github.token }}
