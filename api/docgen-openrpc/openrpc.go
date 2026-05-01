@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/alecthomas/jsonschema"
-	go_openrpc_reflect "github.com/etclabscore/go-openrpc-reflect"
+	go_openrpc_reflect "github.com/curiostorage/go-openrpc-reflect"
 	"github.com/filecoin-project/boost/api/docgen"
 	"github.com/filecoin-project/boost/build"
 	"github.com/ipfs/go-cid"
