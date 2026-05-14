@@ -980,7 +980,8 @@ of filters per connection.`,
 			Name: "MaxFilterResults",
 			Type: "int",
 
-			Comment: `MaxFilterResults specifies the maximum number of results that can be accumulated by an actor event filter.`,
+			Comment: `Self-hosted nodes serving trusted callers can use 0 or a high value. Public RPC
+operators should keep it bounded.`,
 		},
 		{
 			Name: "MaxFilterHeightRange",
