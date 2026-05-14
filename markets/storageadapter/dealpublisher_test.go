@@ -474,6 +474,7 @@ func (d *dpAPI) ChainHead(ctx context.Context) (*types.TipSet, error) {
 	require.NoError(d.t, err)
 	return types.NewTipSet([]*types.BlockHeader{{
 		Miner:                 tutils.NewActorAddr(d.t, "miner"),
+		Ticket:                &types.Ticket{VRFProof: []byte("ticket")},
 		Height:                abi.ChainEpoch(10),
 		ParentStateRoot:       dummyCid,
 		Messages:              dummyCid,

@@ -221,7 +221,7 @@ fix-imports:
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.36.0-rc1
+lotus_version?=v1.36.0
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
