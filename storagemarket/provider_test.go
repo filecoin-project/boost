@@ -2446,6 +2446,7 @@ func mockTipset(minerAddr address.Address, height abi.ChainEpoch) (*chaintypes.T
 	dummyCid, _ := cid.Parse("bafkqaaa")
 	return chaintypes.NewTipSet([]*chaintypes.BlockHeader{{
 		Miner:                 minerAddr,
+		Ticket:                &chaintypes.Ticket{VRFProof: []byte("ticket")},
 		Height:                height,
 		ParentStateRoot:       dummyCid,
 		Messages:              dummyCid,
