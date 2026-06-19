@@ -73,7 +73,7 @@ require (
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/ipld/go-trustless-utils v0.8.0
 	github.com/ipld/ipld/specs v0.0.0-20260428054901-e9314d9a5216
-	github.com/ipni/go-libipni v0.7.7
+	github.com/ipni/go-libipni v0.7.8
 	github.com/ipni/index-provider v0.16.3
 	github.com/ipni/ipni-cli v0.5.2
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
@@ -83,7 +83,7 @@ require (
 	github.com/libp2p/go-libp2p v0.48.0
 	github.com/libp2p/go-libp2p-http v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.39.1
-	github.com/libp2p/go-libp2p-pubsub v0.15.0
+	github.com/libp2p/go-libp2p-pubsub v0.16.0
 	github.com/libp2p/go-libp2p-record v0.3.1
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.5
 	github.com/libp2p/go-msgio v0.3.0

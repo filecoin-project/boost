@@ -982,8 +982,8 @@ github.com/ipld/go-trustless-utils v0.8.0 h1:/rlmYkNVInu1DaWmCF1/NfpEMEaCo/EFNX2
 github.com/ipld/go-trustless-utils v0.8.0/go.mod h1:xT4Ioui+/ZTcvAWbo23px7+yaaJvxPyRHPoYu+d0biE=
 github.com/ipld/ipld/specs v0.0.0-20260428054901-e9314d9a5216 h1:rlM4YbZMPrwxq58y3d1M3+csn2UgytpSUohMN/51X3s=
 github.com/ipld/ipld/specs v0.0.0-20260428054901-e9314d9a5216/go.mod h1:zuflQFZoMJQcrVVu13DEgHqFqNlyhm7a0A9d4o5DhEA=
-github.com/ipni/go-libipni v0.7.7 h1:PcJfJ7aH7TATfJVpKvOnMAi9YvEsOHBA7j2LwaLBXEs=
-github.com/ipni/go-libipni v0.7.7/go.mod h1:1TFpucMiEGD1K89QXKwCE2lfdb9qy6ug6vjHoQGSxEQ=
+github.com/ipni/go-libipni v0.7.8 h1:kPfgi9fNZC/wkzu/UegsaBa2e5F2GxIru/pHkyJXPDY=
+github.com/ipni/go-libipni v0.7.8/go.mod h1:T+QVg6kT/PizcKN4pKKd9NaUXA8BZaubfaG+M6/rixE=
 github.com/ipni/index-provider v0.16.3 h1:oHyYK0lSQu9rY22Apst9+/g0sq8iwu38QSqbVjVtvC4=
 github.com/ipni/index-provider v0.16.3/go.mod h1:TttX+YCYCKRfJhf87zO2zWyJ4zaTQ3WyDL9/Cb6wWM4=
 github.com/ipni/ipni-cli v0.5.2 h1:QYEO1+CpREP3SHOgn8V7lVPIhEJUmG5Nwb8rVbkxtGM=
@@ -1191,8 +1191,8 @@ github.com/libp2p/go-libp2p-peerstore v0.2.2/go.mod h1:NQxhNjWxf1d4w6PihR8btWIRj
 github.com/libp2p/go-libp2p-peerstore v0.2.6/go.mod h1:ss/TWTgHZTMpsU/oKVVPQCGuDHItOpf2W8RxAi50P2s=
 github.com/libp2p/go-libp2p-peerstore v0.2.7/go.mod h1:ss/TWTgHZTMpsU/oKVVPQCGuDHItOpf2W8RxAi50P2s=
 github.com/libp2p/go-libp2p-pnet v0.2.0/go.mod h1:Qqvq6JH/oMZGwqs3N1Fqhv8NVhrdYcO0BW4wssv21LA=
-github.com/libp2p/go-libp2p-pubsub v0.15.0 h1:cG7Cng2BT82WttmPFMi50gDNV+58K626m/wR00vGL1o=
-github.com/libp2p/go-libp2p-pubsub v0.15.0/go.mod h1:lr4oE8bFgQaifRcoc2uWhWWiK6tPdOEKpUuR408GFN4=
+github.com/libp2p/go-libp2p-pubsub v0.16.0 h1:j7G2C8kJwkcAQqYR7Wmq3d75d3Sgw/N0Hhiv0dVx7OY=
+github.com/libp2p/go-libp2p-pubsub v0.16.0/go.mod h1:lr4oE8bFgQaifRcoc2uWhWWiK6tPdOEKpUuR408GFN4=
 github.com/libp2p/go-libp2p-quic-transport v0.10.0/go.mod h1:RfJbZ8IqXIhxBRm5hqUEJqjiiY8xmEuq3HUDS993MkA=
 github.com/libp2p/go-libp2p-record v0.1.0/go.mod h1:ujNc8iuE5dlKWVy6wuL6dd58t0n7xI4hAIl8pE6wu5Q=
 github.com/libp2p/go-libp2p-record v0.2.0/go.mod h1:I+3zMkvvg5m2OcSdoL0KPljyJyvNDFGKX7QdlpYUcwk=
