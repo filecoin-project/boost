@@ -219,10 +219,7 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 	defaultEnsemble := ensemble == nil
 	if defaultEnsemble {
 		eOpts := []kit.EnsembleOpt{
-			//TODO: at the moment we are not mocking proofs
-			//maybe enable this in the future to speed up tests further
-
-			//kit.MockProofs(),
+			kit.RealProofs(),
 		}
 		ensemble = kit.NewEnsemble(t, eOpts...)
 	}
