@@ -55,6 +55,7 @@ func TestLIDCleanup(t *testing.T) {
 	var eopts []kit.EnsembleOpt
 	eopts = append(eopts, kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.Account(verifier1Key, abi.NewTokenAmount(bal.Int64())))
+	eopts = append(eopts, kit.RealProofs())
 	esemble := kit.NewEnsemble(t, eopts...)
 
 	var opts []framework.FrameworkOpts

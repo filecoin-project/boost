@@ -38,7 +38,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 	framework.SetLogLevel()
 
 	// Set up two miners, each with a separate boost instance connected to it
-	ensemble := kit.NewEnsemble(t)
+	ensemble := kit.NewEnsemble(t, kit.RealProofs())
 	var opts []framework.FrameworkOpts
 	opts = append(opts, framework.WithEnsemble(ensemble))
 	boostAndMiner1 := framework.NewTestFramework(ctx, t, opts...)
