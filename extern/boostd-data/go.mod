@@ -5,32 +5,32 @@ go 1.26.2
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
 	github.com/filecoin-project/go-address v1.2.0
-	github.com/filecoin-project/go-jsonrpc v0.10.1
+	github.com/filecoin-project/go-jsonrpc v0.10.2
 	github.com/filecoin-project/go-state-types v0.18.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/ipfs/go-cid v0.6.1
-	github.com/ipfs/go-datastore v0.9.1
-	github.com/ipfs/go-ds-leveldb v0.5.2
-	github.com/ipfs/go-ipfs-blocksutil v0.0.2
-	github.com/ipfs/go-log/v2 v2.9.1
-	github.com/ipld/go-car/v2 v2.16.0
+	github.com/ipfs/go-cid v0.6.2
+	github.com/ipfs/go-datastore v0.9.2
+	github.com/ipfs/go-ds-leveldb v0.5.3
+	github.com/ipfs/go-ipfs-blocksutil v0.0.3
+	github.com/ipfs/go-log/v2 v2.9.2
+	github.com/ipld/go-car/v2 v2.17.0
 	github.com/lib/pq v1.12.3
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multicodec v0.10.0
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/pressly/goose/v3 v3.27.1
-	github.com/prometheus/client_golang v1.23.2
+	github.com/pressly/goose/v3 v3.27.3
+	github.com/prometheus/client_golang v1.24.1
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/yugabyte/gocql v1.6.0-yb-1
 	github.com/yugabyte/pgx/v5 v5.7.6-yb-1
 	go.opencensus.io v0.24.0
-	go.opentelemetry.io/otel v1.43.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
-	go.opentelemetry.io/otel/sdk v1.43.0
-	go.opentelemetry.io/otel/trace v1.43.0
+	go.opentelemetry.io/otel v1.45.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0
+	go.opentelemetry.io/otel/sdk v1.45.0
+	go.opentelemetry.io/otel/trace v1.45.0
 	golang.org/x/sync v0.20.0
 )
 
