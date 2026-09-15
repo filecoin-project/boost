@@ -66,6 +66,16 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 		return &validationError{error: err}
 	}
 
+	// The Transfer descriptor is not covered by the client's signature and is
+	// not otherwise validated. An online deal must declare a positive transfer
+	// size: a zero size makes the HTTP transport's chunk-size calculation
+	// divide by zero, which panics in a goroutine with no recover and takes
+	// down the whole daemon.
+	if !deal.IsOffline && deal.Transfer.Size == 0 {
+		err := fmt.Errorf("deal transfer size must be greater than zero")
+		return &validationError{error: err}
+	}
+
 	if proposal.Label.Length() > DealMaxLabelSize {
 		err := fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, proposal.Label.Length())
 		return &validationError{error: err}
