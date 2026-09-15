@@ -18,6 +18,7 @@ import (
 	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
@@ -119,6 +120,16 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	return nil
 }
 
+// isNv29OrAbove reports whether the chain is at network version 29 (FIP-0118 /
+// Solstice) or later, at which point datacap and verifreg are deprecated.
+func (ddp *DirectDealsProvider) isNv29OrAbove(ctx context.Context) (bool, error) {
+	nv, err := ddp.fullnodeApi.StateNetworkVersion(ctx, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("getting network version: %w", err)
+	}
+	return nv >= network.Version29, nil
+}
+
 func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDeal) (*api.ProviderDealRejectionInfo, error) {
 	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
 	if err != nil {
@@ -127,6 +138,20 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}
 
 	log.Infow("chain head", "epoch", chainHead)
+
+	// FIP-0118 (Solstice): from nv29 datacap and verifreg are deprecated, so the
+	// DDO (FIL+ verified) flow can no longer be served. Reject explicitly here
+	// instead of relying on an implicit allocation-not-found failure below.
+	nv29, err := ddp.isNv29OrAbove(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if nv29 {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   "DDO (FIL+ verified deals) is no longer supported at network version 29+: datacap was deprecated by FIP-0118",
+		}, nil
+	}
 
 	if chainHead.Height()+ddp.config.StartEpochSealingBuffer > entry.StartEpoch {
 		return &api.ProviderDealRejectionInfo{
@@ -229,6 +254,13 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectD
 	res, err := ddp.Accept(ctx, entry)
 	if err != nil {
 		return nil, err
+	}
+
+	// If the deal was rejected (e.g. DDO is unsupported at nv29, or the
+	// allocation is missing) there is nothing left to import. Returning early
+	// also avoids dereferencing a nil allocation below.
+	if !res.Accepted {
+		return res, nil
 	}
 
 	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)

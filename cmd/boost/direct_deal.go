@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
@@ -257,6 +258,16 @@ var directDealAllocate = &cli.Command{
 		}
 		defer closer()
 
+		// FIP-0118 (Solstice): datacap/verifreg is deprecated from nv29, so no
+		// new allocations can be created.
+		nv, err := gapi.StateNetworkVersion(ctx, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("getting network version: %w", err)
+		}
+		if nv >= network.Version29 {
+			return fmt.Errorf("creating allocations is no longer supported at network version 29+: datacap was deprecated by FIP-0118")
+		}
+
 		// Get wallet address from input
 		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 		if err != nil {
@@ -364,7 +375,7 @@ var directDealAllocate = &cli.Command{
 
 var directDealGetAllocations = &cli.Command{
 	Name:  "list-allocations",
-	Usage: "Lists all allocations for a client address(wallet)",
+	Usage: "Lists all allocations for a client address(wallet) [DEPRECATED at nv29: datacap removed by FIP-0118]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "miner",
@@ -602,6 +613,17 @@ If the client id different then claim can be extended up to maximum 5 years from
 		defer closer()
 
 		ctx := bcli.ReqContext(cctx)
+
+		// FIP-0118 (Solstice): datacap/verifreg is deprecated from nv29, so
+		// existing claims can no longer be extended.
+		nv, err := gapi.StateNetworkVersion(ctx, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("getting network version: %w", err)
+		}
+		if nv >= network.Version29 {
+			return fmt.Errorf("extending claims is no longer supported at network version 29+: datacap was deprecated by FIP-0118")
+		}
+
 		claimMap := make(map[verifreg13types.ClaimId]util.ProvInfo)
 
 		// If no miners and arguments are present
