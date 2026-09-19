@@ -17,6 +17,7 @@ import (
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/itests/framework"
@@ -53,6 +54,10 @@ func TestLIDCleanup(t *testing.T) {
 	require.NoError(t, err)
 
 	var eopts []kit.EnsembleOpt
+	// The ensemble defaults to buildconstants.TestNetworkVersion (nv29), where FIP-0118
+	// deprecates datacap and verifreg rejects AddVerifier. This test exercises the legacy
+	// datacap path, so pin it to nv28 (actors v18).
+	eopts = append(eopts, kit.GenesisNetworkVersion(network.Version28))
 	eopts = append(eopts, kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.Account(verifier1Key, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.RealProofs())
