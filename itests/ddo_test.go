@@ -247,8 +247,9 @@ func TestDirectDealRejectedAtNv29(t *testing.T) {
 	framework.SetLogLevel()
 
 	// No GenesisNetworkVersion here: the ensemble defaults to
-	// buildconstants.TestNetworkVersion, which is nv29.
-	esemble := kit.NewEnsemble(t)
+	// buildconstants.TestNetworkVersion, which is nv29, which is where this test
+	// needs to run. The proof mode still has to be explicit.
+	esemble := kit.NewEnsemble(t, kit.RealProofs())
 
 	var opts []framework.FrameworkOpts
 	opts = append(opts, framework.WithEnsemble(esemble))

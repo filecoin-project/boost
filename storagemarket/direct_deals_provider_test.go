@@ -223,16 +223,6 @@ func TestResolveClaimUpgradeHeightNotReportedRetries(t *testing.T) {
 	require.Contains(t, err.Error(), "nv29 upgrade height")
 }
 
-// sectorlessNode reports that the sector is not on chain, which lotus returns as
-// an explicit nil rather than an error.
-type sectorlessNode struct {
-	v1api.FullNode
-}
-
-func (s *sectorlessNode) StateSectorGetInfo(context.Context, address.Address, abi.SectorNumber, ltypes.TipSetKey) (*miner.SectorOnChainInfo, error) {
-	return nil, nil
-}
-
 // vanishingAllocationNode serves the node queries Import makes, with an
 // allocation that is there for Accept's lookup and gone for the one Import runs
 // straight after it - the window in which another deal can claim it. Only the
