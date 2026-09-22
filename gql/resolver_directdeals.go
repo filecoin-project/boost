@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -253,6 +254,15 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		return "Sealer: " + string(si.State)
 	}
 	if claim == nil {
+		// A sector proven at or after nv29 never gets a claim, so warning about
+		// the absence would flag every healthy deal past the upgrade.
+		sealedAtOrAfterNv29, err := storagemarket.SealedAtOrAfterNv29(ctx, dr.fullNode, dr.Provider, dr.SectorID)
+		if err != nil {
+			log.Warnw("error dating the deal's sector against nv29", "deal", dr.DirectDeal.ID, "sector", dr.SectorID, "error", err)
+		}
+		if sealedAtOrAfterNv29 {
+			return "Sealer: " + string(si.State)
+		}
 		return "Sealer: " + string(si.State) + "(No claim found)"
 	}
 	if claim.Sector != dr.SectorID {

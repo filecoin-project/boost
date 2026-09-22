@@ -76,8 +76,8 @@ var dealFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "verified",
-		Usage: "whether the deal funds should come from verified client data-cap",
-		Value: true,
+		Usage: "whether the deal funds should come from verified client data-cap (deprecated at nv29 by FIP-0118; a verified deal is rejected from there on)",
+		Value: false,
 	},
 	&cli.BoolFlag{
 		Name:  "remove-unsealed-copy",

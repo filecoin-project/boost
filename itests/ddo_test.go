@@ -27,7 +27,31 @@ import (
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
 
-func TestDirectDeal(t *testing.T) {
+// upgradeHeight is where the ensemble crosses to nv29. It has to be late enough
+// that the datacap setup and the deal itself are done at nv28 - verifreg rejects
+// AddVerifier from nv29, so none of that flow can run afterwards - and early
+// enough that the sector is still sealing, which is what makes the sector prove
+// under the new rules. The test asserts that ordering rather than trusting it,
+// so a miss shows up as a clear failure instead of a test that quietly stops
+// covering the crossing.
+const upgradeHeight = abi.ChainEpoch(200)
+
+// TestDirectDealSealingAcrossNv29 runs a direct deal across the upgrade: it is
+// accepted at nv28 and its sector finishes sealing at nv29.
+//
+// FIP-0118 removes the verified registry from sector activation, and the miner
+// actor no longer talks to it at all, so the sector proves normally and no claim
+// is ever written. Boost used to read that missing claim as the deal having left
+// the chain, which is the root of the sealing, piece doctor, migration and UI
+// bugs this branch fixes. Testing either side of the upgrade on its own leaves
+// this crossing uncovered, which is how those bugs got in.
+func TestDirectDealSealingAcrossNv29(t *testing.T) {
+	runDirectDealTest(t)
+}
+
+// runDirectDealTest drives a direct deal from allocation to a proving sector,
+// with the chain upgrading to nv29 while that sector is sealing.
+func runDirectDealTest(t *testing.T) {
 	ctx := context.Background()
 	fileSize := 7048576
 
@@ -45,10 +69,9 @@ func TestDirectDeal(t *testing.T) {
 	require.NoError(t, err)
 
 	var eopts []kit.EnsembleOpt
-	// The ensemble defaults to buildconstants.TestNetworkVersion (nv29), where FIP-0118
-	// deprecates datacap and verifreg rejects AddVerifier. This test exercises the legacy
-	// datacap path, so pin it to nv28 (actors v18).
-	eopts = append(eopts, kit.GenesisNetworkVersion(network.Version28))
+	// The ensemble otherwise defaults to buildconstants.TestNetworkVersion
+	// (nv29), where verifreg rejects AddVerifier and none of this flow can run.
+	eopts = append(eopts, kit.LatestActorsAt(upgradeHeight))
 	eopts = append(eopts, kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.Account(verifier1Key, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.RealProofs())
@@ -130,8 +153,6 @@ func TestDirectDeal(t *testing.T) {
 		allocationId = uint64(id)
 	}
 
-	alloc := allocations[verifreg.AllocationId(allocationId)]
-
 	head, err := f.FullNode.ChainHead(ctx)
 	require.NoError(t, err)
 
@@ -159,6 +180,15 @@ func TestDirectDeal(t *testing.T) {
 	}
 	t.Log("Direct data import scheduled for execution")
 
+	// The crossing only gets covered if the deal really was accepted before the
+	// upgrade. Check it rather than assume it, so that setup drifting past the
+	// upgrade height fails loudly instead of silently turning this into a plain
+	// nv29 test that can never pass.
+	nvAtAccept, err := f.FullNode.StateNetworkVersion(ctx, types.EmptyTSK)
+	require.NoError(t, err)
+	require.Less(t, nvAtAccept, network.Version29,
+		"the deal has to be accepted before nv29; raise upgradeHeight")
+
 	// Wait for sector to start sealing
 	time.Sleep(2 * time.Second)
 
@@ -170,24 +200,100 @@ func TestDirectDeal(t *testing.T) {
 		return len(stateList) == 3
 	}, 5*time.Minute, 2*time.Second, "sector 2 is still not proving after 5 minutes")
 
-	// Confirm we have 0 allocations left
-	allocations, err = f.FullNode.StateGetAllocations(ctx, f.ClientAddr, types.EmptyTSK)
+	assertSealedWithoutClaim(t, ctx, f, allocationId)
+}
+
+// assertSealedWithoutClaim is the end state across the upgrade. The sector
+// proved at nv29, where the miner actor no longer talks to the verified
+// registry, so there is no claim for it - and that is the expected outcome, not
+// a fault. What has to hold is that the data really is sealed and stays
+// reachable, which is what the rest of Boost has to key off now that the claim
+// it used to look for is gone.
+func assertSealedWithoutClaim(t *testing.T, ctx context.Context, f *framework.TestFramework, allocationID uint64) {
+	nv, err := f.FullNode.StateNetworkVersion(ctx, types.EmptyTSK)
 	require.NoError(t, err)
-	require.Len(t, allocations, 0)
+	require.GreaterOrEqual(t, nv, network.Version29, "the chain should have upgraded while the sector was sealing")
 
-	// Match claim with different vars
-	claims, err := f.FullNode.StateGetClaims(ctx, f.MinerAddr, types.EmptyTSK)
-	require.NoError(t, err)
-
-	require.Len(t, claims, 3)
-	claim, ok := claims[verifreg.ClaimId(allocationId)]
-	require.True(t, ok)
-
+	// The sector is on chain and proving, so the data did seal.
 	st, err := f.FullNode.StateSectorGetInfo(ctx, f.MinerAddr, abi.SectorNumber(2), types.EmptyTSK)
 	require.NoError(t, err)
+	require.NotNil(t, st, "the sector should be on chain even though no claim was made for it")
 
-	require.Equal(t, alloc.Data, claim.Data)
-	require.Equal(t, alloc.Size, claim.Size)
-	require.Equal(t, claim.TermStart, st.Activation)
-	require.Equal(t, claim.TermMin, alloc.TermMin)
+	// No claim was written for the allocation, and none ever will be.
+	claims, err := f.FullNode.StateGetClaims(ctx, f.MinerAddr, types.EmptyTSK)
+	require.NoError(t, err)
+	_, ok := claims[verifreg.ClaimId(allocationID)]
+	require.False(t, ok, "FIP-0118 removes verifreg from sector activation, so no claim should exist")
+
+	// The sector really carries the piece, so the data is on disk and not just a
+	// sector number that happened to reach Proving.
+	si, err := f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(2), false)
+	require.NoError(t, err)
+	require.NotEmpty(t, si.Pieces, "the sealed sector should still hold its piece")
+}
+
+// TestDirectDealRejectedAtNv29 is the other half of the pair. The crossing test
+// above gets a deal in before the upgrade; this one starts at nv29 and checks
+// that no deal gets in at all.
+//
+// FIP-0118 deprecates datacap at nv29, so a direct deal must be turned away at
+// Accept() with a reason that says why. Rejecting up front matters: allowing
+// the deal through would import data for an allocation that can never be
+// claimed.
+func TestDirectDealRejectedAtNv29(t *testing.T) {
+	ctx := context.Background()
+
+	kit.QuietMiningLogs()
+	framework.SetLogLevel()
+
+	// No GenesisNetworkVersion here: the ensemble defaults to
+	// buildconstants.TestNetworkVersion, which is nv29.
+	esemble := kit.NewEnsemble(t)
+
+	var opts []framework.FrameworkOpts
+	opts = append(opts, framework.WithEnsemble(esemble))
+	opts = append(opts, framework.SetProvisionalWalletBalances(int64(9e18)))
+	f := framework.NewTestFramework(ctx, t, opts...)
+	esemble.Start()
+	esemble.BeginMining(100 * time.Millisecond)
+
+	err := f.Start()
+	require.NoError(t, err)
+	defer f.Stop()
+
+	nv, err := f.FullNode.StateNetworkVersion(ctx, types.EmptyTSK)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, nv, network.Version29, "this test only means anything at nv29 or later")
+
+	// Build a CAR file so the request is well formed in every other respect and
+	// the rejection can only be about the network version.
+	tempdir := t.TempDir()
+	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 7048576)
+	require.NoError(t, err)
+	_, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
+	require.NoError(t, err)
+	commp, err := storagemarket.GenerateCommPLocally(carFilepath)
+	require.NoError(t, err)
+
+	head, err := f.FullNode.ChainHead(ctx)
+	require.NoError(t, err)
+
+	ddParams := smtypes.DirectDealParams{
+		DealUUID:     uuid.New(),
+		AllocationID: verifreg.AllocationId(1),
+		PieceCid:     commp.PieceCID,
+		ClientAddr:   f.ClientAddr,
+		StartEpoch:   head.Height() + 200,
+		EndEpoch:     head.Height() + 2880*400,
+		FilePath:     carFilepath,
+	}
+
+	rej, err := f.Boost.BoostDirectDeal(ctx, ddParams)
+	require.NoError(t, err, "the deal should be rejected cleanly, not fail with an error")
+	require.NotNil(t, rej, "expected a rejection at nv29")
+	require.False(t, rej.Accepted, "a direct deal must not be accepted at nv29")
+	require.Contains(t, rej.Reason, "network version 29",
+		"the rejection should say the network version is why, so an operator is not left guessing")
+	require.Contains(t, rej.Reason, "FIP-0118",
+		"naming the FIP gives the operator something to look up")
 }

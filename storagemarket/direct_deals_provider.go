@@ -120,14 +120,80 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	return nil
 }
 
+// DirectDealRejectionAtNv29 is the reason a direct deal is turned away from
+// nv29 on, where FIP-0118 takes datacap and verifreg out of the DDO flow.
+//
+// It is exported because both ends of the flow use it: Accept rejects the deal
+// with it, and `boostd import-direct` rejects the same deal before the request
+// is ever sent. Sharing the sentence means an operator is told the same thing
+// wherever the deal happens to be stopped, instead of one wording from the
+// client and another from the provider.
+const DirectDealRejectionAtNv29 = "DDO (FIL+ verified deals) is no longer supported at network version 29+: datacap was deprecated by FIP-0118"
+
+// RejectedAtNv29 reports whether a deal has to be turned away at this network
+// version. It is the single definition of that boundary, so the client and the
+// provider cannot come to different conclusions about the same chain.
+//
+// The chain's version now is the right question for a new deal. For a sector
+// that already sealed, ask SealedAtOrAfterNv29 instead: that one dates the
+// sector, not the chain.
+func RejectedAtNv29(nv network.Version) bool {
+	return nv >= network.Version29
+}
+
 // isNv29OrAbove reports whether the chain is at network version 29 (FIP-0118 /
 // Solstice) or later, at which point datacap and verifreg are deprecated.
+//
+// For a sector that has already sealed, ask SealedAtOrAfterNv29 instead: that
+// one dates the sector, not the chain.
 func (ddp *DirectDealsProvider) isNv29OrAbove(ctx context.Context) (bool, error) {
 	nv, err := ddp.fullnodeApi.StateNetworkVersion(ctx, ltypes.EmptyTSK)
 	if err != nil {
 		return false, fmt.Errorf("getting network version: %w", err)
 	}
-	return nv >= network.Version29, nil
+	return RejectedAtNv29(nv), nil
+}
+
+// Nv29UpgradeHeight returns the epoch at which nv29 activates, for dating a
+// sector's activation against it. A non-positive height is an error, not a
+// value to compare against: callers test "activation >= height", so zero would
+// put every sector past the upgrade. Lotus uses a far-future epoch for an
+// unscheduled upgrade and a negative one for active-from-genesis.
+func Nv29UpgradeHeight(ctx context.Context, api v1api.FullNode) (abi.ChainEpoch, error) {
+	params, err := api.StateGetNetworkParams(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting network params: %w", err)
+	}
+
+	height := params.ForkUpgradeParams.UpgradeXxHeight
+	if height <= 0 {
+		return 0, fmt.Errorf("full node reported an nv29 upgrade height of %d: too old to know it", height)
+	}
+	return height, nil
+}
+
+// SealedAtOrAfterNv29 reports whether a sector was activated at or after nv29,
+// where FIP-0118 writes no claim for it.
+//
+// The sector's own activation decides this, not the chain's current version: a
+// sector is often asked about long after it sealed, and reading "the chain is
+// at nv29 now" as "this sector gets no claim" would excuse a claim that really
+// did go missing. Anything that cannot be established reads as "no", which
+// keeps the caller's pre-nv29 behaviour.
+func SealedAtOrAfterNv29(ctx context.Context, api v1api.FullNode, miner address.Address, sector abi.SectorNumber) (bool, error) {
+	si, err := api.StateSectorGetInfo(ctx, miner, sector, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("getting sector info: %w", err)
+	}
+	if si == nil {
+		return false, nil
+	}
+
+	nv29Height, err := Nv29UpgradeHeight(ctx, api)
+	if err != nil {
+		return false, err
+	}
+	return si.Activation >= nv29Height, nil
 }
 
 func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDeal) (*api.ProviderDealRejectionInfo, error) {
@@ -149,7 +215,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	if nv29 {
 		return &api.ProviderDealRejectionInfo{
 			Accepted: false,
-			Reason:   "DDO (FIL+ verified deals) is no longer supported at network version 29+: datacap was deprecated by FIP-0118",
+			Reason:   DirectDealRejectionAtNv29,
 		}, nil
 	}
 
@@ -257,8 +323,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectD
 	}
 
 	// If the deal was rejected (e.g. DDO is unsupported at nv29, or the
-	// allocation is missing) there is nothing left to import. Returning early
-	// also avoids dereferencing a nil allocation below.
+	// allocation is missing) there is nothing left to import.
 	if !res.Accepted {
 		return res, nil
 	}
@@ -266,6 +331,15 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectD
 	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	// Accept checked this allocation a moment ago, so a nil here means it went
+	// away in between. Reject rather than dereference it below.
+	if allocation == nil {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   fmt.Sprintf("allocation %d not found for client %s", entry.AllocationID, entry.Client),
+		}, nil
 	}
 
 	idaddr, err := address.NewIDAddress(uint64(allocation.Provider))
@@ -557,20 +631,11 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *de
 	// Check immediately if the sector has reached a final sealing state
 	complete := checkSealingFinalized()
 	if complete {
-		isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
-		if claimErr != nil {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: claimErr,
-			}
+		done, err := ddp.resolveClaim(entry)
+		if err != nil {
+			return err
 		}
-		if found {
-			if !isClaimed {
-				return &dealMakingError{
-					retry: types.DealRetryFatal,
-					error: errors.New("sector mismatch for claim"),
-				}
-			}
+		if done {
 			return nil
 		}
 	}
@@ -590,20 +655,11 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *de
 		case <-ticker.C:
 			complete := checkSealingFinalized()
 			if complete {
-				isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
-				if claimErr != nil {
-					return &dealMakingError{
-						retry: types.DealRetryAuto,
-						error: claimErr,
-					}
+				done, err := ddp.resolveClaim(entry)
+				if err != nil {
+					return err
 				}
-				if found {
-					if !isClaimed {
-						return &dealMakingError{
-							retry: types.DealRetryFatal,
-							error: errors.New("sector mismatch for claim"),
-						}
-					}
+				if done {
 					return nil
 				}
 				// We should terminate looking for claim after 10 minutes and fail the deal
@@ -617,6 +673,46 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *de
 			}
 		}
 	}
+}
+
+// resolveClaim reports whether a deal whose sector has reached a final sealing
+// state is finished. False with no error means a claim may still turn up; an
+// error is returned to the caller as-is.
+func (ddp *DirectDealsProvider) resolveClaim(entry *types.DirectDeal) (bool, *dealMakingError) {
+	isClaimed, found, err := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+	if err != nil {
+		return false, &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: err,
+		}
+	}
+	if found {
+		if !isClaimed {
+			return false, &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: errors.New("sector mismatch for claim"),
+			}
+		}
+		return true, nil
+	}
+
+	// A sector activated at or after nv29 never gets a claim, so its absence is
+	// the whole of the outcome. One from before nv29 was expected to get one, so
+	// it still falls through to the timeout below.
+	sealedAfterNv29, err := SealedAtOrAfterNv29(ddp.ctx, ddp.fullnodeApi, ddp.Address, entry.SectorID)
+	if err != nil {
+		return false, &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: err,
+		}
+	}
+	if sealedAfterNv29 {
+		ddp.dealLogger.Infow(entry.ID,
+			"sector sealed at network version 29 or above, where FIP-0118 writes no claim for it; the deal is complete")
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *types.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {

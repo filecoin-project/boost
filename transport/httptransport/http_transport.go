@@ -383,9 +383,8 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 	}
 
-	// A non-positive deal size would make the chunk size below zero and cause a
-	// divide-by-zero panic. The mismatch guard above is skipped when the deal
-	// size is zero, so reject it explicitly here.
+	// Reject empty or invalid response sizes before calculating chunk sizes.
+	// A zero size would make chunkSize zero, causing the division below to panic.
 	if dealSize <= 0 {
 		return &httpError{
 			error: fmt.Errorf("deal size must be greater than zero, head: %d, dealInfo: %d", dealSize, t.dealInfo.DealSize),
