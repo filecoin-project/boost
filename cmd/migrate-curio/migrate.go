@@ -550,35 +550,64 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 }
 
 // migratableDirectDeal reports whether a direct deal on disk should be carried
-// over to Curio and, when it should not, why. sealedAfterNv29 dates the deal's
-// own sector, which is what decides whether a claim was ever expected: past
-// nv29 FIP-0118 writes none, so its absence says nothing about the data.
-func migratableDirectDeal(deal *types.DirectDeal, claim *verifreg9types.Claim, sealedAfterNv29, sectorAlive bool) (bool, string, error) {
+// over to Curio and, when it should not, why.
+func migratableDirectDeal(deal *types.DirectDeal, claim *verifreg9types.Claim, onboardedAfterNv29, sectorAlive bool) (bool, string, error) {
 	// SectorID is zero until the piece reaches a sector.
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		return false, "the checkpoint is below add piece", nil
 	}
 
-	// The deal failed because its allocation could not be claimed. Past nv29
-	// there is no claim to make, so the failure is the expected one and the data
-	// is sealed and indexed: skipping it would strand it in Curio.
-	if deal.Err != "" && deal.Retry == types.DealRetryFatal && !sealedAfterNv29 {
-		return false, "the deal retry is fatal", nil
+	if deal.Err != "" && deal.Retry == types.DealRetryFatal {
+		// The missing claim is the only fatal error excused, and only past nv29.
+		claimMissing := deal.Err == storagemarket.ErrNoClaimFound.Error()
+		if !claimMissing || !onboardedAfterNv29 {
+			return false, fmt.Sprintf("the deal retry is fatal: %s", deal.Err), nil
+		}
+	}
+
+	// Before the claim: a dead sector dates as pre-nv29.
+	if !sectorAlive {
+		return false, "the deal sector is no longer alive", nil
 	}
 
 	if claim != nil {
 		if claim.Sector != deal.SectorID {
 			return false, "", fmt.Errorf("sector mismatch for deal")
 		}
-	} else if !sealedAfterNv29 {
-		return false, "no claim was found for a sector sealed before nv29", nil
-	}
-
-	if !sectorAlive {
-		return false, "the deal sector is no longer alive", nil
+	} else if !onboardedAfterNv29 {
+		return false, "no claim was found for a piece onboarded before nv29", nil
 	}
 
 	return true, "", nil
+}
+
+// dateDealsAgainstNv29 reports which of this miner's sectors hold piece data
+// that arrived at or after the nv29 boundary -- the sectors whose deals
+// FIP-0118 writes no claim for. One read answers for every deal, since a deal's
+// answer is its sector's; a stale set can only read true as false.
+func dateDealsAgainstNv29(ctx context.Context, full v1api.FullNode, maddr address.Address,
+	boundary storagemarket.Nv29Boundary) (map[abi.SectorNumber]bool, error) {
+	if !boundary.Reached {
+		return nil, nil
+	}
+
+	head, err := full.ChainHead(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting chain head: %w", err)
+	}
+
+	sectors, err := full.StateMinerSectors(ctx, maddr, nil, head.Key())
+	if err != nil {
+		return nil, fmt.Errorf("listing the miner's sectors: %w", err)
+	}
+
+	onboarded := make(map[abi.SectorNumber]bool)
+	for _, si := range sectors {
+		if boundary.SectorOnboarded(si) {
+			onboarded[si.SectorNumber] = true
+		}
+	}
+	return onboarded, nil
 }
 
 func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bitfield.BitField, maddr address.Address, hdb *harmonydb.DB, sqldb, mdb *sql.DB) error {
@@ -594,24 +623,19 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 		return fmt.Errorf("failed to get all DDO deals: %w", err)
 	}
 
-	// Check the height up front, before any deal is touched. Every decision below
-	// turns on it, and a node that cannot report it would otherwise fall back to
-	// "pre-nv29" on each deal and skip the ones this is meant to rescue. (An
-	// unscheduled nv29 reports a far-future epoch, which is a usable answer.)
-	if _, err := storagemarket.Nv29UpgradeHeight(ctx, full); err != nil {
-		return fmt.Errorf("determining the nv29 upgrade height: %w", err)
+	// Settled once: a run without it reads every deal as pre-nv29.
+	boundary, err := storagemarket.ResolveNv29Boundary(ctx, full)
+	if err != nil {
+		return fmt.Errorf("determining where nv29 sits on this chain: %w", err)
+	}
+	if boundary.Reached {
+		log.Infow("dating deals against the nv29 upgrade", "height", boundary.Height)
 	}
 
-	// A query that fails leaves the deal undated rather than stopping the run:
-	// treating it as pre-nv29 skips one deal, which the next migration picks up.
-	sealedAfterNv29 := func(deal *types.DirectDeal) bool {
-		sealed, err := storagemarket.SealedAtOrAfterNv29(ctx, full, maddr, deal.SectorID)
-		if err != nil {
-			log.Warnw("could not date the deal against nv29; treating it as pre-nv29",
-				"deal", deal.ID.String(), "sector", deal.SectorID, "err", err)
-			return false
-		}
-		return sealed
+	// Before the first deal: a chain that will not answer stops the run.
+	onboardedAfterNv29, err := dateDealsAgainstNv29(ctx, full, maddr, boundary)
+	if err != nil {
+		return fmt.Errorf("dating the miner's sectors against the nv29 upgrade: %w", err)
 	}
 
 	for i, deal := range deals {
@@ -633,7 +657,10 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 			return err
 		}
 
-		ok, reason, err := migratableDirectDeal(deal, claim, sealedAfterNv29(deal), sectorAlive)
+		// From AddedPiece on: SectorID is zero before that.
+		onboarded := deal.Checkpoint >= dealcheckpoints.AddedPiece && onboardedAfterNv29[deal.SectorID]
+
+		ok, reason, err := migratableDirectDeal(deal, claim, onboarded, sectorAlive)
 		if err != nil {
 			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
 		}
@@ -642,7 +669,9 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 			continue
 		}
 		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
-			llog.Infow("Migrating a failed deal because its sector sealed after nv29, where no claim is created")
+			// Named, so a failed deal in the log does not read as an error waved through.
+			llog.Infow("Migrating a failed deal: its only failure was the missing claim a piece onboarded after nv29 never gets",
+				"error", deal.Err)
 		}
 
 		// Skip if already migrated

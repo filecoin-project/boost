@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/testutil"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -201,6 +202,28 @@ func runDirectDealTest(t *testing.T) {
 	}, 5*time.Minute, 2*time.Second, "sector 2 is still not proving after 5 minutes")
 
 	assertSealedWithoutClaim(t, ctx, f, allocationId)
+	assertDirectDealComplete(t, ctx, f, dealUuid)
+}
+
+// assertDirectDealComplete is the other half of the crossing: the chain facts
+// above say the piece sealed, and this says Boost read the same chain the same
+// way. With no claim to find, the deal is completed only if the sealer reports
+// the piece in the sector, which is the path nothing else in the suite covers.
+func assertDirectDealComplete(t *testing.T, ctx context.Context, f *framework.TestFramework, dealUuid uuid.UUID) {
+	ddb := f.DirectDealsDB(t)
+
+	var deal *smtypes.DirectDeal
+	require.Eventuallyf(t, func() bool {
+		d, err := ddb.ByID(ctx, dealUuid)
+		if err != nil || d == nil {
+			return false
+		}
+		deal = d
+		return d.Checkpoint >= dealcheckpoints.Complete
+	}, 2*time.Minute, time.Second, "boost never completed the direct deal")
+
+	require.Equal(t, dealcheckpoints.Complete, deal.Checkpoint)
+	require.Empty(t, deal.Err, "a deal whose piece sealed must not be failed for a missing claim")
 }
 
 // assertSealedWithoutClaim is the end state across the upgrade. The sector
@@ -230,6 +253,18 @@ func assertSealedWithoutClaim(t *testing.T, ctx context.Context, f *framework.Te
 	si, err := f.LotusMiner.SectorsStatus(ctx, abi.SectorNumber(2), false)
 	require.NoError(t, err)
 	require.NotEmpty(t, si.Pieces, "the sealed sector should still hold its piece")
+
+	// With no claim to read, the sector's own record is the only evidence this deal's
+	// data was onboarded: its piece spacetime says the sector is not empty and its epoch says past
+	// nv29.
+	// Logged because which of the two weights carries the spacetime is the basis for reading both.
+	t.Logf("sector 2 on chain: activation=%d powerBase=%d dealWeight=%s verifiedDealWeight=%s snapped=%t",
+		st.Activation, st.PowerBaseEpoch, st.DealWeight, st.VerifiedDealWeight, st.SectorKeyCID != nil)
+
+	onboarded, err := storagemarket.PieceOnboardedAtOrAfterNv29(ctx, f.FullNode, f.MinerAddr, abi.SectorNumber(2))
+	require.NoError(t, err)
+	require.True(t, onboarded,
+		"the chain should show the piece as onboarded at or after nv29, which is what stands in for the claim")
 }
 
 // TestDirectDealRejectedAtNv29 is the other half of the pair. The crossing test

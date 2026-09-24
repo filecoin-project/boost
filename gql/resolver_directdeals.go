@@ -36,6 +36,19 @@ type directDealListResolver struct {
 	More       bool
 }
 
+// newDirectDealResolver is the one constructor for a direct deal resolver; the single-deal query
+// once built one without a full node and panicked.
+func newDirectDealResolver(r *resolver, deal *types.DirectDeal) *directDealResolver {
+	return &directDealResolver{
+		DirectDeal:  *deal,
+		transferred: 0, // TODO
+		dealsDB:     r.dealsDB,
+		logsDB:      r.logsDB,
+		spApi:       r.spApi,
+		fullNode:    r.fullNode,
+	}
+}
+
 // query: directDeals(query, filter, cursor, offset, limit) DirectDealList
 func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDealListResolver, error) {
 	offset := 0
@@ -91,14 +104,7 @@ func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDeal
 	resolvers := make([]*directDealResolver, 0, len(deals))
 	for _, deal := range deals {
 		//deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
-		resolvers = append(resolvers, &directDealResolver{
-			DirectDeal:  *deal,
-			transferred: 0, // TODO
-			dealsDB:     r.dealsDB,
-			logsDB:      r.logsDB,
-			spApi:       r.spApi,
-			fullNode:    r.fullNode,
-		})
+		resolvers = append(resolvers, newDirectDealResolver(r, deal))
 	}
 
 	return &directDealListResolver{
@@ -120,13 +126,7 @@ func (r *resolver) DirectDeal(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
-	return &directDealResolver{
-		DirectDeal:  *deal,
-		transferred: 0, // TODO
-		dealsDB:     r.dealsDB,
-		logsDB:      r.logsDB,
-		spApi:       r.spApi,
-	}, nil
+	return newDirectDealResolver(r, deal), nil
 }
 
 func (r *resolver) DirectDealsCount(ctx context.Context) (int32, error) {
@@ -254,13 +254,14 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		return "Sealer: " + string(si.State)
 	}
 	if claim == nil {
-		// A sector proven at or after nv29 never gets a claim, so warning about
-		// the absence would flag every healthy deal past the upgrade.
-		sealedAtOrAfterNv29, err := storagemarket.SealedAtOrAfterNv29(ctx, dr.fullNode, dr.Provider, dr.SectorID)
+		// Data onboarded at or after nv29 never gets a claim, so its absence is normal only if this
+		// deal's piece is in the sector.
+		onboardedAtOrAfterNv29, err := storagemarket.PieceOnboardedAtOrAfterNv29(ctx, dr.fullNode, dr.Provider, dr.SectorID)
 		if err != nil {
-			log.Warnw("error dating the deal's sector against nv29", "deal", dr.DirectDeal.ID, "sector", dr.SectorID, "error", err)
+			log.Warnw("error dating the deal's piece against nv29", "deal", dr.DirectDeal.ID, "sector", dr.SectorID, "error", err)
 		}
-		if sealedAtOrAfterNv29 {
+		held, reported := storagemarket.SectorHoldsPiece(si, dr.PieceCID)
+		if onboardedAtOrAfterNv29 && (held || !reported) {
 			return "Sealer: " + string(si.State)
 		}
 		return "Sealer: " + string(si.State) + "(No claim found)"

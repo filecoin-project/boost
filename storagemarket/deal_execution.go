@@ -784,6 +784,24 @@ func IsFinalSealingState(state lapi.SectorState) bool {
 	return false
 }
 
+// IsFailedSealingState reports whether a final sealing state is one the deal's data does not
+// survive. Past nv29 no claim is written either way, so the sealing state is the only thing telling
+// a successful seal from a failed one.
+func IsFailedSealingState(state lapi.SectorState) bool {
+	switch sealing.SectorState(state) {
+	case
+		sealing.Removed,
+		sealing.Removing,
+		sealing.Terminating,
+		sealing.TerminateWait,
+		sealing.TerminateFinality,
+		sealing.TerminateFailed,
+		sealing.FailedUnrecoverable:
+		return true
+	}
+	return false
+}
+
 func HasDeal(deals []abi.DealID, pdsDealId abi.DealID) bool {
 	var ret bool
 	for _, d := range deals {
