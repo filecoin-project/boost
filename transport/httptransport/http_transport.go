@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -240,6 +241,16 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		defer t.wg.Done()
 		defer cleanup()
 
+		// A panic in this goroutine would otherwise terminate the process:
+		// there is no recover() on this path, and the goroutine is detached
+		// from the caller. Turn any panic into a transfer error instead.
+		defer func() {
+			if r := recover(); r != nil {
+				t.dl.Errorw(duuid, "panic during http transfer", "panic", r, "stack", string(debug.Stack()))
+				t.emitEvent(types.TransportEvent{Error: fmt.Errorf("panic during http transfer: %v", r)})
+			}
+		}()
+
 		if err := t.execute(tctx); err != nil {
 			t.emitEvent(types.TransportEvent{Error: err})
 		}
@@ -369,6 +380,14 @@ func (t *transfer) execute(ctx context.Context) error {
 	if t.dealInfo.DealSize != 0 && dealSize != t.dealInfo.DealSize {
 		return &httpError{
 			error: fmt.Errorf("deal size mismatch: head: %d, dealInfo: %d", dealSize, t.dealInfo.DealSize),
+		}
+	}
+
+	// Reject empty or invalid response sizes before calculating chunk sizes.
+	// A zero size would make chunkSize zero, causing the division below to panic.
+	if dealSize <= 0 {
+		return &httpError{
+			error: fmt.Errorf("deal size must be greater than zero, head: %d, dealInfo: %d", dealSize, t.dealInfo.DealSize),
 		}
 	}
 

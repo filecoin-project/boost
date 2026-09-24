@@ -30,6 +30,7 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -548,6 +549,67 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 	return nil
 }
 
+// migratableDirectDeal reports whether a direct deal on disk should be carried
+// over to Curio and, when it should not, why.
+func migratableDirectDeal(deal *types.DirectDeal, claim *verifreg9types.Claim, onboardedAfterNv29, sectorAlive bool) (bool, string, error) {
+	// SectorID is zero until the piece reaches a sector.
+	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		return false, "the checkpoint is below add piece", nil
+	}
+
+	if deal.Err != "" && deal.Retry == types.DealRetryFatal {
+		// The missing claim is the only fatal error excused, and only past nv29.
+		claimMissing := deal.Err == storagemarket.ErrNoClaimFound.Error()
+		if !claimMissing || !onboardedAfterNv29 {
+			return false, fmt.Sprintf("the deal retry is fatal: %s", deal.Err), nil
+		}
+	}
+
+	// Before the claim: a dead sector dates as pre-nv29.
+	if !sectorAlive {
+		return false, "the deal sector is no longer alive", nil
+	}
+
+	if claim != nil {
+		if claim.Sector != deal.SectorID {
+			return false, "", fmt.Errorf("sector mismatch for deal")
+		}
+	} else if !onboardedAfterNv29 {
+		return false, "no claim was found for a piece onboarded before nv29", nil
+	}
+
+	return true, "", nil
+}
+
+// dateDealsAgainstNv29 reports which of this miner's sectors hold piece data
+// that arrived at or after the nv29 boundary -- the sectors whose deals
+// FIP-0118 writes no claim for. One read answers for every deal, since a deal's
+// answer is its sector's; a stale set can only read true as false.
+func dateDealsAgainstNv29(ctx context.Context, full v1api.FullNode, maddr address.Address,
+	boundary storagemarket.Nv29Boundary) (map[abi.SectorNumber]bool, error) {
+	if !boundary.Reached {
+		return nil, nil
+	}
+
+	head, err := full.ChainHead(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting chain head: %w", err)
+	}
+
+	sectors, err := full.StateMinerSectors(ctx, maddr, nil, head.Key())
+	if err != nil {
+		return nil, fmt.Errorf("listing the miner's sectors: %w", err)
+	}
+
+	onboarded := make(map[abi.SectorNumber]bool)
+	for _, si := range sectors {
+		if boundary.SectorOnboarded(si) {
+			onboarded[si.SectorNumber] = true
+		}
+	}
+	return onboarded, nil
+}
+
 func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bitfield.BitField, maddr address.Address, hdb *harmonydb.DB, sqldb, mdb *sql.DB) error {
 	ddb := db.NewDirectDealsDB(sqldb)
 
@@ -561,41 +623,55 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 		return fmt.Errorf("failed to get all DDO deals: %w", err)
 	}
 
+	// Settled once: a run without it reads every deal as pre-nv29.
+	boundary, err := storagemarket.ResolveNv29Boundary(ctx, full)
+	if err != nil {
+		return fmt.Errorf("determining where nv29 sits on this chain: %w", err)
+	}
+	if boundary.Reached {
+		log.Infow("dating deals against the nv29 upgrade", "height", boundary.Height)
+	}
+
+	// Before the first deal: a chain that will not answer stops the run.
+	onboardedAfterNv29, err := dateDealsAgainstNv29(ctx, full, maddr, boundary)
+	if err != nil {
+		return fmt.Errorf("dating the miner's sectors against the nv29 upgrade: %w", err)
+	}
+
 	for i, deal := range deals {
 		if i > 0 && i%100 == 0 {
 			fmt.Printf("Migrating DDO Deals: %d / %d (%0.2f%%)\n", i, len(deals), float64(i)/float64(len(deals))*100)
 		}
 		llog := log.With("DDO Deal", deal.ID.String())
-		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
-			llog.Infow("Skipping as deal retry is fatal")
-			continue
-		}
 
-		if deal.Checkpoint < dealcheckpoints.AddedPiece {
-			llog.Infow("Skipping as checkpoint is below add piece")
-			continue
-		}
-
+		// A cross-check, not a gate: absent by design after nv29, but when present
+		// it must still agree about which sector holds the data.
 		claim, err := full.StateGetClaim(ctx, maddr, verifreg9types.ClaimId(deal.AllocationID), ltypes.EmptyTSK)
 		if err != nil {
 			return fmt.Errorf("deal: %s: error getting the claim status: %w", deal.ID.String(), err)
 		}
-		if claim == nil {
-			llog.Infow("Skipping as checkpoint is below add piece")
-			continue
-		}
-		if claim.Sector != deal.SectorID {
-			return fmt.Errorf("deal: %s: sector mismatch for deal", deal.ID.String())
-		}
 
 		// Skip if the sector for the deal is not alive
-		ok, err := activeSectors.IsSet(uint64(deal.SectorID))
+		sectorAlive, err := activeSectors.IsSet(uint64(deal.SectorID))
 		if err != nil {
 			return err
 		}
+
+		// From AddedPiece on: SectorID is zero before that.
+		onboarded := deal.Checkpoint >= dealcheckpoints.AddedPiece && onboardedAfterNv29[deal.SectorID]
+
+		ok, reason, err := migratableDirectDeal(deal, claim, onboarded, sectorAlive)
+		if err != nil {
+			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
+		}
 		if !ok {
-			llog.Infow("Skipping as sector ID is 0")
+			llog.Infow("Skipping direct deal", "reason", reason)
 			continue
+		}
+		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
+			// Named, so a failed deal in the log does not read as an error waved through.
+			llog.Infow("Migrating a failed deal: its only failure was the missing claim a piece onboarded after nv29 never gets",
+				"error", deal.Err)
 		}
 
 		// Skip if already migrated

@@ -66,6 +66,7 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
@@ -113,6 +114,7 @@ type TestFramework struct {
 	config *TestFrameworkConfig
 
 	HomeDir       string
+	RepoDir       string
 	Client        *boostclient.StorageClient
 	Boost         api.Boost
 	FullNode      *kit.TestFullNode
@@ -120,6 +122,19 @@ type TestFramework struct {
 	ClientAddr    address.Address
 	MinerAddr     address.Address
 	DefaultWallet address.Address
+}
+
+// DirectDealsDB opens the database the running node records its direct deals
+// in, so a test can read a deal's checkpoints rather than only the effects it
+// has on chain.
+func (f *TestFramework) DirectDealsDB(t *testing.T) *db.DirectDealsDB {
+	t.Helper()
+
+	sqldb, err := db.SqlDB(path.Join(f.RepoDir, db.DealsDBName) + "?cache=shared")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqldb.Close() })
+
+	return db.NewDirectDealsDB(sqldb)
 }
 
 type FrameworkOpts func(pc *TestFrameworkConfig)
@@ -325,6 +340,10 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	if err != nil {
 		return err
 	}
+
+	// The node writes its sqlite databases under the repo path, which the
+	// in-memory repo backs with a real temporary directory.
+	f.RepoDir = lr.Path()
 
 	// The in-memory repo implementation assumes that its being used to test
 	// a miner, which has storage configuration.

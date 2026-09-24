@@ -294,6 +294,14 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 }
 
 func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datatransfer.Message, proposal legacyretrievaltypes.DealProposal, request graphsync.RequestData, retType RetrievalType) (bool, error) {
+	// The graphsync wire schema marks the selector optional, so an incoming
+	// request may omit it and decode to a nil selector. Reject it here so it is
+	// neither tracked as a transfer nor handed to the validator, which would
+	// fail to encode it.
+	if request.Selector() == nil {
+		return true, errors.New("selector is required")
+	}
+
 	// If it's a paid retrieval, do not intercept it
 	if !proposal.UnsealPrice.IsZero() || !proposal.PricePerByte.IsZero() {
 		return false, nil

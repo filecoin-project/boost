@@ -34,6 +34,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	bdclientutil "github.com/filecoin-project/boost/extern/boostd-data/clientutil"
@@ -944,6 +945,21 @@ func TestDealVerification(t *testing.T) {
 			},
 			expectedErr: "verified deal DataCap 1 too small",
 		},
+		// FIP-0118 stops a verified deal earning a claim at nv29, but the datacap
+		// actor survives the upgrade, so a client with a leftover balance would
+		// otherwise sail through the checks below and be sealed at the verified
+		// ask - which providers set low or free in exchange for power that no
+		// longer arrives.
+		"fails a verified deal at nv29 even when the client still holds datacap": {
+			ask: &legacytypes.StorageAsk{
+				VerifiedPrice: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
+			},
+			opts:        []harnessOpt{withNetworkVersion(network.Version29)},
+			expectedErr: "no longer supported at network version 29",
+		},
 		"fails if can't fetch datacap for verified deal": {
 			ask: &legacytypes.StorageAsk{
 				VerifiedPrice: abi.NewTokenAmount(0),
@@ -1119,6 +1135,69 @@ func TestDealVerification(t *testing.T) {
 			require.Contains(t, err.Error(), tc.expectedErr)
 		})
 	}
+}
+
+// TestUnverifiedDealAcceptedAtNv29 is the other half of the nv29 verified deal
+// case in TestDealVerification. FIP-0118 only takes away verified deals, so an
+// unverified one has to keep going through at nv29 - without this, a gate that
+// turned away every deal at nv29 would still look correct.
+func TestUnverifiedDealAcceptedAtNv29(t *testing.T) {
+	ctx := context.Background()
+
+	harness := NewHarness(t, withNetworkVersion(network.Version29))
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	require.NoError(t, td.executeAndSubscribe())
+
+	td.waitForAndAssert(t, ctx, dealcheckpoints.IndexedAndAnnounced)
+}
+
+// TestZeroSizeTransfer covers the guard on the transfer size, which is the one
+// field of a deal the client does not sign and nothing else validates. A zero
+// size makes the HTTP transport's chunk size zero, and the division that follows
+// panics in a goroutine with no recover, taking the daemon down - so an online
+// deal has to be turned away during validation, before the transfer is set up.
+//
+// The offline half is what keeps the guard from being drawn too wide: an offline
+// deal declares no transfer at all, so a zero size there is normal and the deal
+// has to seal as it always did.
+func TestZeroSizeTransfer(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("an online deal is rejected", func(t *testing.T) {
+		harness := NewHarness(t)
+		harness.Start(t, ctx)
+		defer harness.Stop()
+
+		td := harness.newDealBuilder(t, 1).withNoOpMinerStub().build()
+		td.params.Transfer.Size = 0
+
+		err := td.executeAndSubscribe()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "deal transfer size must be greater than zero")
+	})
+
+	t.Run("an offline deal declares no transfer and still seals", func(t *testing.T) {
+		harness := NewHarness(t)
+		harness.Start(t, ctx)
+		defer harness.Stop()
+
+		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withAllMinerCallsNonBlocking().build()
+		td.params.Transfer.Size = 0
+
+		require.NoError(t, td.executeAndSubscribe())
+
+		// An offline deal is accepted and then waits for the client to hand the
+		// data over, so the import has to happen before the deal moves on.
+		td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+		require.NoError(t, td.executeAndSubscribeImportOfflineDeal(false))
+
+		// AddedPiece is the far side of the whole pipeline, so reaching it means
+		// the zero size never tripped the online guard.
+		td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+	})
 }
 
 func TestIPNIAnnounce(t *testing.T) {
@@ -1397,6 +1476,11 @@ type providerConfig struct {
 	publishWalletBal int64
 	collatWalletBal  int64
 
+	// networkVersion is what the mock full node reports. It defaults to nv28,
+	// the last version where datacap still worked, so the existing verified deal
+	// cases keep exercising the datacap checks.
+	networkVersion network.Version
+
 	price         abi.TokenAmount
 	verifiedPrice abi.TokenAmount
 	minPieceSize  abi.PaddedPieceSize
@@ -1476,6 +1560,12 @@ func withStateMarketBalance(locked, escrow abi.TokenAmount) harnessOpt {
 	}
 }
 
+func withNetworkVersion(nv network.Version) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.networkVersion = nv
+	}
+}
+
 func withDealFilter(filter dealfilter.StorageDealFilter) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.dealFilter = filter
@@ -1500,6 +1590,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		escrowFunds:          big.NewInt(5000000),
 		publishWalletBal:     1000,
 		collatWalletBal:      1000,
+		networkVersion:       network.Version28,
 
 		price:         abi.NewTokenAmount(0),
 		verifiedPrice: abi.NewTokenAmount(0),
@@ -1678,6 +1769,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		Locked: pc.lockedFunds,
 		Escrow: pc.escrowFunds,
 	}, nil).AnyTimes()
+
+	fn.EXPECT().StateNetworkVersion(gomock.Any(), gomock.Any()).Return(pc.networkVersion, nil).AnyTimes()
 
 	fn.EXPECT().WalletBalance(gomock.Any(), ph.PledgeCollatWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 	fn.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()

@@ -12,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
@@ -218,6 +219,94 @@ func TestRefreshState(t *testing.T) {
 						sid3: db.SealStateSealed,
 					},
 					SectorWithDeals: map[abi.SectorID]struct{}{},
+				}
+
+				exerciseAndVerify := func() {
+					got, err := mgr.refreshState(ctx)
+					require.NoError(t, err)
+
+					zero := time.Time{}
+					require.NotEqual(t, got.UpdatedAt, zero)
+
+					//null timestamp, so that we can do deep equal
+					got.UpdatedAt = zero
+
+					require.True(t, reflect.DeepEqual(expected, got), "expected: %s, got: %s", spew.Sdump(expected), spew.Sdump(got))
+				}
+
+				return fixtures{
+					mockExpectations:  mockExpectations,
+					exerciseAndVerify: exerciseAndVerify,
+				}
+			},
+		},
+		{
+			description: "sector with deals - piece data found in either weight",
+			f: func() fixtures {
+				sqldb := db.CreateTestTmpDB(t)
+				require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
+				require.NoError(t, migrations.Migrate(sqldb))
+				mgr.sdb = db.NewSectorStateDB(sqldb)
+
+				legacyUnverified := abi.SectorID{Miner: aid, Number: 101}
+				legacyVerified := abi.SectorID{Miner: aid, Number: 102}
+				sinceNv29 := abi.SectorID{Miner: aid, Number: 103}
+				committedCapacity := abi.SectorID{Miner: aid, Number: 104}
+
+				input_StorageList := map[storiface.ID][]storiface.Decl{
+					"storage-location-uuid1": {
+						{SectorID: legacyUnverified, SectorFileType: storiface.FTSealed},
+						{SectorID: legacyVerified, SectorFileType: storiface.FTSealed},
+						{SectorID: sinceNv29, SectorFileType: storiface.FTSealed},
+						{SectorID: committedCapacity, SectorFileType: storiface.FTSealed},
+					},
+				}
+				input_StateMinerActiveSectors := []*miner.SectorOnChainInfo{
+					{SectorNumber: legacyUnverified.Number},
+					{SectorNumber: legacyVerified.Number},
+					{SectorNumber: sinceNv29.Number},
+					{SectorNumber: committedCapacity.Number},
+				}
+				// One sector per population the weights distinguish; the manager must read them all the same
+				// way.
+				input_StateMinerSectors := []*miner.SectorOnChainInfo{
+					{SectorNumber: legacyUnverified.Number, DealWeight: big.NewInt(1 << 20)},
+					{SectorNumber: legacyVerified.Number, VerifiedDealWeight: big.NewInt(1 << 20)},
+					{SectorNumber: sinceNv29.Number, VerifiedDealWeight: big.NewInt(1 << 30)},
+					{SectorNumber: committedCapacity.Number},
+				}
+
+				mockExpectations := func() {
+					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList, nil)
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerSectors, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors, nil)
+				}
+
+				expected := &SectorStateUpdates{
+					Updates: map[abi.SectorID]db.SealState{
+						legacyUnverified:  db.SealStateSealed,
+						legacyVerified:    db.SealStateSealed,
+						sinceNv29:         db.SealStateSealed,
+						committedCapacity: db.SealStateSealed,
+					},
+					ActiveSectors: map[abi.SectorID]struct{}{
+						legacyUnverified:  {},
+						legacyVerified:    {},
+						sinceNv29:         {},
+						committedCapacity: {},
+					},
+					SectorStates: map[abi.SectorID]db.SealState{
+						legacyUnverified:  db.SealStateSealed,
+						legacyVerified:    db.SealStateSealed,
+						sinceNv29:         db.SealStateSealed,
+						committedCapacity: db.SealStateSealed,
+					},
+					SectorWithDeals: map[abi.SectorID]struct{}{
+						legacyUnverified: {},
+						legacyVerified:   {},
+						sinceNv29:        {},
+					},
 				}
 
 				exerciseAndVerify := func() {

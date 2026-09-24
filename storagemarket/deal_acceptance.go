@@ -66,6 +66,16 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 		return &validationError{error: err}
 	}
 
+	// The Transfer descriptor is not covered by the client's signature and is
+	// not otherwise validated. An online deal must declare a positive transfer
+	// size: a zero size makes the HTTP transport's chunk-size calculation
+	// divide by zero, which panics in a goroutine with no recover and takes
+	// down the whole daemon.
+	if !deal.IsOffline && deal.Transfer.Size == 0 {
+		err := fmt.Errorf("deal transfer size must be greater than zero")
+		return &validationError{error: err}
+	}
+
 	if proposal.Label.Length() > DealMaxLabelSize {
 		err := fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, proposal.Label.Length())
 		return &validationError{error: err}
@@ -162,6 +172,23 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 
 	// Verified deal checks
 	if proposal.VerifiedDeal {
+		// The flag is meaningless past nv29, but the datacap actor survives, so a
+		// leftover balance would still pass below and seal at the verified ask.
+		// Flipping the client default misses --verified and older clients.
+		nv, err := p.fullnodeApi.StateNetworkVersion(p.ctx, tsk)
+		if err != nil {
+			return &validationError{
+				reason: "server error: getting network version",
+				error:  fmt.Errorf("node error getting network version: %w", err),
+			}
+		}
+		if RejectedAtNv29(nv) {
+			return &validationError{
+				reason: "verified deals are no longer supported at network version 29+: datacap was deprecated by FIP-0118",
+				error:  errors.New("verified deal proposed at nv29 or later, where datacap is deprecated by FIP-0118"),
+			}
+		}
+
 		// Get data cap
 		dataCap, err := p.fullnodeApi.StateVerifiedClientStatus(p.ctx, proposal.Client, tsk)
 		if err != nil {

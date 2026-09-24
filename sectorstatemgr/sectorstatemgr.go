@@ -13,7 +13,6 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
@@ -263,14 +262,16 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	sectorWithDeals := make(map[abi.SectorID]struct{})
-	zero := big.Zero()
 	for _, info := range allSet {
 		sectorID := abi.SectorID{
 			Miner:  abi.ActorID(mid),
 			Number: info.SectorNumber,
 		}
 
-		if info.DealWeight.GreaterThan(zero) {
+		// Which weight carries a sector's spacetime depends on when it activated: pre-nv29 unverified is
+		// in DealWeight and verified in VerifiedDealWeight, while from nv29 FIP-0118 puts every piece in
+		// VerifiedDealWeight, so both are read.
+		if SectorCarriesData(info.DealWeight) || SectorCarriesData(info.VerifiedDealWeight) {
 			sectorWithDeals[sectorID] = struct{}{}
 		}
 	}
@@ -282,4 +283,10 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	return &SectorStateUpdates{sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
+}
+
+// SectorCarriesData reports whether one of a sector's spacetime weights says it holds piece data;
+// an absent weight reads as a zero one, not a panic.
+func SectorCarriesData(weight abi.DealWeight) bool {
+	return !weight.NilOrZero()
 }

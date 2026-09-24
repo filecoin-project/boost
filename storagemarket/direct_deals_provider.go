@@ -12,18 +12,21 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	miner13types "github.com/filecoin-project/go-state-types/builtin/v13/miner"
 	verifreg13types "github.com/filecoin-project/go-state-types/builtin/v13/verifreg"
 	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -65,8 +68,27 @@ type DirectDealsProvider struct {
 	runningLk sync.RWMutex
 	running   map[uuid.UUID]struct{}
 
+	sealingPollEvery time.Duration
+	sealingClock     func() time.Time
+
+	noSealerPiecesOnce sync.Once
+
 	pd *piecedirectory.PieceDirectory
 	ip *indexprovider.Wrapper
+}
+
+func (ddp *DirectDealsProvider) pollEvery() time.Duration {
+	if ddp.sealingPollEvery > 0 {
+		return ddp.sealingPollEvery
+	}
+	return sealingPollInterval
+}
+
+func (ddp *DirectDealsProvider) now() time.Time {
+	if ddp.sealingClock != nil {
+		return ddp.sealingClock()
+	}
+	return time.Now()
 }
 
 func NewDirectDealsProvider(cfg DDPConfig, minerAddr address.Address, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc types.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
@@ -119,6 +141,107 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	return nil
 }
 
+// DirectDealRejectionAtNv29 is the reason a direct deal is turned away from nv29 on.
+const DirectDealRejectionAtNv29 = "DDO (FIL+ verified deals) is no longer supported at network version 29+: datacap was deprecated by FIP-0118"
+
+// RejectedAtNv29 reports whether a new deal has to be turned away at this network
+// version; for a sealed sector ask PieceOnboardedAtOrAfterNv29 instead.
+func RejectedAtNv29(nv network.Version) bool {
+	return nv >= network.Version29
+}
+
+func (ddp *DirectDealsProvider) isNv29OrAbove(ctx context.Context) (bool, error) {
+	nv, err := ddp.fullnodeApi.StateNetworkVersion(ctx, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("getting network version: %w", err)
+	}
+	return RejectedAtNv29(nv), nil
+}
+
+// nv29UpgradeHeight returns the epoch nv29 activates at, off the node's own fork
+// schedule. A zero cannot be used: the node predates the field.
+func nv29UpgradeHeight(ctx context.Context, api v1api.FullNode) (abi.ChainEpoch, error) {
+	params, err := api.StateGetNetworkParams(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting network params: %w", err)
+	}
+
+	height := params.ForkUpgradeParams.UpgradeSolsticeHeight
+	if height == 0 {
+		return 0, errors.New("the full node reported no nv29 upgrade height: too old to know it")
+	}
+	return height, nil
+}
+
+// Nv29Boundary is where nv29 sits on the chain a node is synced to.
+type Nv29Boundary struct {
+	Reached bool
+	Height  abi.ChainEpoch
+}
+
+// ResolveNv29Boundary asks the chain where nv29 sits on it.
+func ResolveNv29Boundary(ctx context.Context, api v1api.FullNode) (Nv29Boundary, error) {
+	nv, err := api.StateNetworkVersion(ctx, ltypes.EmptyTSK)
+	if err != nil {
+		return Nv29Boundary{}, fmt.Errorf("getting network version: %w", err)
+	}
+	if !RejectedAtNv29(nv) {
+		return Nv29Boundary{}, nil
+	}
+
+	height, err := nv29UpgradeHeight(ctx, api)
+	if err != nil {
+		return Nv29Boundary{}, err
+	}
+	return Nv29Boundary{Reached: true, Height: height}, nil
+}
+
+// PieceOnboardedAtOrAfterNv29 reports whether a sector holds piece data that entered
+// it at or after nv29, where FIP-0118 writes no claim for it.
+//
+// The sector's own history decides this, not the chain's current version, which would
+// excuse a claim that really did go missing.
+func PieceOnboardedAtOrAfterNv29(ctx context.Context, api v1api.FullNode, miner address.Address, sector abi.SectorNumber) (bool, error) {
+	boundary, err := ResolveNv29Boundary(ctx, api)
+	if err != nil {
+		return false, err
+	}
+	return boundary.PieceOnboarded(ctx, api, miner, sector)
+}
+
+func (b Nv29Boundary) PieceOnboarded(ctx context.Context, api v1api.FullNode, miner address.Address, sector abi.SectorNumber) (bool, error) {
+	if !b.Reached {
+		return false, nil
+	}
+
+	si, err := api.StateSectorGetInfo(ctx, miner, sector, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("getting sector info: %w", err)
+	}
+	return b.SectorOnboarded(si), nil
+}
+
+// SectorOnboarded is PieceOnboarded for sector info already in hand, so the
+// migration, holding every sector from one StateMinerSectors call, reads no chain.
+func (b Nv29Boundary) SectorOnboarded(si *minertypes.SectorOnChainInfo) bool {
+	if !b.Reached || si == nil {
+		return false
+	}
+
+	// No piece spacetime: committed capacity, or a snap that never landed.
+	if !sectorstatemgr.SectorCarriesData(si.DealWeight) && !sectorstatemgr.SectorCarriesData(si.VerifiedDealWeight) {
+		return false
+	}
+
+	// Activation only records when the sector was committed, so a snapped sector is
+	// dated from PowerBaseEpoch, which the first ReplicaUpdate moves.
+	onboarded := si.Activation
+	if si.SectorKeyCID != nil {
+		onboarded = si.PowerBaseEpoch
+	}
+	return onboarded >= b.Height
+}
+
 func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDeal) (*api.ProviderDealRejectionInfo, error) {
 	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
 	if err != nil {
@@ -127,6 +250,20 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}
 
 	log.Infow("chain head", "epoch", chainHead)
+
+	// FIP-0118 (Solstice): from nv29 datacap and verifreg are deprecated, so the
+	// DDO (FIL+ verified) flow can no longer be served. Reject explicitly here
+	// instead of relying on an implicit allocation-not-found failure below.
+	nv29, err := ddp.isNv29OrAbove(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if nv29 {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   DirectDealRejectionAtNv29,
+		}, nil
+	}
 
 	if chainHead.Height()+ddp.config.StartEpochSealingBuffer > entry.StartEpoch {
 		return &api.ProviderDealRejectionInfo{
@@ -231,9 +368,24 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params types.DirectD
 		return nil, err
 	}
 
+	// If the deal was rejected (e.g. DDO is unsupported at nv29, or the
+	// allocation is missing) there is nothing left to import.
+	if !res.Accepted {
+		return res, nil
+	}
+
 	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	// Accept checked this allocation a moment ago, so a nil here means it went
+	// away in between. Reject rather than dereference it below.
+	if allocation == nil {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   fmt.Sprintf("allocation %d not found for client %s", entry.AllocationID, entry.Client),
+		}, nil
 	}
 
 	idaddr, err := address.NewIDAddress(uint64(allocation.Provider))
@@ -501,90 +653,206 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *types.Direc
 	return nil
 }
 
+// ErrNoClaimFound is the failure a direct deal records when its sector finished
+// sealing but the allocation was never claimed and the data cannot be shown to have
+// been onboarded past nv29. The migration to Curio excuses this one fatal error.
+var ErrNoClaimFound = errors.New("no claim found")
+
+// ErrPieceNotOnboarded is the failure a direct deal records when the chain shows its
+// sector's data landed but the sector does not hold the deal's piece. Deliberately
+// not ErrNoClaimFound, which the migration excuses.
+var ErrPieceNotOnboarded = errors.New("piece not onboarded")
+
+// ErrPieceUnverifiable is the failure a direct deal records when the chain shows its
+// sector's data landed past nv29 but the sealer gave no piece list to check the deal's
+// piece against. Deliberately not ErrNoClaimFound either.
+var ErrPieceUnverifiable = errors.New("piece unverifiable")
+
+const claimWaitLimit = 10 * time.Minute
+
+const sealingPollInterval = 10 * time.Second
+
+// claimWait measures that wait. Its clock starts at the first final sealing state, not
+// when the deal began being watched: a sector can spend hours collecting its remaining
+// pieces, so an earlier budget would be gone before any answer.
+type claimWait struct {
+	since time.Time
+}
+
+// start begins the wait if it has not begun, so returning to a final state gives no
+// fresh budget.
+func (w *claimWait) start(now time.Time) {
+	if w.since.IsZero() {
+		w.since = now
+	}
+}
+
+// expired reports whether the wait has run out; a wait that never began has not.
+func (w *claimWait) expired(now time.Time) bool {
+	return !w.since.IsZero() && now.Sub(w.since) > claimWaitLimit
+}
+
+type claimOutcome int
+
+const (
+	claimPending claimOutcome = iota
+	// claimUnverifiable: keep waiting, but a timeout means the sealer never
+	// established the outcome.
+	claimUnverifiable
+	claimDone
+)
+
+func fatal(err error) *dealMakingError {
+	return &dealMakingError{retry: types.DealRetryFatal, error: err}
+}
+
+func retryable(err error) *dealMakingError {
+	return &dealMakingError{retry: types.DealRetryAuto, error: err}
+}
+
 // watchSealingUpdates periodically checks the sealing status of the deal,
 // and returns once the deal is active (or boost is shutdown)
 func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *dealMakingError {
 	var lastSealingState lapi.SectorState
-	checkSealingFinalized := func() bool {
-		// Get the sector status
+	finalSealingState := func() lapi.SectorState {
 		si, err := ddp.sps.SectorsStatus(ddp.ctx, entry.SectorID, false)
 		if err != nil {
 			log.Warnw("getting sector sealing state", "sector", entry.SectorID, "err", err.Error())
-			return false
+			return ""
 		}
 
 		if si.State != lastSealingState {
-			// Sector status has changed
 			lastSealingState = si.State
 			ddp.dealLogger.Infow(entry.ID, "current sealing state", "state", si.State)
 		}
 
-		return IsFinalSealingState(si.State)
+		if !IsFinalSealingState(si.State) {
+			return ""
+		}
+		return si.State
 	}
 
-	// Check immediately if the sector has reached a final sealing state
-	complete := checkSealingFinalized()
-	if complete {
-		isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
-		if claimErr != nil {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: claimErr,
-			}
+	var wait claimWait
+
+	check := func() (done bool, derr *dealMakingError) {
+		state := finalSealingState()
+		if state == "" {
+			return false, nil
 		}
-		if found {
-			if !isClaimed {
-				return &dealMakingError{
-					retry: types.DealRetryFatal,
-					error: errors.New("sector mismatch for claim"),
-				}
-			}
-			return nil
+		wait.start(ddp.now())
+
+		outcome, derr := ddp.settle(entry, state)
+		if derr != nil {
+			return true, derr
 		}
+		if outcome == claimDone {
+			return true, nil
+		}
+		if wait.expired(ddp.now()) {
+			return true, timeoutError(outcome)
+		}
+		return false, nil
 	}
 
-	// Check status every 10 seconds
+	if done, derr := check(); done {
+		return derr
+	}
+
 	ddp.dealLogger.Infow(entry.ID, "watching deal sealing state changes")
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(ddp.pollEvery())
 	defer ticker.Stop()
-	claimTime := time.Now()
 	for {
 		select {
 		case <-ddp.ctx.Done():
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: ddp.ctx.Err(),
-			}
+			return retryable(ddp.ctx.Err())
 		case <-ticker.C:
-			complete := checkSealingFinalized()
-			if complete {
-				isClaimed, found, claimErr := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
-				if claimErr != nil {
-					return &dealMakingError{
-						retry: types.DealRetryAuto,
-						error: claimErr,
-					}
-				}
-				if found {
-					if !isClaimed {
-						return &dealMakingError{
-							retry: types.DealRetryFatal,
-							error: errors.New("sector mismatch for claim"),
-						}
-					}
-					return nil
-				}
-				// We should terminate looking for claim after 10 minutes and fail the deal
-				// This is to account for any state issues arising from sync issues
-				if time.Since(claimTime) > 10*time.Minute {
-					return &dealMakingError{
-						retry: types.DealRetryFatal,
-						error: errors.New("no claim found"),
-					}
-				}
+			if done, derr := check(); done {
+				return derr
 			}
 		}
 	}
+}
+
+// settle reports what the chain says about a deal whose sector has reached a final
+// sealing state. The claim is looked up first, as the pre-nv29 code did: it settles the
+// question on its own. Only with no claim does the sealing state end the deal.
+func (ddp *DirectDealsProvider) settle(entry *types.DirectDeal, state lapi.SectorState) (claimOutcome, *dealMakingError) {
+	isClaimed, found, err := ddp.confirmClaim(ddp.ctx, entry.AllocationID, entry.SectorID)
+	if err != nil {
+		return claimPending, retryable(err)
+	}
+	if found {
+		if !isClaimed {
+			return claimPending, fatal(errors.New("sector mismatch for claim"))
+		}
+		return claimDone, nil
+	}
+
+	// Past nv29 no claim is written, so the sector is the whole of the outcome, and that
+	// takes both halves: dated past the upgrade, and holding this deal's piece.
+	outcome := claimPending
+	onboarded, err := PieceOnboardedAtOrAfterNv29(ddp.ctx, ddp.fullnodeApi, ddp.Address, entry.SectorID)
+	if err != nil {
+		return claimPending, retryable(err)
+	}
+	if onboarded {
+		// No on-chain record names the sector's piece CIDs past nv29, so the piece is checked
+		// against the sealer's.
+		si, err := ddp.sps.SectorsStatus(ddp.ctx, entry.SectorID, false)
+		if err != nil {
+			return claimPending, retryable(fmt.Errorf("getting sector status: %w", err))
+		}
+		held, reported := SectorHoldsPiece(si, entry.PieceCID)
+		switch {
+		case held:
+			ddp.dealLogger.Infow(entry.ID,
+				"piece onboarded at network version 29 or above, where FIP-0118 writes no claim for it; the deal is complete")
+			return claimDone, nil
+		case !reported:
+			// Nothing names the piece either way: keep looking, and let the timeout record it.
+			ddp.warnSealerListsNoPieces(entry)
+			outcome = claimUnverifiable
+		default:
+			// Waiting cannot change this: fail rather than let the timeout excuse it.
+			return claimPending, fatal(fmt.Errorf("%w: sector %d carries data from network version 29 or above without the deal's piece %s",
+				ErrPieceNotOnboarded, entry.SectorID, entry.PieceCID))
+		}
+	}
+
+	if IsFailedSealingState(state) {
+		return claimPending, fatal(fmt.Errorf("%w: sector %d reached sealing state %s", ErrSectorSealingFailed, entry.SectorID, state))
+	}
+	return outcome, nil
+}
+
+// timeoutError names the failure a deal ends on when its wait runs out: ErrNoClaimFound,
+// whose text the migration matches on to carry such a deal over.
+func timeoutError(outcome claimOutcome) *dealMakingError {
+	if outcome == claimUnverifiable {
+		return fatal(ErrPieceUnverifiable)
+	}
+	return fatal(ErrNoClaimFound)
+}
+
+// warnSealerListsNoPieces tells the operator once per process that the sealer does not
+// report which pieces a sector holds.
+func (ddp *DirectDealsProvider) warnSealerListsNoPieces(entry *types.DirectDeal) {
+	ddp.noSealerPiecesOnce.Do(func() {
+		ddp.dealLogger.Warnw(entry.ID,
+			"sector carries data from network version 29 or above but the sealer reported no pieces to check the deal's piece against; post-nv29 direct deals cannot be verified against this sealer and will be reported as unverifiable when they time out",
+			"sector", entry.SectorID, "piece", entry.PieceCID)
+	})
+}
+
+// SectorHoldsPiece reports whether a sealer's record holds a piece, and whether it
+// listed any pieces at all.
+func SectorHoldsPiece(si lapi.SectorInfo, pieceCID cid.Cid) (held bool, reported bool) {
+	for _, p := range si.Pieces {
+		if p.Piece.PieceCID.Equals(pieceCID) {
+			return true, true
+		}
+	}
+	return false, len(si.Pieces) > 0
 }
 
 func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *types.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
