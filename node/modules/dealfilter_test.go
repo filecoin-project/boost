@@ -12,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	markettypes "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/network"
 
@@ -20,8 +21,6 @@ import (
 
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
-
-	markettypes "github.com/filecoin-project/go-state-types/builtin/v9/market"
 )
 
 // TestBasicDealFilterVerifiedSettingsAtNv29 covers what FIP-0118 does to the two
