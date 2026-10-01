@@ -45,7 +45,6 @@ func (s *fixedSectorPipeline) SectorsStatus(context.Context, abi.SectorNumber, b
 type sealingSequencePipeline struct {
 	sealingpipeline.API
 	states []lapi.SectorState
-	pieces []lapi.SectorPiece
 	calls  int
 }
 
@@ -55,11 +54,7 @@ func (s *sealingSequencePipeline) SectorsStatus(context.Context, abi.SectorNumbe
 		i = len(s.states) - 1
 	}
 	s.calls++
-	return lapi.SectorInfo{State: s.states[i], Pieces: s.pieces}, nil
-}
-
-func holdPiece(piece cid.Cid) []lapi.SectorPiece {
-	return []lapi.SectorPiece{{Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(1 << 20), PieceCID: piece}}}
+	return lapi.SectorInfo{State: s.states[i]}, nil
 }
 
 // preNv29Sector: the 10x came from the deal's own verified weight, flag clear, a claim.
@@ -148,11 +143,6 @@ func newTestStores(t *testing.T) (*db.DirectDealsDB, *logs.DealLogger) {
 // newWatchSealingHarness builds a provider watching one deal, sealer parked, node answering.
 func newWatchSealingHarness(t *testing.T, node *chainNode, state lapi.SectorState) (*DirectDealsProvider, *types.DirectDeal) {
 	t.Helper()
-	return newWatchSealingHarnessWithPieces(t, node, state, nil)
-}
-
-func newWatchSealingHarnessWithPieces(t *testing.T, node *chainNode, state lapi.SectorState, pieces []lapi.SectorPiece) (*DirectDealsProvider, *types.DirectDeal) {
-	t.Helper()
 
 	_, dealLogger := newTestStores(t)
 
@@ -163,7 +153,7 @@ func newWatchSealingHarnessWithPieces(t *testing.T, node *chainNode, state lapi.
 		ctx:         context.Background(),
 		Address:     maddr,
 		fullnodeApi: node,
-		sps:         &fixedSectorPipeline{info: lapi.SectorInfo{State: state, Pieces: pieces}},
+		sps:         &fixedSectorPipeline{info: lapi.SectorInfo{State: state}},
 		dealLogger:  dealLogger,
 	}
 
