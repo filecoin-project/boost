@@ -5,14 +5,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -24,8 +22,7 @@ import (
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
 
-// provingPipeline reports a sealed sector with no on-chain info, as lotus does
-// unless asked for it, so reading Activation off this call yields a zero epoch.
+// provingPipeline reports a sealed sector, as the sealer's own record has it.
 type provingPipeline struct {
 	sealingpipeline.API
 	state lapi.SectorState
@@ -35,71 +32,51 @@ func (p *provingPipeline) SectorsStatus(context.Context, abi.SectorNumber, bool)
 	return lapi.SectorInfo{State: p.state}, nil
 }
 
-// claimNode answers the version, schedule, sector and claim lookups sealingState makes, on a chain
-// always at nv29.
+// claimNode answers the chain reads sealingState makes through the provider's own call.
 type claimNode struct {
 	v1api.FullNode
-	paramsErr     error
-	claim         *verifreg9types.Claim
-	activation    abi.ChainEpoch
-	snappedAt     abi.ChainEpoch
-	snapped       bool
-	noPieceData   bool
-	sectorErr     error
-	sectorMissing bool
-}
 
-func (c *claimNode) StateNetworkVersion(context.Context, ltypes.TipSetKey) (network.Version, error) {
-	return network.Version29, nil
-}
-
-func (c *claimNode) StateGetNetworkParams(context.Context) (*lapi.NetworkParams, error) {
-	if c.paramsErr != nil {
-		return nil, c.paramsErr
-	}
-	return &lapi.NetworkParams{
-		ForkUpgradeParams: lapi.ForkUpgradeParams{UpgradeSolsticeHeight: nv29Height},
-	}, nil
-}
-
-func (c *claimNode) StateGetClaim(context.Context, address.Address, verifreg9types.ClaimId, ltypes.TipSetKey) (*verifreg9types.Claim, error) {
-	return c.claim, nil
+	sector    *miner.SectorOnChainInfo
+	sectorErr error
+	claim     *verifreg9types.Claim
+	claimErr  error
 }
 
 func (c *claimNode) StateSectorGetInfo(_ context.Context, _ address.Address, sector abi.SectorNumber, _ ltypes.TipSetKey) (*miner.SectorOnChainInfo, error) {
 	if c.sectorErr != nil {
 		return nil, c.sectorErr
 	}
-	if c.sectorMissing {
-		return nil, nil
-	}
-
-	si := &miner.SectorOnChainInfo{
-		SectorNumber: sector,
-		Activation:   c.activation,
-		// Zero, not absent: the chain always writes both weights.
-		DealWeight:         big.Zero(),
-		VerifiedDealWeight: big.Zero(),
-	}
-	if !c.noPieceData {
-		// Past nv29 every piece's spacetime lands here, verified or not.
-		si.VerifiedDealWeight = big.NewInt(1 << 20)
-	}
-	if c.snapped {
-		keyCid, err := cid.Parse("bafkqaaa")
-		if err != nil {
-			return nil, err
-		}
-		si.SectorKeyCID = &keyCid
-		si.PowerBaseEpoch = c.snappedAt
-	}
-	return si, nil
+	return c.sector, nil
 }
 
-// nv29Height is the epoch claimNode reports as nv29's.
-const nv29Height = abi.ChainEpoch(1000)
+func (c *claimNode) StateGetClaim(context.Context, address.Address, verifreg9types.ClaimId, ltypes.TipSetKey) (*verifreg9types.Claim, error) {
+	return c.claim, c.claimErr
+}
 
-func newSealingStateResolver(t *testing.T, node *claimNode) *directDealResolver {
+// preNv29Sector: 10x from the deal's own verified weight, flag clear, a claim.
+func preNv29Sector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	return &miner.SectorOnChainInfo{
+		SectorNumber:       sector,
+		DealWeight:         big.Zero(),
+		VerifiedDealWeight: big.NewInt(1 << 20),
+	}
+}
+
+// nv29Sector: piece data in at or after the fork, so the flag is set and no claim written.
+func nv29Sector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	si := preNv29Sector(sector)
+	si.Flags = miner.FULL_QA_POWER
+	return si
+}
+
+// emptySector is flagged by the fork but holds no piece data: a snap that never landed.
+func emptySector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	si := nv29Sector(sector)
+	si.VerifiedDealWeight = big.Zero()
+	return si
+}
+
+func newSealingStateResolverInState(t *testing.T, node *claimNode, state lapi.SectorState) *directDealResolver {
 	t.Helper()
 
 	maddr, err := address.NewIDAddress(1000)
@@ -112,92 +89,93 @@ func newSealingStateResolver(t *testing.T, node *claimNode) *directDealResolver 
 			SectorID:     abi.SectorNumber(2),
 			AllocationID: verifreg9types.AllocationId(1),
 		},
-		spApi:    &provingPipeline{state: lapi.SectorState(sealing.Proving)},
+		spApi:    &provingPipeline{state: state},
 		fullNode: node,
 	}
 }
 
-// TestSealingStateNoClaimSealedAfterNv29 covers a deal that sealed after the
-// upgrade, where having no claim is normal and must not be flagged.
-func TestSealingStateNoClaimSealedAfterNv29(t *testing.T) {
-	dr := newSealingStateResolver(t, &claimNode{activation: nv29Height + 1})
+func TestSealingStateNamesWhereTheDealIs(t *testing.T) {
+	const proving = "Sealer: " + string(sealing.Proving)
 
-	state := dr.sealingState(context.Background())
-	require.Equal(t, "Sealer: "+string(sealing.Proving), state)
-	require.NotContains(t, state, "No claim found")
-}
-
-// TestSealingStateNoClaimSealedBeforeNv29: dating by the sector's own history keeps a real missing
-// claim showing.
-func TestSealingStateNoClaimSealedBeforeNv29(t *testing.T) {
-	dr := newSealingStateResolver(t, &claimNode{activation: nv29Height - 1})
-
-	require.Contains(t, dr.sealingState(context.Background()), "No claim found")
-}
-
-// TestSealingStateNoClaimSnappedAfterNv29: a sector sealed long before nv29 but snapped after it,
-// where dating by activation alone would flag a healthy deal -- the update's epoch is the one that
-// counts.
-func TestSealingStateNoClaimSnappedAfterNv29(t *testing.T) {
-	dr := newSealingStateResolver(t, &claimNode{
-		activation: nv29Height - 5000,
-		snapped:    true,
-		snappedAt:  nv29Height + 1,
-	})
-
-	state := dr.sealingState(context.Background())
-	require.Equal(t, "Sealer: "+string(sealing.Proving), state)
-	require.NotContains(t, state, "No claim found")
-}
-
-// TestSealingStateNoClaimEmptySectorAfterNv29: a sector proven past nv29 with no piece data, as a
-// snap that never landed leaves, must still flag a deal whose data is not on chain.
-func TestSealingStateNoClaimEmptySectorAfterNv29(t *testing.T) {
-	dr := newSealingStateResolver(t, &claimNode{activation: nv29Height + 1, noPieceData: true})
-
-	require.Contains(t, dr.sealingState(context.Background()), "No claim found")
-}
-
-// TestSealingStateNoClaimActivationUnknown covers what cannot be dated: the
-// report falls back to flagging the absence, the safer way to be wrong.
-func TestSealingStateNoClaimActivationUnknown(t *testing.T) {
-	for name, node := range map[string]*claimNode{
-		"sector lookup fails": {sectorErr: context.DeadlineExceeded},
-		"sector not on chain": {sectorMissing: true},
-		"activation is zero":  {},
-		"activation pre-nv29": {activation: nv29Height - 1},
-		"params lookup fails": {paramsErr: context.DeadlineExceeded, activation: nv29Height + 1},
+	for name, tc := range map[string]struct {
+		node  *claimNode
+		state lapi.SectorState
+		want  string
+	}{
+		"a sector onboarded after nv29": {
+			node: &claimNode{sector: nv29Sector(abi.SectorNumber(2))},
+			want: proving + "(On chain)",
+		},
+		"a snap that landed after nv29": {
+			node: &claimNode{sector: nv29Sector(abi.SectorNumber(2))},
+			want: proving + "(On chain)",
+		},
+		"a pre-nv29 sector with its claim": {
+			node: &claimNode{
+				sector: preNv29Sector(abi.SectorNumber(2)),
+				claim:  &verifreg9types.Claim{Sector: abi.SectorNumber(2)},
+			},
+			want: proving + "(On chain)",
+		},
+		"a pre-nv29 sector with no claim, which is a real absence": {
+			node: &claimNode{sector: preNv29Sector(abi.SectorNumber(2))},
+			want: proving + "(No claim found)",
+		},
+		"a pre-nv29 sector whose claim names another sector": {
+			node: &claimNode{
+				sector: preNv29Sector(abi.SectorNumber(2)),
+				claim:  &verifreg9types.Claim{Sector: abi.SectorNumber(3)},
+			},
+			want: proving + "(Sector mismatch)",
+		},
+		"a flagged sector holding no piece data": {
+			node: &claimNode{sector: emptySector(abi.SectorNumber(2))},
+			want: proving + "(No claim found)",
+		},
+		"a sector this node's chain does not show": {
+			node: &claimNode{},
+			want: proving + "(Not on this node's chain)",
+		},
+		"a chain that will not answer": {
+			node: &claimNode{sectorErr: context.DeadlineExceeded},
+			want: proving,
+		},
+		"a claim the chain will not hand over": {
+			node: &claimNode{
+				sector:   preNv29Sector(abi.SectorNumber(2)),
+				claimErr: context.DeadlineExceeded,
+			},
+			want: proving,
+		},
+		"a sealer still working on the sector": {
+			node:  &claimNode{sector: nv29Sector(abi.SectorNumber(2))},
+			state: lapi.SectorState(sealing.Packing),
+			want:  "Sealer: " + string(sealing.Packing),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dr := newSealingStateResolver(t, node)
+			state := tc.state
+			if state == "" {
+				state = lapi.SectorState(sealing.Proving)
+			}
 
-			require.Contains(t, dr.sealingState(context.Background()), "No claim found")
+			dr := newSealingStateResolverInState(t, tc.node, state)
+
+			require.Equal(t, tc.want, dr.sealingState(context.Background()))
 		})
 	}
 }
 
-// TestSealingStateClaimVerified checks that a matching claim is still reported
-// as verified past nv29, so the new branch has not displaced the normal case.
-func TestSealingStateClaimVerified(t *testing.T) {
-	claim := &verifreg9types.Claim{Sector: abi.SectorNumber(2)}
-	dr := newSealingStateResolver(t, &claimNode{activation: nv29Height + 1, claim: claim})
+func TestSealingStateFailedSector(t *testing.T) {
+	dr := newSealingStateResolverInState(t, &claimNode{}, lapi.SectorState(sealing.FailedUnrecoverable))
 
-	require.Contains(t, dr.sealingState(context.Background()), "Claim verified")
-}
-
-// TestSealingStateClaimSectorMismatch checks that a claim on another sector is
-// still reported: a real inconsistency, not the expected nv29 absence.
-func TestSealingStateClaimSectorMismatch(t *testing.T) {
-	claim := &verifreg9types.Claim{Sector: abi.SectorNumber(3)}
-	dr := newSealingStateResolver(t, &claimNode{activation: nv29Height + 1, claim: claim})
-
-	require.Contains(t, dr.sealingState(context.Background()), "Sector mismatch")
+	require.Equal(t, "Sealer: "+string(sealing.FailedUnrecoverable), dr.sealingState(context.Background()))
 }
 
 // TestDirectDealResolverCarriesItsPlumbing pins that both query paths build the resolver through
 // the same constructor, so it has the full node sealingState needs.
 func TestDirectDealResolverCarriesItsPlumbing(t *testing.T) {
-	node := &claimNode{activation: nv29Height + 1}
+	node := &claimNode{sector: nv29Sector(abi.SectorNumber(2))}
 	maddr, err := address.NewIDAddress(1000)
 	require.NoError(t, err)
 
@@ -211,5 +189,5 @@ func TestDirectDealResolverCarriesItsPlumbing(t *testing.T) {
 		AllocationID: verifreg9types.AllocationId(1),
 	})
 
-	require.Equal(t, "Sealer: "+string(sealing.Proving), dr.sealingState(context.Background()))
+	require.Equal(t, "Sealer: "+string(sealing.Proving)+"(On chain)", dr.sealingState(context.Background()))
 }

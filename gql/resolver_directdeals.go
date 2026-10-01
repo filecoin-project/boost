@@ -6,8 +6,6 @@ import (
 
 	"github.com/graph-gophers/graphql-go"
 
-	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -15,10 +13,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
-	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
 
 type directDealResolver struct {
@@ -238,38 +233,35 @@ func (dr *directDealResolver) message(ctx context.Context, checkpoint dealcheckp
 	return checkpoint.String()
 }
 
+// sealingState names where the deal has got to, in the operator's words, reporting the
+// provider's own answer so a screen cannot drift from the deal.
 func (dr *directDealResolver) sealingState(ctx context.Context) string {
 	si, err := dr.spApi.SectorsStatus(ctx, dr.SectorID, false)
 	if err != nil {
 		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
-	if si.State != lapi.SectorState(sealing.Proving) {
-		return "Sealer: " + string(si.State)
+
+	state := "Sealer: " + string(si.State)
+
+	status, err := storagemarket.DirectDealStatus(ctx, dr.fullNode, dr.Provider, &dr.DirectDeal, si)
+	if err != nil {
+		// Nothing is known beyond the sealer's own state, which is what gets shown.
+		log.Warnw("error reading the deal's sector from chain", "deal", dr.DirectDeal.ID, "sector", dr.SectorID, "error", err)
+		return state
 	}
 
-	claim, err := dr.fullNode.StateGetClaim(ctx, dr.Provider, verifreg9types.ClaimId(dr.AllocationID()), ltypes.EmptyTSK)
-	if err != nil {
-		log.Warnw("error getting status for claim", "claim", dr.AllocationID(), "error", err)
-		return "Sealer: " + string(si.State)
+	switch status {
+	case storagemarket.DirectDealOnChainDone:
+		return state + "(On chain)"
+	case storagemarket.DirectDealNoClaim:
+		return state + "(No claim found)"
+	case storagemarket.DirectDealClaimElsewhere:
+		return state + "(Sector mismatch)"
+	case storagemarket.DirectDealNotVisible:
+		return state + "(Not on this node's chain)"
 	}
-	if claim == nil {
-		// Data onboarded at or after nv29 never gets a claim, so its absence is normal only if this
-		// deal's piece is in the sector.
-		onboardedAtOrAfterNv29, err := storagemarket.PieceOnboardedAtOrAfterNv29(ctx, dr.fullNode, dr.Provider, dr.SectorID)
-		if err != nil {
-			log.Warnw("error dating the deal's piece against nv29", "deal", dr.DirectDeal.ID, "sector", dr.SectorID, "error", err)
-		}
-		held, reported := storagemarket.SectorHoldsPiece(si, dr.PieceCID)
-		if onboardedAtOrAfterNv29 && (held || !reported) {
-			return "Sealer: " + string(si.State)
-		}
-		return "Sealer: " + string(si.State) + "(No claim found)"
-	}
-	if claim.Sector != dr.SectorID {
-		return "Sealer: " + string(si.State) + "(Sector mismatch)"
-	}
-	return "Sealer: " + string(si.State) + "(Claim verified)"
+	return state
 }
 
 func (dr *directDealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {

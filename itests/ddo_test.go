@@ -21,6 +21,7 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 
 	lapi "github.com/filecoin-project/lotus/api"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
@@ -255,16 +256,15 @@ func assertSealedWithoutClaim(t *testing.T, ctx context.Context, f *framework.Te
 	require.NotEmpty(t, si.Pieces, "the sealed sector should still hold its piece")
 
 	// With no claim to read, the sector's own record is the only evidence this deal's
-	// data was onboarded: its piece spacetime says the sector is not empty and its epoch says past
-	// nv29.
+	// piece spacetime says the sector is not empty; FULL_QA_POWER says it came in at or after the fork.
 	// Logged because which of the two weights carries the spacetime is the basis for reading both.
-	t.Logf("sector 2 on chain: activation=%d powerBase=%d dealWeight=%s verifiedDealWeight=%s snapped=%t",
-		st.Activation, st.PowerBaseEpoch, st.DealWeight, st.VerifiedDealWeight, st.SectorKeyCID != nil)
+	t.Logf("sector 2 on chain: activation=%d powerBase=%d dealWeight=%s verifiedDealWeight=%s flags=%d snapped=%t",
+		st.Activation, st.PowerBaseEpoch, st.DealWeight, st.VerifiedDealWeight, st.Flags, st.SectorKeyCID != nil)
 
-	onboarded, err := storagemarket.PieceOnboardedAtOrAfterNv29(ctx, f.FullNode, f.MinerAddr, abi.SectorNumber(2))
-	require.NoError(t, err)
-	require.True(t, onboarded,
-		"the chain should show the piece as onboarded at or after nv29, which is what stands in for the claim")
+	require.True(t, st.Flags&minertypes.FULL_QA_POWER != 0,
+		"FIP-0118 sets FULL_QA_POWER on the sector it writes no claim for; that bit is what stands in for the claim")
+	require.True(t, storagemarket.SectorOnboarded(st),
+		"the chain should show the deal's sector as onboarded at or after nv29")
 }
 
 // TestDirectDealRejectedAtNv29 is the other half of the pair. The crossing test

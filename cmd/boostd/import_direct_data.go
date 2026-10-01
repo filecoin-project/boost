@@ -41,7 +41,7 @@ func checkDirectDealSupported(nv network.Version) error {
 
 var importDirectDataCmd = &cli.Command{
 	Name:      "import-direct",
-	Usage:     "Import data for direct onboarding flow with Boost",
+	Usage:     "Import data for direct onboarding flow with Boost [DEPRECATED at nv29: datacap removed by FIP-0118]",
 	ArgsUsage: "<piececid> <file>",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{

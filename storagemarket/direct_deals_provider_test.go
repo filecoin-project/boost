@@ -3,7 +3,6 @@ package storagemarket
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -32,22 +31,17 @@ import (
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
 
-const sealedState = lapi.SectorState(sealing.Proving)
-
-type sealedSectorPipeline struct {
+// fixedSectorPipeline reports one sector record, whatever it is asked.
+type fixedSectorPipeline struct {
 	sealingpipeline.API
-	state  lapi.SectorState
-	pieces []lapi.SectorPiece
+	info lapi.SectorInfo
 }
 
-func (s *sealedSectorPipeline) SectorsStatus(context.Context, abi.SectorNumber, bool) (lapi.SectorInfo, error) {
-	return lapi.SectorInfo{State: s.state, Pieces: s.pieces}, nil
+func (s *fixedSectorPipeline) SectorsStatus(context.Context, abi.SectorNumber, bool) (lapi.SectorInfo, error) {
+	return s.info, nil
 }
 
-func holdPiece(piece cid.Cid) []lapi.SectorPiece {
-	return []lapi.SectorPiece{{Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(1 << 20), PieceCID: piece}}}
-}
-
+// sealingSequencePipeline walks the sealer through a list of states, holding on the last.
 type sealingSequencePipeline struct {
 	sealingpipeline.API
 	states []lapi.SectorState
@@ -64,135 +58,75 @@ func (s *sealingSequencePipeline) SectorsStatus(context.Context, abi.SectorNumbe
 	return lapi.SectorInfo{State: s.states[i], Pieces: s.pieces}, nil
 }
 
-func jumpingClock(base time.Time, atCall int) func() time.Time {
-	calls := 0
-	return func() time.Time {
-		calls++
-		if calls >= atCall {
-			return base.Add(claimWaitLimit + time.Minute)
-		}
-		return base
+func holdPiece(piece cid.Cid) []lapi.SectorPiece {
+	return []lapi.SectorPiece{{Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(1 << 20), PieceCID: piece}}}
+}
+
+// preNv29Sector: the 10x came from the deal's own verified weight, flag clear, a claim.
+func preNv29Sector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	return &miner.SectorOnChainInfo{
+		SectorNumber:       sector,
+		DealWeight:         big.Zero(),
+		VerifiedDealWeight: big.NewInt(1 << 20),
 	}
 }
 
-// TestWatchSealingUpdatesTimesOutInTheLoop drives the poll loop and its wait: a
-// deal whose sector never produces an outcome ends on a timeout naming what was waited for.
-func TestWatchSealingUpdatesTimesOutInTheLoop(t *testing.T) {
-	base := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+// nv29Sector carries piece data and the FULL_QA_POWER bit, with no claim written for it.
+func nv29Sector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	si := preNv29Sector(sector)
+	si.Flags = miner.FULL_QA_POWER
+	return si
+}
 
-	for name, tc := range map[string]struct {
-		node    *claimLookupNode
-		pieces  []lapi.SectorPiece
-		wantErr error
-		notErr  error
-	}{
-		"a missing claim": {
-			// Pre-nv29: the claim is expected, and only late, so the deal waits.
-			node:    &claimLookupNode{activation: nv29Height - 1},
-			wantErr: ErrNoClaimFound,
-			notErr:  ErrPieceUnverifiable,
-		},
-		"a piece nobody could check": {
-			// Post-nv29 with a sealer that lists no pieces, so the piece question was
-			// never answered: unverifiable, not a missing claim, a difference the Curio migration reads.
-			node:    &claimLookupNode{activation: nv29Height + 1},
-			pieces:  nil,
-			wantErr: ErrPieceUnverifiable,
-			notErr:  ErrNoClaimFound,
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			ddp, entry := newWatchSealingHarness(t, tc.node)
-			ddp.sps = &sealingSequencePipeline{
-				states: []lapi.SectorState{lapi.SectorState(sealing.Packing), lapi.SectorState(sealing.Proving)},
-				pieces: tc.pieces,
-			}
-			ddp.sealingPollEvery = time.Millisecond
-			ddp.sealingClock = jumpingClock(base, 2)
-
-			derr := ddp.watchSealingUpdates(entry)
-
-			require.NotNil(t, derr)
-			require.Equal(t, types.DealRetryFatal, derr.retry)
-			require.ErrorIs(t, derr.error, tc.wantErr)
-			require.NotErrorIs(t, derr.error, tc.notErr)
-		})
+func emptySector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	return &miner.SectorOnChainInfo{
+		SectorNumber:       sector,
+		DealWeight:         big.Zero(),
+		VerifiedDealWeight: big.Zero(),
+		Flags:              miner.FULL_QA_POWER,
 	}
 }
 
-// claimLookupNode answers the chain queries watchSealingUpdates makes. Its chain
-// is always at nv29, so a check reading the current version gets a wrong answer.
-type claimLookupNode struct {
+// tenXByDatacapSector is pre-nv29 with its whole weight from datacap, so lotus's
+// miner.SectorIsFullQaPower reads it as full QA power where the flag says otherwise.
+func tenXByDatacapSector(sector abi.SectorNumber) *miner.SectorOnChainInfo {
+	const (
+		tenXDuration abi.ChainEpoch = 1 << 20
+		thirtyTwoGiB abi.SectorSize = 32 << 30
+	)
+
+	si := preNv29Sector(sector)
+	si.SealProof = abi.RegisteredSealProof_StackedDrg32GiBV1_1
+	si.Expiration = tenXDuration
+	si.VerifiedDealWeight = big.Mul(big.NewInt(int64(thirtyTwoGiB)), big.NewInt(int64(tenXDuration)))
+	return si
+}
+
+// chainNode answers the chain reads the direct deal paths make; anything else panics.
+type chainNode struct {
 	v1api.FullNode
-	nv            network.Version
-	paramsErr     error
-	activation    abi.ChainEpoch
-	snappedAt     abi.ChainEpoch
-	snapped       bool
-	noPieceData   bool
-	sectorErr     error
-	sectorMissing bool
-	claim         *verifreg9types.Claim
+
+	sector    *miner.SectorOnChainInfo
+	sectorErr error
+	claim     *verifreg9types.Claim
+	claimErr  error
+
+	sectorReads int
+	claimReads  int
 }
 
-func (c *claimLookupNode) StateNetworkVersion(context.Context, ltypes.TipSetKey) (network.Version, error) {
-	if c.nv == 0 {
-		return network.Version29, nil
-	}
-	return c.nv, nil
-}
-
-func (c *claimLookupNode) StateGetNetworkParams(context.Context) (*lapi.NetworkParams, error) {
-	if c.paramsErr != nil {
-		return nil, c.paramsErr
-	}
-	return &lapi.NetworkParams{
-		ForkUpgradeParams: lapi.ForkUpgradeParams{UpgradeSolsticeHeight: nv29Height},
-	}, nil
-}
-
-func (c *claimLookupNode) StateGetClaim(context.Context, address.Address, verifreg9types.ClaimId, ltypes.TipSetKey) (*verifreg9types.Claim, error) {
-	return c.claim, nil
-}
-
-func (c *claimLookupNode) StateSectorGetInfo(_ context.Context, _ address.Address, sector abi.SectorNumber, _ ltypes.TipSetKey) (*miner.SectorOnChainInfo, error) {
+func (c *chainNode) StateSectorGetInfo(_ context.Context, _ address.Address, sector abi.SectorNumber, _ ltypes.TipSetKey) (*miner.SectorOnChainInfo, error) {
+	c.sectorReads++
 	if c.sectorErr != nil {
 		return nil, c.sectorErr
 	}
-	if c.sectorMissing {
-		return nil, nil
-	}
-
-	si := &miner.SectorOnChainInfo{
-		SectorNumber: sector,
-		Activation:   c.activation,
-		// Zero, not absent: the chain always writes both weights, and an absent one panics.
-		DealWeight:         big.Zero(),
-		VerifiedDealWeight: big.Zero(),
-	}
-	if !c.noPieceData {
-		// Past nv29 every piece's spacetime lands here whether or not it was verified.
-		si.VerifiedDealWeight = big.NewInt(1 << 20)
-	}
-	if c.snapped {
-		// A snapped sector keeps its sealed CID and moves the power base to the update epoch, leaving
-		// activation at the original prove.
-		key := testSectorKeyCid(c.activation)
-		si.SectorKeyCID = &key
-		si.PowerBaseEpoch = c.snappedAt
-	}
-	return si, nil
+	return c.sector, nil
 }
 
-func testSectorKeyCid(seed abi.ChainEpoch) cid.Cid {
-	mh, err := multihash.Sum([]byte(fmt.Sprintf("sector key %d", seed)), multihash.SHA2_256, -1)
-	if err != nil {
-		panic(err)
-	}
-	return cid.NewCidV1(cid.Raw, mh)
+func (c *chainNode) StateGetClaim(context.Context, address.Address, verifreg9types.ClaimId, ltypes.TipSetKey) (*verifreg9types.Claim, error) {
+	c.claimReads++
+	return c.claim, c.claimErr
 }
-
-const nv29Height = abi.ChainEpoch(1000)
 
 // newTestStores creates the sqlite database a DirectDealsProvider needs, with
 // the boost tables in it.
@@ -211,20 +145,13 @@ func newTestStores(t *testing.T) (*db.DirectDealsDB, *logs.DealLogger) {
 	return db.NewDirectDealsDB(sqldb), logs.NewDealLogger(db.NewLogsDB(sqldb))
 }
 
-func newWatchSealingHarness(t *testing.T, node *claimLookupNode) (*DirectDealsProvider, *types.DirectDeal) {
+// newWatchSealingHarness builds a provider watching one deal, sealer parked, node answering.
+func newWatchSealingHarness(t *testing.T, node *chainNode, state lapi.SectorState) (*DirectDealsProvider, *types.DirectDeal) {
 	t.Helper()
-	return newWatchSealingHarnessInState(t, node, lapi.SectorState(sealing.Proving))
+	return newWatchSealingHarnessWithPieces(t, node, state, nil)
 }
 
-func newWatchSealingHarnessInState(t *testing.T, node *claimLookupNode, state lapi.SectorState) (*DirectDealsProvider, *types.DirectDeal) {
-	t.Helper()
-
-	ddp, entry := newWatchSealingHarnessWithPieces(t, node, state, nil)
-	ddp.sps = &sealedSectorPipeline{state: state, pieces: holdPiece(entry.PieceCID)}
-	return ddp, entry
-}
-
-func newWatchSealingHarnessWithPieces(t *testing.T, node *claimLookupNode, state lapi.SectorState, pieces []lapi.SectorPiece) (*DirectDealsProvider, *types.DirectDeal) {
+func newWatchSealingHarnessWithPieces(t *testing.T, node *chainNode, state lapi.SectorState, pieces []lapi.SectorPiece) (*DirectDealsProvider, *types.DirectDeal) {
 	t.Helper()
 
 	_, dealLogger := newTestStores(t)
@@ -236,7 +163,7 @@ func newWatchSealingHarnessWithPieces(t *testing.T, node *claimLookupNode, state
 		ctx:         context.Background(),
 		Address:     maddr,
 		fullnodeApi: node,
-		sps:         &sealedSectorPipeline{state: state, pieces: pieces},
+		sps:         &fixedSectorPipeline{info: lapi.SectorInfo{State: state, Pieces: pieces}},
 		dealLogger:  dealLogger,
 	}
 
@@ -249,169 +176,72 @@ func newWatchSealingHarnessWithPieces(t *testing.T, node *claimLookupNode, state
 	return ddp, entry
 }
 
-// TestWatchSealingUpdatesSealedAfterNv29 covers a sector activated after the
-// upgrade, where the sealed sector is the whole of the outcome and reporting the
-// missing claim as a failure marks a deal that is fine as broken.
 func TestWatchSealingUpdatesSealedAfterNv29(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{activation: nv29Height + 1})
+	node := &chainNode{sector: nv29Sector(abi.SectorNumber(2))}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
 	require.Nil(t, ddp.watchSealingUpdates(entry),
-		"a deal whose sector sealed after nv29 is complete even though no claim was written")
+		"a deal whose sector onboarded after nv29 is complete even though no claim was written")
+	require.Zero(t, node.claimReads, "the flag answers for this sector; the claim is not read")
 }
 
 // TestWatchSealingUpdatesClaimFound pins the pre-nv29 path: a claim that matches
 // the sector still completes the deal, so the nv29 branch has not displaced the
 // normal case.
 func TestWatchSealingUpdatesClaimFound(t *testing.T) {
-	claim := &verifreg9types.Claim{Sector: abi.SectorNumber(2)}
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{activation: nv29Height - 1, claim: claim})
-
-	require.Nil(t, ddp.watchSealingUpdates(entry))
-}
-
-// TestWatchSealingUpdatesClaimSectorMismatch checks that a claim on another
-// sector stays fatal whatever the sector's activation, so the new branch does not
-// swallow a real inconsistency along with the expected absences.
-func TestWatchSealingUpdatesClaimSectorMismatch(t *testing.T) {
-	for name, node := range map[string]*claimLookupNode{
-		"sealed before nv29": {activation: nv29Height - 1, claim: &verifreg9types.Claim{Sector: abi.SectorNumber(3)}},
-		"sealed after nv29":  {activation: nv29Height + 1, claim: &verifreg9types.Claim{Sector: abi.SectorNumber(3)}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			ddp, entry := newWatchSealingHarness(t, node)
-
-			derr := ddp.watchSealingUpdates(entry)
-			require.NotNil(t, derr)
-			require.Equal(t, types.DealRetryFatal, derr.retry)
-			require.Contains(t, derr.Error(), "sector mismatch")
-		})
+	node := &chainNode{
+		sector: preNv29Sector(abi.SectorNumber(2)),
+		claim:  &verifreg9types.Claim{Sector: abi.SectorNumber(2)},
 	}
-}
-
-// TestWatchSealingUpdatesClaimFoundAtNv29 covers a deal that got its claim
-// before the upgrade and is re-checked after: it is still on chain, so use it.
-func TestWatchSealingUpdatesClaimFoundAtNv29(t *testing.T) {
-	claim := &verifreg9types.Claim{Sector: abi.SectorNumber(2)}
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{activation: nv29Height + 1, claim: claim})
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
 	require.Nil(t, ddp.watchSealingUpdates(entry))
 }
 
-func TestSettleNoClaimSealedBeforeNv29KeepsWaiting(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{activation: nv29Height - 1})
+func TestWatchSealingUpdatesNoClaimOnASectorThisNodeHasFails(t *testing.T) {
+	node := &chainNode{sector: preNv29Sector(abi.SectorNumber(2))}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimPending, outcome, "a pre-nv29 sector's missing claim is a fault, not the expected nv29 absence")
+	derr := ddp.watchSealingUpdates(entry)
+	require.NotNil(t, derr)
+	require.Equal(t, types.DealRetryFatal, derr.retry)
+	require.ErrorIs(t, derr.error, ErrNoClaimFound)
 }
 
-func TestSettleSectorNotOnChainKeepsWaiting(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{sectorMissing: true})
+func TestWatchSealingUpdatesClaimSectorMismatch(t *testing.T) {
+	node := &chainNode{
+		sector: preNv29Sector(abi.SectorNumber(2)),
+		claim:  &verifreg9types.Claim{Sector: abi.SectorNumber(3)},
+	}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimPending, outcome)
+	derr := ddp.watchSealingUpdates(entry)
+	require.NotNil(t, derr)
+	require.Equal(t, types.DealRetryFatal, derr.retry)
+	require.Contains(t, derr.Error(), "sector mismatch")
 }
 
-// TestSettleLookupFailureRetries: a failed chain query is neither answer, so the deal retries.
-func TestSettleLookupFailureRetries(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{sectorErr: context.DeadlineExceeded})
+func TestWatchSealingUpdatesSectorNotOnThisNodesChain(t *testing.T) {
+	node := &chainNode{}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
-	outcome, err := ddp.settle(entry, sealedState)
-	require.NotNil(t, err)
-	require.Equal(t, claimPending, outcome)
-	require.Equal(t, types.DealRetryAuto, err.retry)
+	derr := ddp.watchSealingUpdates(entry)
+	require.NotNil(t, derr)
+	require.Equal(t, types.DealRetryAuto, derr.retry)
+	require.NotErrorIs(t, derr.error, ErrNoClaimFound,
+		"a local lag must not be able to produce the migration's verdict")
 }
 
-// TestSettleSnapAfterNv29: the update's epoch dates a snapped piece, not the activation, which
-// would wait for a claim FIP-0118 never writes.
-func TestSettleSnapAfterNv29(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{
-		activation: nv29Height - 5000,
-		snapped:    true,
-		snappedAt:  nv29Height + 1,
-	})
+func TestWatchSealingUpdatesChainReadFailureRetries(t *testing.T) {
+	node := &chainNode{sectorErr: context.DeadlineExceeded}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Proving))
 
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimDone, outcome, "a piece snapped into a sector after nv29 is complete without a claim")
+	derr := ddp.watchSealingUpdates(entry)
+	require.NotNil(t, derr)
+	require.Equal(t, types.DealRetryAuto, derr.retry)
+	require.ErrorIs(t, derr.error, context.DeadlineExceeded)
 }
 
-func TestSettleSnapBeforeNv29KeepsWaiting(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{
-		activation: nv29Height - 5000,
-		snapped:    true,
-		snappedAt:  nv29Height - 1,
-	})
-
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimPending, outcome)
-}
-
-// TestSettleFailedSnapAfterNv29KeepsWaiting: with no snap landed, the absent piece spacetime is
-// what says the data never reached the sector.
-func TestSettleFailedSnapAfterNv29KeepsWaiting(t *testing.T) {
-	ddp, entry := newWatchSealingHarness(t, &claimLookupNode{
-		activation:  nv29Height + 1,
-		noPieceData: true,
-	})
-
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimPending, outcome, "an empty sector must not settle a deal whose data never reached it")
-}
-
-// TestSettleSnapWithoutThePieceIsFatal: the sector dates as complete, so only the
-// sealer's piece list can say this deal's data is not in it, and no wait will put it there.
-func TestSettleSnapWithoutThePieceIsFatal(t *testing.T) {
-	ddp, entry := newWatchSealingHarnessWithPieces(t,
-		&claimLookupNode{activation: nv29Height - 5000, snapped: true, snappedAt: nv29Height + 1},
-		lapi.SectorState(sealing.Proving),
-		holdPiece(testPieceCidSeed(t, "another deal's piece")))
-
-	outcome, err := ddp.settle(entry, sealedState)
-	require.NotNil(t, err)
-	require.Equal(t, claimPending, outcome)
-	require.Equal(t, types.DealRetryFatal, err.retry)
-	require.ErrorIs(t, err.error, ErrPieceNotOnboarded)
-	require.NotErrorIs(t, err.error, ErrNoClaimFound)
-}
-
-func TestSettlePieceListUnavailableKeepsWaiting(t *testing.T) {
-	ddp, entry := newWatchSealingHarnessWithPieces(t,
-		&claimLookupNode{activation: nv29Height + 1},
-		lapi.SectorState(sealing.Proving),
-		nil)
-
-	outcome, err := ddp.settle(entry, sealedState)
-	require.Nil(t, err)
-	require.Equal(t, claimUnverifiable, outcome, "waiting on a piece list that never came is not the same wait as a claim that never came")
-}
-
-// TestTimeoutErrorNamesWhatWasWaitedFor: Curio carries a missing claim over on the text alone, so
-// an unverifiable piece must not read as that claim.
-func TestTimeoutErrorNamesWhatWasWaitedFor(t *testing.T) {
-	missingClaim := timeoutError(claimPending)
-	require.ErrorIs(t, missingClaim.error, ErrNoClaimFound)
-	require.Equal(t, types.DealRetryFatal, missingClaim.retry)
-
-	unverified := timeoutError(claimUnverifiable)
-	require.ErrorIs(t, unverified.error, ErrPieceUnverifiable)
-	require.Equal(t, types.DealRetryFatal, unverified.retry)
-	require.NotErrorIs(t, unverified.error, ErrNoClaimFound)
-	require.NotErrorIs(t, unverified.error, ErrPieceNotOnboarded)
-
-	require.Equal(t, "piece unverifiable", ErrPieceUnverifiable.Error())
-}
-
-func TestErrPieceNotOnboardedWording(t *testing.T) {
-	require.Equal(t, "piece not onboarded", ErrPieceNotOnboarded.Error())
-	require.NotEqual(t, ErrNoClaimFound.Error(), ErrPieceNotOnboarded.Error())
-}
-
-// TestWatchSealingUpdatesSealingFailed: past nv29 no claim is written either way, so
-// only the sealing state tells a failed sector from one that sealed.
 func TestWatchSealingUpdatesSealingFailed(t *testing.T) {
 	for _, state := range []sealing.SectorState{
 		sealing.FailedUnrecoverable,
@@ -419,41 +249,38 @@ func TestWatchSealingUpdatesSealingFailed(t *testing.T) {
 		sealing.Terminating,
 	} {
 		t.Run(string(state), func(t *testing.T) {
-			node := &claimLookupNode{activation: nv29Height + 1, noPieceData: true}
-			ddp, entry := newWatchSealingHarnessInState(t, node, lapi.SectorState(state))
+			node := &chainNode{sector: emptySector(abi.SectorNumber(2))}
+			ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(state))
 
 			derr := ddp.watchSealingUpdates(entry)
 			require.NotNil(t, derr)
 			require.Equal(t, types.DealRetryFatal, derr.retry)
 			require.ErrorIs(t, derr.error, ErrSectorSealingFailed)
 			require.NotErrorIs(t, derr.error, ErrNoClaimFound)
+			require.Zero(t, node.sectorReads,
+				"a failed sector is the sealer's own verdict, so it is not put to the chain")
 		})
 	}
 }
 
-// TestWatchSealingUpdatesClaimOutranksSealingState pins the order the two questions
-// are asked in: a claim on chain settles the deal before the sealing state gets a say.
-func TestWatchSealingUpdatesClaimOutranksSealingState(t *testing.T) {
-	for _, state := range []sealing.SectorState{
-		sealing.Removed,
-		sealing.Terminating,
-		sealing.FailedUnrecoverable,
-	} {
-		t.Run(string(state), func(t *testing.T) {
-			claim := &verifreg9types.Claim{Sector: abi.SectorNumber(2)}
-			node := &claimLookupNode{activation: nv29Height - 1, claim: claim}
-			ddp, entry := newWatchSealingHarnessInState(t, node, lapi.SectorState(state))
-
-			require.Nil(t, ddp.watchSealingUpdates(entry),
-				"a deal whose claim is on chain is complete even if the sector was removed afterwards")
-		})
+func TestWatchSealingUpdatesWaitsForTheSealer(t *testing.T) {
+	node := &chainNode{sector: nv29Sector(abi.SectorNumber(2))}
+	ddp, entry := newWatchSealingHarness(t, node, lapi.SectorState(sealing.Packing))
+	ddp.sps = &sealingSequencePipeline{
+		states: []lapi.SectorState{lapi.SectorState(sealing.Packing), lapi.SectorState(sealing.Proving)},
 	}
+	ddp.sealingPollEvery = time.Millisecond
+
+	require.Nil(t, ddp.watchSealingUpdates(entry))
+	require.Equal(t, 2, ddp.sps.(*sealingSequencePipeline).calls)
+	require.Equal(t, 1, node.sectorReads,
+		"the chain is read once, when the sealer is done, not on every poll")
 }
 
 // TestErrNoClaimFoundWording pins the sentence migrate-curio matches on: a deal
 // carries its error as text alone, so changing the wording would strand data.
 func TestErrNoClaimFoundWording(t *testing.T) {
-	require.Equal(t, "no claim found", ErrNoClaimFound.Error())
+	require.Equal(t, "no claim was found for a piece onboarded before nv29", ErrNoClaimFound.Error())
 	require.True(t, errors.Is(ErrNoClaimFound, ErrNoClaimFound))
 }
 
@@ -463,24 +290,6 @@ func TestNoClaimFoundIsRecordedVerbatim(t *testing.T) {
 	derr := &dealMakingError{retry: types.DealRetryFatal, error: ErrNoClaimFound}
 
 	require.Equal(t, ErrNoClaimFound.Error(), derr.Error())
-}
-
-// TestClaimWaitStartsWhenThereIsSomethingToWaitFor pins the clock the wait is
-// measured against: a deal is watched from announcement, before its sector seals.
-func TestClaimWaitStartsWhenThereIsSomethingToWaitFor(t *testing.T) {
-	now := time.Now()
-
-	var wait claimWait
-	require.False(t, wait.expired(now.Add(24*time.Hour)),
-		"a wait that never began has nothing to run out on")
-
-	wait.start(now)
-	require.False(t, wait.expired(now.Add(9*time.Minute)))
-	require.True(t, wait.expired(now.Add(11*time.Minute)))
-
-	wait.start(now.Add(time.Hour))
-	require.True(t, wait.expired(now.Add(time.Hour)),
-		"the first start is the one that counts")
 }
 
 // vanishingAllocationNode serves the node queries Import makes, with an
@@ -628,80 +437,31 @@ func testPieceCidSeed(t *testing.T, seed string) cid.Cid {
 	return cid.NewCidV1(cid.Raw, mh)
 }
 
-// TestPieceOnboardedAtOrAfterNv29BeforeUpgrade: pre-nv29 the version alone settles
-// it, and the sector lookup is rigged to fail if the check goes past that.
-func TestPieceOnboardedAtOrAfterNv29BeforeUpgrade(t *testing.T) {
-	maddr, err := address.NewIDAddress(1000)
-	require.NoError(t, err)
-
-	node := &claimLookupNode{nv: network.Version28, sectorErr: context.DeadlineExceeded}
-
-	onboarded, err := PieceOnboardedAtOrAfterNv29(context.Background(), node, maddr, abi.SectorNumber(2))
-	require.NoError(t, err)
-	require.False(t, onboarded)
-}
-
-type paramsNode struct {
-	v1api.FullNode
-	params *lapi.NetworkParams
-	err    error
-}
-
-func (p *paramsNode) StateGetNetworkParams(context.Context) (*lapi.NetworkParams, error) {
-	return p.params, p.err
-}
-
-func paramsAt(height abi.ChainEpoch) *paramsNode {
-	return &paramsNode{params: &lapi.NetworkParams{
-		ForkUpgradeParams: lapi.ForkUpgradeParams{UpgradeSolsticeHeight: height},
-	}}
-}
-
-// TestNv29UpgradeHeight: the epoch comes from the node, so these cases hold under every build tag.
-func TestNv29UpgradeHeight(t *testing.T) {
-	tests := map[string]struct {
-		node      v1api.FullNode
-		want      abi.ChainEpoch
-		expectErr bool
+func TestSectorOnboarded(t *testing.T) {
+	for name, tc := range map[string]struct {
+		sector *miner.SectorOnChainInfo
+		want   bool
 	}{
-		"calibnet, whose epoch is already set": {
-			node: paramsAt(4109133),
-			want: 4109133,
+		"a sector onboarded before nv29": {
+			// What fails if the dating is read off miner.SectorIsFullQaPower instead of the bit.
+			sector: tenXByDatacapSector(abi.SectorNumber(2)),
+			want:   false,
 		},
-		"mainnet, whose upgrade is not scheduled yet": {
-			node: paramsAt(999999999999999),
-			want: 999999999999999,
+		"a sector onboarded from nv29 on": {
+			sector: nv29Sector(abi.SectorNumber(2)),
+			want:   true,
 		},
-		"a devnet with a scheduled upgrade": {
-			node: paramsAt(200),
-			want: 200,
+		"a flagged sector holding no piece": {
+			sector: emptySector(abi.SectorNumber(2)),
+			want:   false,
 		},
-		"a devnet with nv29 active from genesis": {
-			// Lotus spells a genesis-active nv29 as a negative epoch, which needs no normalising.
-			node: paramsAt(-24),
-			want: -24,
+		"nothing on chain for the sector": {
+			sector: nil,
+			want:   false,
 		},
-		"a node too old to carry the field": {
-			// Decodes to zero, which would put every sector past the upgrade and settle the deal.
-			node:      &paramsNode{params: &lapi.NetworkParams{}},
-			expectErr: true,
-		},
-		"the lookup fails": {
-			node:      &paramsNode{err: context.DeadlineExceeded},
-			expectErr: true,
-		},
-	}
-
-	for name, tc := range tests {
+	} {
 		t.Run(name, func(t *testing.T) {
-			height, err := nv29UpgradeHeight(context.Background(), tc.node)
-			if tc.expectErr {
-				require.Error(t, err)
-				require.Zero(t, height, "a rejected height must not leak out as a usable epoch")
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tc.want, height)
+			require.Equal(t, tc.want, SectorOnboarded(tc.sector))
 		})
 	}
 }

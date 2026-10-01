@@ -48,6 +48,9 @@ var (
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
 	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
+	// ErrNoClaimFound ends a pre-nv29 deal whose sector is on chain without a claim. From
+	// nv29 on FIP-0118 writes none, so such a sector never reaches this error.
+	ErrNoClaimFound = errors.New("no claim was found for a piece onboarded before nv29")
 )
 
 var (

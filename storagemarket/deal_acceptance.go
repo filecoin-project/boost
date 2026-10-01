@@ -172,9 +172,10 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 
 	// Verified deal checks
 	if proposal.VerifiedDeal {
-		// The flag is meaningless past nv29, but the datacap actor survives, so a
-		// leftover balance would still pass below and seal at the verified ask.
-		// Flipping the client default misses --verified and older clients.
+		// Only the verified half is turned away: FIP-0118 takes the deal ids out of the
+		// pre-commit, not the deals out of the sector, so an unverified deal still onboards.
+		// The verified half has no claim left to make, and the datacap actor survives the
+		// upgrade, so a leftover balance would be sealed at the verified ask regardless.
 		nv, err := p.fullnodeApi.StateNetworkVersion(p.ctx, tsk)
 		if err != nil {
 			return &validationError{

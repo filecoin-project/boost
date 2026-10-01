@@ -49,7 +49,7 @@ func claimOnSector(s abi.SectorNumber) *verifreg9types.Claim {
 	return &verifreg9types.Claim{Sector: s}
 }
 
-// fakeChainNode answers the one read the nv29 dating makes.
+// fakeChainNode answers the reads the nv29 dating and the claim lookup make.
 type fakeChainNode struct {
 	v1api.FullNode
 
@@ -57,7 +57,10 @@ type fakeChainNode struct {
 	headErr error
 	err     error
 
+	claim       *verifreg9types.Claim
+	claimErr    error
 	sectorReads int
+	claimReads  int
 }
 
 func (f *fakeChainNode) ChainHead(context.Context) (*ltypes.TipSet, error) {
@@ -69,19 +72,23 @@ func (f *fakeChainNode) StateMinerSectors(context.Context, address.Address, *bit
 	return f.sectors, f.err
 }
 
-// onboardedAtNv29Sector holds piece data from epoch 300, past the test boundary.
+func (f *fakeChainNode) StateGetClaim(context.Context, address.Address, verifreg9types.ClaimId, ltypes.TipSetKey) (*verifreg9types.Claim, error) {
+	f.claimReads++
+	return f.claim, f.claimErr
+}
+
+// onboardedAtNv29Sector holds piece data in a sector the fork dated at or after nv29.
 func onboardedAtNv29Sector() *minertypes.SectorOnChainInfo {
 	return &minertypes.SectorOnChainInfo{
 		SectorNumber: sectorID,
 		Activation:   300,
 		DealWeight:   big.NewInt(1),
+		Flags:        minertypes.FULL_QA_POWER,
 	}
 }
 
-// TestDateDealsAgainstNv29 pins that the sectors are read once, and that a read
-// which cannot establish the dating stops the run rather than coming back empty.
+// TestDateDealsAgainstNv29: one read, dated by the flag; a read that cannot date stops the run.
 func TestDateDealsAgainstNv29(t *testing.T) {
-	boundary := storagemarket.Nv29Boundary{Reached: true, Height: 200}
 	ctx := context.Background()
 	maddr := address.TestAddress
 
@@ -89,22 +96,34 @@ func TestDateDealsAgainstNv29(t *testing.T) {
 		node := &fakeChainNode{sectors: []*minertypes.SectorOnChainInfo{
 			onboardedAtNv29Sector(),
 			{SectorNumber: otherSector, Activation: 100, DealWeight: big.NewInt(1)},
-			{SectorNumber: 4, Activation: 300},
+			{SectorNumber: 4, Activation: 300, Flags: minertypes.FULL_QA_POWER},
 		}}
 
-		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr, boundary)
+		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr)
 
 		require.NoError(t, err)
 		require.True(t, onboarded[sectorID])
 		require.False(t, onboarded[otherSector])
-		require.False(t, onboarded[4])
+		require.False(t, onboarded[4], "a flagged sector with no piece spacetime holds no piece to date")
 		require.Equal(t, 1, node.sectorReads, "the miner's sectors are read once, not once per deal")
+	})
+
+	t.Run("the flag dates the sector, not its epoch", func(t *testing.T) {
+		// An activation past any fork is not enough: only the bit FIP-0118 sets dates a sector.
+		node := &fakeChainNode{sectors: []*minertypes.SectorOnChainInfo{
+			{SectorNumber: sectorID, Activation: 9_000_000, DealWeight: big.NewInt(1)},
+		}}
+
+		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr)
+
+		require.NoError(t, err)
+		require.Empty(t, onboarded)
 	})
 
 	t.Run("a chain that will not answer stops the run", func(t *testing.T) {
 		node := &fakeChainNode{err: errors.New("connection refused")}
 
-		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr, boundary)
+		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr)
 
 		require.ErrorContains(t, err, "listing the miner's sectors")
 		require.ErrorContains(t, err, "connection refused")
@@ -114,22 +133,48 @@ func TestDateDealsAgainstNv29(t *testing.T) {
 	t.Run("a chain that will not name a head stops the run too", func(t *testing.T) {
 		node := &fakeChainNode{headErr: errors.New("node is syncing")}
 
-		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr, boundary)
+		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr)
 
 		require.ErrorContains(t, err, "getting chain head")
 		require.ErrorContains(t, err, "node is syncing")
 		require.Nil(t, onboarded)
 		require.Zero(t, node.sectorReads, "no sectors can be dated without a head to date them at")
 	})
+}
 
-	t.Run("a chain before nv29 is not asked about its sectors at all", func(t *testing.T) {
-		node := &fakeChainNode{err: errors.New("must not be asked")}
+// TestClaimToRead: past nv29 the flag spares the read.
+func TestClaimToRead(t *testing.T) {
+	ctx := context.Background()
+	maddr := address.TestAddress
 
-		onboarded, err := dateDealsAgainstNv29(ctx, node, maddr, storagemarket.Nv29Boundary{})
+	t.Run("an nv29 sector is not asked for a claim", func(t *testing.T) {
+		node := &fakeChainNode{claim: claimOnSector(sectorID)}
+
+		claim, err := claimToRead(ctx, node, maddr, migratableDeal(), onboardedAtNv29)
 
 		require.NoError(t, err)
-		require.Empty(t, onboarded)
-		require.Zero(t, node.sectorReads)
+		require.Nil(t, claim)
+		require.Zero(t, node.claimReads, "the flag answers for this deal; the chain is not asked")
+	})
+
+	t.Run("a pre-nv29 sector is", func(t *testing.T) {
+		node := &fakeChainNode{claim: claimOnSector(sectorID)}
+
+		claim, err := claimToRead(ctx, node, maddr, migratableDeal(), false)
+
+		require.NoError(t, err)
+		require.Equal(t, sectorID, claim.Sector)
+		require.Equal(t, 1, node.claimReads)
+	})
+
+	t.Run("a pre-nv29 look up that fails stops the deal, not the run", func(t *testing.T) {
+		node := &fakeChainNode{claimErr: errors.New("connection refused")}
+
+		claim, err := claimToRead(ctx, node, maddr, migratableDeal(), false)
+
+		require.ErrorContains(t, err, "error getting the claim status")
+		require.ErrorContains(t, err, "connection refused")
+		require.Nil(t, claim)
 	})
 }
 
@@ -159,13 +204,6 @@ func TestMigratableDirectDeal(t *testing.T) {
 			sectorAlive:        true,
 			want:               true,
 		},
-		"a deal whose sector sealed after nv29 still gets its claim checked": {
-			deal:               migratableDeal(),
-			claim:              claimOnSector(otherSector),
-			onboardedAfterNv29: onboardedAtNv29,
-			sectorAlive:        true,
-			wantErr:            "sector mismatch",
-		},
 		"a claim that will never exist must not strand a deal failed by an older boost": {
 			// Boost used to fail such a deal once the claim lookup came back
 			// empty. Skipping it here leaves the deal record and the retrieval
@@ -192,24 +230,17 @@ func TestMigratableDirectDeal(t *testing.T) {
 			sectorAlive:        true,
 			wantReason:         "commp mismatch",
 		},
-		"a piece the sector does not hold is not excused by nv29 either": {
-			deal: failedWith(storagemarket.ErrPieceNotOnboarded.Error() +
-				": sector 2 carries data from network version 29 or above without the deal's piece baga6ea4seaq"),
-			onboardedAfterNv29: onboardedAtNv29,
-			sectorAlive:        true,
-			wantReason:         storagemarket.ErrPieceNotOnboarded.Error(),
-		},
-		"a piece nobody could check is not excused by nv29 either": {
-			deal:               failedWith(storagemarket.ErrPieceUnverifiable.Error()),
-			onboardedAfterNv29: onboardedAtNv29,
-			sectorAlive:        true,
-			wantReason:         storagemarket.ErrPieceUnverifiable.Error(),
-		},
 		"a claim mismatch recorded as the deal error is not excused either": {
 			deal:               failedWith("sector mismatch for claim"),
 			onboardedAfterNv29: onboardedAtNv29,
 			sectorAlive:        true,
 			wantReason:         "sector mismatch for claim",
+		},
+		"a pre-nv29 claim that names another sector stops the deal": {
+			deal:        migratableDeal(),
+			claim:       claimOnSector(otherSector),
+			sectorAlive: true,
+			wantErr:     "sector mismatch for deal",
 		},
 		"a deal that never reached a sector": {
 			deal: &types.DirectDeal{
