@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
@@ -90,8 +91,14 @@ func (d *Doctor) Run(ctx context.Context) {
 				return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
 			}
 
+			nv, err := d.fullnodeApi.StateNetworkVersion(ctx, types.EmptyTSK)
+			if err != nil {
+				return fmt.Errorf("getting network version: %w", err)
+			}
+			nv29 := nv >= network.Version29
+
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid, lu, head, claims)
+				err := d.checkPiece(ctx, pcid, lu, head, claims, nv29)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -120,7 +127,8 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim) error {
+// nv29 reports whether claims have stopped being created (FIP-0118).
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim, nv29 bool) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
 	// Check if piece belongs to an active sector
@@ -193,6 +201,22 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 					if v.Sector == dealId.SectorID {
 						found = true
 					}
+				}
+				// Claims stop being written at nv29, so for such a sector the
+				// active sector found above is the only evidence left and reading
+				// the missing claim as "gone from chain" would skip the checks
+				// below on every pass.
+				//
+				// The chain version is enough here, unlike elsewhere in this
+				// change: the sector is already known to be active, and a sector
+				// that sealed before nv29 always has its claim, so dating each
+				// sector individually would only ever re-derive that. Reading the
+				// version too high just means a claim is assumed present a little
+				// later than it was, which makes the doctor check more, not less.
+				if !found && nv29 {
+					doclog.Debugw("no claim for direct deal at nv29+; relying on its active sector",
+						"piece", pieceCid, "allocation", dealId.ChainDealID, "sector", dealId.SectorID)
+					found = true
 				}
 			} else {
 				doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId.ChainDealID)

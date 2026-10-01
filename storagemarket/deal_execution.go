@@ -604,15 +604,6 @@ func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser
 }
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
-	// If this is Curio sealer then we should wait till sector finishes sealing
-	if p.config.Curio {
-		// Wait for sector to finish sealing
-		err := p.trackCurioSealing(deal.SectorID)
-		if err != nil {
-			return err
-		}
-	}
-
 	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
@@ -784,6 +775,24 @@ func IsFinalSealingState(state lapi.SectorState) bool {
 	return false
 }
 
+// IsFailedSealingState reports whether a final sealing state is one the deal's data does not
+// survive. Past nv29 no claim is written either way, so the sealing state is the only thing telling
+// a successful seal from a failed one.
+func IsFailedSealingState(state lapi.SectorState) bool {
+	switch sealing.SectorState(state) {
+	case
+		sealing.Removed,
+		sealing.Removing,
+		sealing.Terminating,
+		sealing.TerminateWait,
+		sealing.TerminateFinality,
+		sealing.TerminateFailed,
+		sealing.FailedUnrecoverable:
+		return true
+	}
+	return false
+}
+
 func HasDeal(deals []abi.DealID, pdsDealId abi.DealID) bool {
 	var ret bool
 	for _, d := range deals {
@@ -919,45 +928,4 @@ func (p *Provider) checkDealProposalStartEpoch(deal *types.ProviderDealState) *d
 	}
 
 	return nil
-}
-
-func (p *Provider) trackCurioSealing(sectorNum abi.SectorNumber) *dealMakingError {
-	var lastSealingState lapi.SectorState
-	checkStatus := func() lapi.SectorInfo {
-		// Get the sector status
-		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
-		if err == nil && si.State != lastSealingState {
-			lastSealingState = si.State
-		}
-		return si
-	}
-
-	retErr := &dealMakingError{
-		retry: types.DealRetryFatal,
-		error: ErrSectorSealingFailed,
-	}
-
-	// Check status immediately
-	info := checkStatus()
-	if IsFinalSealingState(info.State) {
-		return nil
-	}
-
-	// Check status every 10 second. There is no advantage of checking it every second
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-p.ctx.Done():
-			return nil
-		case <-ticker.C:
-			info = checkStatus()
-			if IsFinalSealingState(info.State) {
-				if sealing.SectorState(info.State) == sealing.FailedUnrecoverable {
-					return retErr
-				}
-				return nil
-			}
-		}
-	}
 }

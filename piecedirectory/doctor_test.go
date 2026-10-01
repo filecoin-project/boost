@@ -18,6 +18,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/client"
@@ -27,6 +28,9 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 func TestPieceDoctor(t *testing.T) {
@@ -58,6 +62,14 @@ func TestPieceDoctor(t *testing.T) {
 
 		t.Run("check pieces", func(t *testing.T) {
 			testCheckPieces(ctx, t, cl)
+		})
+
+		t.Run("direct deal without claim", func(t *testing.T) {
+			testDirectDealWithoutClaim(ctx, t, cl)
+		})
+
+		t.Run("direct deal claim sector mismatch", func(t *testing.T) {
+			testDirectDealClaimSectorMismatch(ctx, t, cl)
 		})
 
 		t.Run("pieces count", func(t *testing.T) {
@@ -99,6 +111,16 @@ func TestPieceDoctor(t *testing.T) {
 		t.Run("check pieces", func(t *testing.T) {
 			svc.RecreateTables(ctx, t, ybstore)
 			testCheckPieces(ctx, t, cl)
+		})
+
+		t.Run("direct deal without claim", func(t *testing.T) {
+			svc.RecreateTables(ctx, t, ybstore)
+			testDirectDealWithoutClaim(ctx, t, cl)
+		})
+
+		t.Run("direct deal claim sector mismatch", func(t *testing.T) {
+			svc.RecreateTables(ctx, t, ybstore)
+			testDirectDealClaimSectorMismatch(ctx, t, cl)
 		})
 
 		t.Run("pieces count", func(t *testing.T) {
@@ -318,7 +340,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	doc := NewDoctor(minerAddr, cl, nil, nil)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, false)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no index for it
@@ -336,7 +358,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, false)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
@@ -352,7 +374,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	ssu.SectorStates[dlSectorID] = db.SealStateSealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, false)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no unsealed copy
@@ -368,7 +390,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	ssu.SectorStates[dlSectorID] = db.SealStateUnsealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, false)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
@@ -379,6 +401,161 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
+}
+
+// noClaimFullNode stands in for a full node that finds nothing on chain: it
+// reports no market deal, mirroring a direct deal whose allocation was never
+// claimed. Only the methods checkPiece calls are implemented; the embedded
+// interface panics on anything else, which keeps the fake honest.
+type noClaimFullNode struct {
+	api.FullNode
+}
+
+func (n *noClaimFullNode) StateMarketStorageDeal(context.Context, abi.DealID, types.TipSetKey) (*api.MarketDeal, error) {
+	return nil, fmt.Errorf("deal not found")
+}
+
+// testDirectDealWithoutClaim covers a direct deal that has no claim on chain.
+// From nv29 FIP-0118 stops claims being created, so this is the steady state
+// for a deal that sealed after the upgrade. The doctor must still report a
+// missing index or unsealed copy: treating the absent claim as "gone from
+// chain" used to unflag the piece and return before either check ran, and
+// because pieces are re-checked on a timer that hid the fault on every pass.
+func testDirectDealWithoutClaim(ctx context.Context, t *testing.T, cl *client.Store) {
+	_, carFilePath := CreateCarFile(t)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	commpCalc := CalculateCommp(t, carv1Reader)
+
+	minerActorID := abi.ActorID(1012)
+	minerAddr, err := address.NewIDAddress(uint64(minerActorID))
+	require.NoError(t, err)
+
+	di := model.DealInfo{
+		DealUuid:     uuid.New().String(),
+		ChainDealID:  7,
+		MinerAddr:    minerAddr,
+		SectorID:     7,
+		PieceOffset:  0,
+		PieceLength:  commpCalc.PieceSize,
+		IsDirectDeal: true,
+	}
+	dlSectorID := abi.SectorID{Miner: minerActorID, Number: di.SectorID}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
+	require.NoError(t, err)
+
+	// The sector is active and holds an unsealed copy.
+	ssu := &sectorstatemgr.SectorStateUpdates{
+		ActiveSectors: map[abi.SectorID]struct{}{dlSectorID: {}},
+		SectorStates:  map[abi.SectorID]db.SealState{dlSectorID: db.SealStateUnsealed},
+	}
+
+	// A doctor with a full node attached, so the on-chain check actually runs.
+	doc := NewDoctor(minerAddr, cl, nil, &noClaimFullNode{})
+
+	// nv29, no claims: the piece has no index yet, so it must be flagged.
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, true)
+	require.NoError(t, err)
+	count, err := cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "piece with no index must be flagged even when it has no claim")
+
+	// Index it: now there is nothing wrong, so it should be unflagged.
+	recs := GetRecords(t, carv1Reader)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, true)
+	require.NoError(t, err)
+
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, true)
+	require.NoError(t, err)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// Drop the unsealed copy: that must be reported too.
+	ssu.SectorStates[dlSectorID] = db.SealStateSealed
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, true)
+	require.NoError(t, err)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "piece with no unsealed copy must be flagged even when it has no claim")
+
+	// Before nv29 a missing claim still means the deal left the chain, so the
+	// piece is untracked rather than flagged. This pins the older behaviour.
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, nil, false)
+	require.NoError(t, err)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, count, "pre-nv29 a missing claim should still unflag the piece")
+}
+
+// testDirectDealClaimSectorMismatch checks that a claim pointing at a different
+// sector is not accepted as proof for this piece.
+func testDirectDealClaimSectorMismatch(ctx context.Context, t *testing.T, cl *client.Store) {
+	_, carFilePath := CreateCarFile(t)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	commpCalc := CalculateCommp(t, carv1Reader)
+
+	minerActorID := abi.ActorID(1013)
+	minerAddr, err := address.NewIDAddress(uint64(minerActorID))
+	require.NoError(t, err)
+
+	di := model.DealInfo{
+		DealUuid:     uuid.New().String(),
+		ChainDealID:  8,
+		MinerAddr:    minerAddr,
+		SectorID:     8,
+		PieceOffset:  0,
+		PieceLength:  commpCalc.PieceSize,
+		IsDirectDeal: true,
+	}
+	dlSectorID := abi.SectorID{Miner: minerActorID, Number: di.SectorID}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
+	require.NoError(t, err)
+
+	ssu := &sectorstatemgr.SectorStateUpdates{
+		ActiveSectors: map[abi.SectorID]struct{}{dlSectorID: {}},
+		SectorStates:  map[abi.SectorID]db.SealState{dlSectorID: db.SealStateUnsealed},
+	}
+
+	// A claim exists, but for a different sector than the one holding the piece.
+	claims := map[verifregtypes.ClaimId]verifregtypes.Claim{
+		verifregtypes.ClaimId(di.ChainDealID): {Sector: di.SectorID + 1},
+	}
+
+	doc := NewDoctor(minerAddr, cl, nil, &noClaimFullNode{})
+
+	// Pre-nv29 the mismatched claim is no proof, so the piece is unflagged and
+	// left alone rather than health-checked.
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, claims, false)
+	require.NoError(t, err)
+	count, err := cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// At nv29 the active sector carries the piece, so the missing index is
+	// reported despite the mismatched claim.
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil, claims, true)
+	require.NoError(t, err)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }
 
 func testPiecesCount(ctx context.Context, t *testing.T, cl *client.Store) {

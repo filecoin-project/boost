@@ -30,6 +30,7 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -548,6 +549,76 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 	return nil
 }
 
+// claimToRead skips the read for a sector onboarded at or after nv29: no claim was written.
+func claimToRead(ctx context.Context, full v1api.FullNode, maddr address.Address, deal *types.DirectDeal, onboardedAfterNv29 bool) (*verifreg9types.Claim, error) {
+	if onboardedAfterNv29 {
+		return nil, nil
+	}
+
+	claim, err := full.StateGetClaim(ctx, maddr, verifreg9types.ClaimId(deal.AllocationID), ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("error getting the claim status: %w", err)
+	}
+	return claim, nil
+}
+
+// migratableDirectDeal reports whether a direct deal on disk should be carried
+// over to Curio and, when it should not, why.
+//
+// A deal's own record is not asked whether it completed: Boost wrote a deal off when it
+// found no claim, which after nv29 is every deal FIP-0118 handled.
+func migratableDirectDeal(deal *types.DirectDeal, claim *verifreg9types.Claim, onboardedAfterNv29, sectorAlive bool) (bool, string, error) {
+	// SectorID is zero until the piece reaches a sector.
+	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		return false, "the checkpoint is below add piece", nil
+	}
+
+	if deal.Err != "" && deal.Retry == types.DealRetryFatal {
+		// The missing claim is the only fatal error excused, and only past nv29.
+		claimMissing := deal.Err == storagemarket.ErrNoClaimFound.Error()
+		if !claimMissing || !onboardedAfterNv29 {
+			return false, fmt.Sprintf("the deal retry is fatal: %s", deal.Err), nil
+		}
+	}
+
+	// Before the claim: a dead sector dates as pre-nv29.
+	if !sectorAlive {
+		return false, "the deal sector is no longer alive", nil
+	}
+
+	if claim != nil {
+		if claim.Sector != deal.SectorID {
+			return false, "", fmt.Errorf("sector mismatch for deal")
+		}
+	} else if !onboardedAfterNv29 {
+		return false, "no claim was found for a piece onboarded before nv29", nil
+	}
+
+	return true, "", nil
+}
+
+// dateDealsAgainstNv29 reports which sectors were onboarded at or after nv29 and so have
+// no claim. One read answers for every deal; the sector's own flag dates it.
+func dateDealsAgainstNv29(ctx context.Context, full v1api.FullNode, maddr address.Address) (map[abi.SectorNumber]bool, error) {
+	head, err := full.ChainHead(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting chain head: %w", err)
+	}
+
+	sectors, err := full.StateMinerSectors(ctx, maddr, nil, head.Key())
+	if err != nil {
+		return nil, fmt.Errorf("listing the miner's sectors: %w", err)
+	}
+
+	onboarded := make(map[abi.SectorNumber]bool)
+	for _, si := range sectors {
+		if storagemarket.SectorOnboarded(si) {
+			onboarded[si.SectorNumber] = true
+		}
+	}
+	return onboarded, nil
+}
+
 func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bitfield.BitField, maddr address.Address, hdb *harmonydb.DB, sqldb, mdb *sql.DB) error {
 	ddb := db.NewDirectDealsDB(sqldb)
 
@@ -561,41 +632,47 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 		return fmt.Errorf("failed to get all DDO deals: %w", err)
 	}
 
+	// Settled once, before the first deal: a chain that will not answer stops the run.
+	onboardedAfterNv29, err := dateDealsAgainstNv29(ctx, full, maddr)
+	if err != nil {
+		return fmt.Errorf("dating the miner's sectors against the nv29 upgrade: %w", err)
+	}
+	if len(onboardedAfterNv29) > 0 {
+		log.Infow("dating deals against the nv29 upgrade", "sectorsOnboardedAtOrAfterNv29", len(onboardedAfterNv29))
+	}
+
 	for i, deal := range deals {
 		if i > 0 && i%100 == 0 {
 			fmt.Printf("Migrating DDO Deals: %d / %d (%0.2f%%)\n", i, len(deals), float64(i)/float64(len(deals))*100)
 		}
 		llog := log.With("DDO Deal", deal.ID.String())
-		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
-			llog.Infow("Skipping as deal retry is fatal")
-			continue
-		}
-
-		if deal.Checkpoint < dealcheckpoints.AddedPiece {
-			llog.Infow("Skipping as checkpoint is below add piece")
-			continue
-		}
-
-		claim, err := full.StateGetClaim(ctx, maddr, verifreg9types.ClaimId(deal.AllocationID), ltypes.EmptyTSK)
-		if err != nil {
-			return fmt.Errorf("deal: %s: error getting the claim status: %w", deal.ID.String(), err)
-		}
-		if claim == nil {
-			llog.Infow("Skipping as checkpoint is below add piece")
-			continue
-		}
-		if claim.Sector != deal.SectorID {
-			return fmt.Errorf("deal: %s: sector mismatch for deal", deal.ID.String())
-		}
 
 		// Skip if the sector for the deal is not alive
-		ok, err := activeSectors.IsSet(uint64(deal.SectorID))
+		sectorAlive, err := activeSectors.IsSet(uint64(deal.SectorID))
 		if err != nil {
 			return err
 		}
+
+		// From AddedPiece on: SectorID is zero before that.
+		onboarded := deal.Checkpoint >= dealcheckpoints.AddedPiece && onboardedAfterNv29[deal.SectorID]
+
+		claim, err := claimToRead(ctx, full, maddr, deal, onboarded)
+		if err != nil {
+			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
+		}
+
+		ok, reason, err := migratableDirectDeal(deal, claim, onboarded, sectorAlive)
+		if err != nil {
+			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
+		}
 		if !ok {
-			llog.Infow("Skipping as sector ID is 0")
+			llog.Infow("Skipping direct deal", "reason", reason)
 			continue
+		}
+		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
+			// Named, so a failed deal in the log does not read as an error waved through.
+			llog.Infow("Migrating a failed deal: its only failure was the missing claim a piece onboarded after nv29 never gets",
+				"error", deal.Err)
 		}
 
 		// Skip if already migrated

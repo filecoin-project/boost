@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,16 +15,33 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
+// checkDirectDealSupported turns away a direct deal the provider is going to
+// reject anyway. FIP-0118 deprecates datacap at nv29, so from there on the
+// allocation this import is for can never become a claim.
+//
+// It is the same rejection DirectDealsProvider.Accept makes, wording and all,
+// asked one step earlier: the request carries a path to the CAR file, and the
+// checks below read the allocation off chain, so stopping here saves an
+// operator that work and tells them why before anything moves.
+func checkDirectDealSupported(nv network.Version) error {
+	if storagemarket.RejectedAtNv29(nv) {
+		return errors.New(storagemarket.DirectDealRejectionAtNv29)
+	}
+	return nil
+}
+
 var importDirectDataCmd = &cli.Command{
 	Name:      "import-direct",
-	Usage:     "Import data for direct onboarding flow with Boost",
+	Usage:     "Import data for direct onboarding flow with Boost [DEPRECATED at nv29: datacap removed by FIP-0118]",
 	ArgsUsage: "<piececid> <file>",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
@@ -101,6 +119,16 @@ var importDirectDataCmd = &cli.Command{
 		head, err := lapi.ChainHead(ctx)
 		if err != nil {
 			return fmt.Errorf("getting chain head: %w", err)
+		}
+
+		// Reject here rather than letting the import travel to boostd only to be
+		// turned away there.
+		nv, err := lapi.StateNetworkVersion(ctx, head.Key())
+		if err != nil {
+			return fmt.Errorf("getting network version: %w", err)
+		}
+		if err := checkDirectDealSupported(nv); err != nil {
+			return err
 		}
 
 		clientAddr, err := address.NewFromString(cctx.String("client-addr"))

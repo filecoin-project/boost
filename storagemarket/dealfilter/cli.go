@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os/exec"
+
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket/funds"
@@ -14,18 +17,33 @@ import (
 )
 
 const agent = "boost"
-const jsonVersion = "2.2.0"
+
+// storageJsonVersion is the version of the storage deal JSON document handed to an external filter;
+// 2.3.0 adds NetworkVersion, which a filter sorting FIL+ traffic by VerifiedDeal needs at nv29.
+const storageJsonVersion = "2.3.0"
+
+// retrievalJsonVersion is the version of the retrieval deal JSON document; it does not move with
+// the storage one, which would tell filters to expect a shape that never arrived.
+const retrievalJsonVersion = "2.2.0"
 
 type StorageDealFilter func(ctx context.Context, deal DealFilterParams) (bool, string, error)
 type RetrievalDealFilter func(ctx context.Context, deal legacyretrievaltypes.ProviderDealState) (bool, string, error)
 
 func CliStorageDealFilter(cmd string) StorageDealFilter {
 	return func(ctx context.Context, deal DealFilterParams) (bool, string, error) {
+		// A zero is an unresolved version, not nv0: it reads to a filter as a very old chain, so refuse
+		// rather than send a script down the pre-nv29 path.
+		if deal.NetworkVersion == 0 {
+			return false, "server error: deal filter network version missing",
+				errors.New("storage deal filter params carry no network version")
+		}
+
 		d := struct {
 			types.DealParams
 			SealingPipelineState sealingpipeline.Status
 			FundsState           funds.Status
 			StorageState         storagespace.Status
+			NetworkVersion       network.Version
 			DealType             string
 			FormatVersion        string
 			Agent                string
@@ -34,8 +52,9 @@ func CliStorageDealFilter(cmd string) StorageDealFilter {
 			SealingPipelineState: deal.SealingPipelineState,
 			FundsState:           deal.FundsState,
 			StorageState:         deal.StorageState,
+			NetworkVersion:       deal.NetworkVersion,
 			DealType:             "storage",
-			FormatVersion:        jsonVersion,
+			FormatVersion:        storageJsonVersion,
 			Agent:                agent,
 		}
 		return runDealFilter(ctx, cmd, d)
@@ -52,7 +71,7 @@ func CliRetrievalDealFilter(cmd string) RetrievalDealFilter {
 		}{
 			ProviderDealState: deal,
 			DealType:          "retrieval",
-			FormatVersion:     jsonVersion,
+			FormatVersion:     retrievalJsonVersion,
 			Agent:             agent,
 		}
 		return runDealFilter(ctx, cmd, d)

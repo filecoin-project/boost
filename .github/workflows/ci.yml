@@ -107,7 +107,16 @@ jobs:
             target: "./cmd/booster-bitswap"
           - name: test-itest-lid-cleanup
             target: "./itests/lid_cleanup_test.go"
-        
+          # The piece doctor tests sit behind the test_lid build tag, so nothing
+          # else in this matrix compiles them, let alone runs them - which is how
+          # they were able to stop compiling without anyone noticing. Only the
+          # leveldb half is run here: the yugabyte half needs a database this
+          # runner does not have.
+          - name: test-piece-doctor
+            target: "./piecedirectory/..."
+            tags: "debug,test_lid"
+            run-filter: "-run TestPieceDoctor/leveldb"
+
     steps:
       - uses: actions/checkout@v6
 
@@ -132,7 +141,7 @@ jobs:
         shell: bash
 
       - name: Run tests
-        run: go test -v --tags=debug -timeout 30m ${{ matrix.test-suite.target }}
+        run: go test -v --tags=${{ matrix.test-suite.tags || 'debug' }} -timeout 30m ${{ matrix.test-suite.run-filter }} ${{ matrix.test-suite.target }}
         shell: bash
 
   lint:
