@@ -30,6 +30,7 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
@@ -548,6 +549,29 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 	return nil
 }
 
+// ddoDealOnChain reports whether a DDO deal recorded in boost's DB still has
+// evidence of itself on chain, which is what earns it a place in the migration.
+//
+// The evidence differs by era. Before nv29 the chain's verifreg claim is the
+// proof, and a claim pointing at another sector is an answer rather than
+// evidence for this one -- it cannot be repaired here, so it is an error. From
+// nv29 on FIP-0118 writes no claim at all, so a post-nv29 deal has none by
+// construction and its sector's own weight answers instead; reading that absent
+// claim as "the deal did not land" would drop every post-nv29 direct deal from
+// the migration.
+//
+// claim and si are the two reads; si is consulted only when there is no claim
+// and may be nil, which carries no weight.
+func ddoDealOnChain(claim *verifreg9types.Claim, si *miner.SectorOnChainInfo, sectorNum abi.SectorNumber) (bool, error) {
+	if claim == nil {
+		return sectorstatemgr.SectorCarriesData(si), nil
+	}
+	if claim.Sector != sectorNum {
+		return false, errors.New("sector mismatch for deal")
+	}
+	return true, nil
+}
+
 func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bitfield.BitField, maddr address.Address, hdb *harmonydb.DB, sqldb, mdb *sql.DB) error {
 	ddb := db.NewDirectDealsDB(sqldb)
 
@@ -580,12 +604,25 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 		if err != nil {
 			return fmt.Errorf("deal: %s: error getting the claim status: %w", deal.ID.String(), err)
 		}
+		// From nv29 on FIP-0118 writes no claim, so a deal onboarded after the
+		// upgrade has none by design and its sector's weight is the proof
+		// instead. The sector is read only when that can be needed, so the
+		// pre-nv29 path keeps its single chain call.
+		var si *miner.SectorOnChainInfo
 		if claim == nil {
-			llog.Infow("Skipping as checkpoint is below add piece")
-			continue
+			si, err = full.StateSectorGetInfo(ctx, maddr, deal.SectorID, ltypes.EmptyTSK)
+			if err != nil {
+				return fmt.Errorf("deal: %s: error getting the sector: %w", deal.ID.String(), err)
+			}
 		}
-		if claim.Sector != deal.SectorID {
-			return fmt.Errorf("deal: %s: sector mismatch for deal", deal.ID.String())
+
+		onChain, err := ddoDealOnChain(claim, si, deal.SectorID)
+		if err != nil {
+			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
+		}
+		if !onChain {
+			llog.Infow("Skipping as neither a claim nor sector data is on chain", "sector", deal.SectorID)
+			continue
 		}
 
 		// Skip if the sector for the deal is not alive

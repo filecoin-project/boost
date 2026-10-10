@@ -33,13 +33,24 @@ var doclog = logging.Logger("piecedoc")
 // pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
 	maddr       address.Address
-	store       *bdclient.Store
+	store       pieceStore
 	ssm         *sectorstatemgr.SectorStateMgr
 	fullnodeApi api.FullNode
 }
 
 func NewDoctor(maddr address.Address, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *Doctor {
 	return &Doctor{maddr: maddr, store: store, ssm: ssm, fullnodeApi: fullnodeApi}
+}
+
+// pieceStore is the slice of the local index directory the doctor uses. It is an
+// interface so a check can be driven without a running index directory.
+type pieceStore interface {
+	NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
+	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
+	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
+	FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool, maddr address.Address) error
+	UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
+	UntrackPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
 }
 
 // The average interval between calls to NextPiecesToCheck
@@ -120,6 +131,23 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
+// directDealOnChain reports whether a direct deal's data is on chain, from the
+// two reads the doctor has. Before nv29 the deal's claim is the proof, and a
+// claim pointing at another sector is a negative answer. From nv29 on FIP-0118
+// writes no claim at all, so an absent claim is the normal state rather than a
+// sign the deal is missing -- the sector's own weight answers instead, read from
+// the sector-state manager's set of sectors that carry data.
+//
+// allocID is the deal's allocation id, which is also its claim id.
+func directDealOnChain(allocID abi.DealID, sectorID abi.SectorID, claims map[verifregtypes.ClaimId]verifregtypes.Claim, sectorsWithDeals map[abi.SectorID]struct{}) bool {
+	if claim, ok := claims[verifregtypes.ClaimId(allocID)]; ok {
+		return claim.Sector == sectorID.Number
+	}
+
+	_, ok := sectorsWithDeals[sectorID]
+	return ok
+}
+
 func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
@@ -187,12 +215,19 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	if d.fullnodeApi != nil { // nil in tests
 		found := false
 		for _, dealId := range chainDeals {
+			mid, err := address.IDFromAddress(dealId.MinerAddr)
+			if err != nil {
+				return err
+			}
+			sectorID := abi.SectorID{
+				Miner:  abi.ActorID(mid),
+				Number: dealId.SectorID,
+			}
+
 			if dealId.IsDirectDeal {
 				doclog.Debugw("checking state for direct deal", "piece", pieceCid, "allocation", dealId.ChainDealID)
-				for _, v := range claims {
-					if v.Sector == dealId.SectorID {
-						found = true
-					}
+				if directDealOnChain(dealId.ChainDealID, sectorID, claims, lu.SectorWithDeals) {
+					found = true
 				}
 			} else {
 				doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId.ChainDealID)

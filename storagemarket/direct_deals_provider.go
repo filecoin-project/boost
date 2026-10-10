@@ -12,6 +12,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -25,6 +26,7 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -560,67 +562,33 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *de
 	var lastSealingState lapi.SectorState
 
 	check := func() (bool, *dealMakingError) {
-		// Get the sector status
-		si, err := ddp.sps.SectorsStatus(ddp.ctx, entry.SectorID, false)
+		// The deal row is the authority on whether this deal is done. entry is a
+		// snapshot taken when the deal thread started, and the watch can poll for
+		// as long as the sector takes to seal, so re-read completion from the
+		// database rather than trusting the snapshot: if the deal has been
+		// completed in the meantime there is nothing left to wait for.
+		dbDeal, err := ddp.directDealsDB.ByID(ddp.ctx, entry.ID)
 		if err != nil {
-			// A status read that fails is not a verdict; keep polling.
-			log.Warnw("getting sector sealing state", "sector", entry.SectorID, "err", err.Error())
-			return false, nil
-		}
-
-		if si.State != lastSealingState {
-			// Sector status has changed
-			lastSealingState = si.State
-			ddp.dealLogger.Infow(entry.ID, "current sealing state", "state", si.State)
-		}
-
-		// An unrecoverable failure is the one verdict the sealer alone can give.
-		if sealing.SectorState(si.State) == sealing.FailedUnrecoverable {
-			return true, &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("%w: sector %d reached sealing state %s",
-					ErrSectorSealingFailed, entry.SectorID, si.State),
-			}
-		}
-
-		if !IsFinalSealingState(si.State) {
-			return false, nil
-		}
-
-		// The sealer reports a terminal state only once the sector is on chain, so
-		// confirm from the chain's own record that this deal's data landed.
-		sc, err := ddp.fullnodeApi.StateSectorGetInfo(ddp.ctx, ddp.Address, entry.SectorID, ltypes.EmptyTSK)
-		if err != nil {
-			log.Warnw("getting sector from chain", "sector", entry.SectorID, "err", err.Error())
-			return false, nil
-		}
-		if sc == nil {
-			// This node's chain does not show the sector yet: node lag, not a verdict.
-			return false, nil
-		}
-
-		claim, err := ddp.claimForAllocation(entry)
-		if err != nil {
-			log.Warnw("getting claim for allocation", "allocation", entry.AllocationID, "err", err.Error())
-			return false, nil
-		}
-
-		switch verdictForSealedSector(sc, claim, entry.SectorID) {
-		case sealingDone:
-			ddp.dealLogger.Infow(entry.ID,
-				"the deal's sector is committed and live on chain", "sector", entry.SectorID)
+			log.Warnw("re-reading direct deal from db", "id", entry.ID, "err", err.Error())
+		} else if dbDeal.Checkpoint >= dealcheckpoints.Complete {
 			return true, nil
-		case sealingClaimElsewhere:
-			return true, &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("sector mismatch for claim: allocation %d is claimed by a sector other than %d",
-					entry.AllocationID, entry.SectorID),
-			}
 		}
 
-		// sealingNoEvidence: keep polling -- the snap may not have settled, or a
-		// piece onboarded before nv29 may still have a claim to appear.
-		return false, nil
+		step := ddp.checkSealingOnce(ddp.ctx, entry)
+
+		if step.observed && step.state != lastSealingState {
+			// Sector status has changed
+			lastSealingState = step.state
+			ddp.dealLogger.Infow(entry.ID, "current sealing state", "state", step.state)
+		}
+
+		if step.done && step.err == nil {
+			ddp.dealLogger.Infow(entry.ID,
+				"the deal's sector is committed and live on chain",
+				"sector", entry.SectorID, "case", step.caseID.String())
+		}
+
+		return step.done, step.err
 	}
 
 	// Check immediately if the sector has reached a terminal state
@@ -647,52 +615,326 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *de
 	}
 }
 
-// directDealSealingVerdict is what the on-chain reads say about a deal whose
-// sealer has reported a terminal sealing state.
+// sealingWatchStep is the outcome of a single poll of the sealer's status.
+type sealingWatchStep struct {
+	// state is the sealer's reported state. Only meaningful when observed.
+	state lapi.SectorState
+	// observed is false when the sealer's state could not be read. Nothing was
+	// learned, so state must not be treated as meaningful.
+	observed bool
+
+	// done ends the watch: the deal is proven in the sector, or it failed.
+	done bool
+	// err is the failure, set only when done is true and the deal did not make
+	// it. A done step with a nil err is a success.
+	err *dealMakingError
+	// caseID names the shape the chain reads identified, for logging. Set only
+	// for a successful done step.
+	caseID sealingCase
+}
+
+// checkSealingOnce performs one poll of the sealing watch: ask the sealer, and
+// only if the sealer is settled, ask the chain. It is the whole evidence ladder
+// in one place, split out from the ticker loop so the state-by-chain matrix is
+// testable directly.
+func (ddp *DirectDealsProvider) checkSealingOnce(ctx context.Context, entry *types.DirectDeal) sealingWatchStep {
+	si, err := ddp.sps.SectorsStatus(ctx, entry.SectorID, false)
+	if err != nil {
+		// A status read that fails is not a verdict; keep polling.
+		log.Warnw("getting sector sealing state", "sector", entry.SectorID, "err", err.Error())
+		return sealingWatchStep{}
+	}
+
+	step := sealingWatchStep{state: si.State, observed: true}
+
+	switch sealingStateGateFor(si.State) {
+	case sealingStateFailed:
+		// An unrecoverable failure is the one verdict the sealer alone can give.
+		step.done = true
+		step.err = &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("%w: sector %d reached sealing state %s",
+				ErrSectorSealingFailed, entry.SectorID, si.State),
+		}
+		return step
+	case sealingStatePending:
+		// Still sealing; nothing on chain can be concluded yet.
+		return step
+	}
+
+	// The sealer reports a terminal state only once the sector is on chain, so
+	// confirm from the chain's own record that this deal's data landed.
+	sc, err := ddp.fullnodeApi.StateSectorGetInfo(ctx, ddp.Address, entry.SectorID, ltypes.EmptyTSK)
+	if err != nil {
+		log.Warnw("getting sector from chain", "sector", entry.SectorID, "err", err.Error())
+		return step
+	}
+	// sc may be nil -- this node's chain does not show the sector yet. That is
+	// node lag, not a verdict, but the claim is still read: a claim that points
+	// elsewhere settles the deal without ever seeing this sector.
+	claim, err := ddp.claimForAllocation(entry)
+	if err != nil {
+		log.Warnw("getting claim for allocation", "allocation", entry.AllocationID, "err", err.Error())
+		return step
+	}
+
+	read := sealedSectorRead{
+		sector:      sc,
+		claim:       claim,
+		pieces:      si.Pieces,
+		pieceCID:    entry.PieceCID,
+		pieceSize:   entry.PieceSize,
+		offset:      entry.Offset,
+		piecesKnown: ddp.sectorPiecesKnown(),
+	}
+
+	scase, verdict := verdictForSealedSector(read, entry.SectorID)
+	step.caseID = scase
+	switch verdict {
+	case sealingDone:
+		step.done = true
+		return step
+	case sealingClaimElsewhere:
+		step.done = true
+		step.err = &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("sector mismatch for claim: allocation %d is claimed by a sector other than %d",
+				entry.AllocationID, entry.SectorID),
+		}
+		return step
+	case sealingRolledBack:
+		step.done = true
+		step.err = &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("%w: sector %d carries no data and the piece is not in it -- the snap fell back to the original CC",
+				ErrSectorSealingFailed, entry.SectorID),
+		}
+		return step
+	}
+
+	// sealingNoEvidence: keep polling -- the snap may not have settled, or a
+	// piece onboarded before nv29 may still have a claim to appear.
+	return step
+}
+
+// sealingStateGate is the sealer's own verdict on a sector, taken before any
+// chain read. It is the first rung of the evidence ladder.
+type sealingStateGate int
+
+const (
+	// sealingStatePending: the sealer is still working on the sector. Nothing on
+	// chain can be concluded yet.
+	sealingStatePending sealingStateGate = iota
+	// sealingStateFailed: unrecoverable. Terminal, and a failure.
+	sealingStateFailed
+	// sealingStateSettled: the sealer is done with the sector. Whether the deal's
+	// data landed is the chain's question now.
+	sealingStateSettled
+)
+
+// sealingStateGateFor maps any sealer state onto the gate. Every state in
+// sealing.ExistSectorStateList lands on exactly one arm, and the test asserts
+// that against the list, so a state added by a future lotus cannot silently
+// fall through to a default.
+//
+// FailedUnrecoverable is checked first because it is also in
+// IsFinalSealingState: it is terminal, but terminal-and-failed, which is a
+// verdict rather than a hand-off.
+func sealingStateGateFor(state lapi.SectorState) sealingStateGate {
+	if sealing.SectorState(state) == sealing.FailedUnrecoverable {
+		return sealingStateFailed
+	}
+	if IsFinalSealingState(state) {
+		return sealingStateSettled
+	}
+	return sealingStatePending
+}
+
+// directDealSealingVerdict is the action the decision point takes for a deal
+// whose sealer has reported a terminal sealing state.
 type directDealSealingVerdict int
 
 const (
-	// sealingNoEvidence: neither a claim nor sector weight shows the data
-	// landed. Not a verdict: the snap may still be settling, or this node may
-	// be behind, so the watch keeps polling rather than failing the deal.
+	// sealingNoEvidence: the reads do not (yet) prove the data landed. Not a
+	// verdict: the snap may still be settling, or this node may be behind, so
+	// the watch keeps polling rather than failing the deal.
 	sealingNoEvidence directDealSealingVerdict = iota
 	// sealingDone: the deal's data is proven to be in the sector.
 	sealingDone
 	// sealingClaimElsewhere: a claim for the allocation points at another
 	// sector, so this sector does not hold the deal. Terminal.
 	sealingClaimElsewhere
+	// sealingRolledBack: the sealer is settled in a non-upgrade state, the
+	// sector carries no weight and has no claim, and our piece is absent from
+	// its piece list -- the snap ran and fell back to the original CC. Terminal.
+	sealingRolledBack
 )
 
-// sectorCarriesData reports whether a sector's on-chain spacetime weights say
-// it holds piece data. Both arms are read: pre-nv29 unverified spacetime sits
-// in DealWeight and verified spacetime in VerifiedDealWeight, while from nv29
-// on FIP-0118 puts every piece in VerifiedDealWeight. A nil weight reads as zero.
-func sectorCarriesData(si *minertypes.SectorOnChainInfo) bool {
-	if si == nil {
-		return false
+// sealingCase names which of the flow's states the reads identify. It is
+// derived only from the reads, never from an epoch, and exists for logs and
+// tests -- the decision point does not branch on it. Note that the boundary
+// (CC -> snap) and a post-nv29 deal are identical on chain and collapse into
+// casePostSealedSector, and the two pure-CC eras collapse into
+// caseEmptyPureCC. See docs/en/nv29-direct-deals-sealing-flow.md.
+type sealingCase int
+
+const (
+	// caseIndeterminate: this node cannot see enough to decide. Keep polling.
+	caseIndeterminate sealingCase = iota
+	// caseNv28SealedSector: a sector that carries data, or whose claim hits it,
+	// with a claim present -- i.e. the pre-nv29 world, where the claim is the
+	// authority.
+	caseNv28SealedSector
+	// casePostSealedSector: weight is non-zero with no claim -- a CC snapped at
+	// or after nv29, or any post-nv29 deal. The two are the same on chain.
+	casePostSealedSector
+	// caseEmptyPureCC: weight is zero with no claim -- a CC carrying no data, in
+	// either era.
+	caseEmptyPureCC
+	// caseClaimElsewhere: a claim for the allocation points at another sector.
+	caseClaimElsewhere
+	// caseRolledBack: a snap that ran and fell back to the original CC.
+	caseRolledBack
+)
+
+func (c sealingCase) String() string {
+	switch c {
+	case caseNv28SealedSector:
+		return "nv28-sealed"
+	case casePostSealedSector:
+		return "post-nv29-sealed"
+	case caseEmptyPureCC:
+		return "empty-pure-cc"
+	case caseClaimElsewhere:
+		return "claim-elsewhere"
+	case caseRolledBack:
+		return "rolled-back"
+	default:
+		return "indeterminate"
 	}
-	return !si.DealWeight.NilOrZero() || !si.VerifiedDealWeight.NilOrZero()
+}
+
+// sectorCarriesData is sectorstatemgr's predicate, used here so the decision
+// path and the sector-state followers cannot drift apart on what "carries data"
+// means. See its comment for why the QA power bit and the power-base epoch are
+// not consulted.
+func sectorCarriesData(si *minertypes.SectorOnChainInfo) bool {
+	return sectorstatemgr.SectorCarriesData(si)
+}
+
+// sectorPiecesKnown reports whether this sealer fills SectorInfo.Pieces. A
+// Curio-backed sealer is the open question -- boost already special-cases Curio
+// elsewhere because it does not populate SectorInfo.Deals -- so until that is
+// confirmed, treat Curio as not reporting pieces and never infer a rollback from
+// a list that may simply be empty.
+func (ddp *DirectDealsProvider) sectorPiecesKnown() bool {
+	return !ddp.config.Curio
+}
+
+// pieceInSector reports whether the sealer's piece list holds our piece at our
+// offset. The list carries no offset, but it is ordered by offset and gap-free,
+// so accumulating Size reconstructs each entry's offset. All of (PieceCID, Size,
+// offset) must match: one sector can hold two identical pieces, and only the
+// offset tells this deal's copy from the other.
+func pieceInSector(pieces []lapi.SectorPiece, pieceCID cid.Cid, pieceSize abi.PaddedPieceSize, offset abi.PaddedPieceSize) bool {
+	var off abi.PaddedPieceSize
+	for _, p := range pieces {
+		if p.Piece.PieceCID.Equals(pieceCID) && p.Piece.Size == pieceSize && off == offset {
+			return true
+		}
+		off += p.Piece.Size
+	}
+	return false
+}
+
+// sealedSectorRead is everything the decision point reads for one poll. It is
+// passed whole so verdictForSealedSector stays pure and the flow's full table
+// is testable without a node.
+type sealedSectorRead struct {
+	// sector is the sector as this node's chain sees it; nil means not visible.
+	sector *minertypes.SectorOnChainInfo
+	// claim is the verifreg claim for the deal's allocation; nil means none.
+	claim *verifreg9types.Claim
+	// pieces is the sealer's piece list for the sector.
+	pieces []lapi.SectorPiece
+	// our piece's identity inside the sector, from SectorAddPieceToAny.
+	pieceCID  cid.Cid
+	pieceSize abi.PaddedPieceSize
+	offset    abi.PaddedPieceSize
+	// piecesKnown says the sealer actually reports this sector's piece list.
+	// When false an absent piece proves nothing, so a rollback is never inferred.
+	piecesKnown bool
 }
 
 // verdictForSealedSector decides a direct deal from the sector's own on-chain
 // record and the allocation's claim, without dating anything by epoch: the
 // weight check covers pieces onboarded at nv29 or later, where FIP-0118 writes
-// no claim, and the claim check covers pieces onboarded before it.
+// no claim, including the CC -> snap boundary (activation pre-nv29, data
+// post-nv29); the claim check covers pieces onboarded before nv29.
 //
-// The weight check cannot tell this deal's piece from another piece sharing the
-// sector, so a sector that carries some data is taken as done; the piece-level
-// check belongs to the sealer's own piece list.
-func verdictForSealedSector(si *minertypes.SectorOnChainInfo, claim *verifreg9types.Claim, sectorNum abi.SectorNumber) directDealSealingVerdict {
-	if sectorCarriesData(si) {
-		return sealingDone
+// It returns the verdict and the case the reads identify (for logs).
+func verdictForSealedSector(r sealedSectorRead, sectorNum abi.SectorNumber) (sealingCase, directDealSealingVerdict) {
+	// A claim pointing at another sector is terminal whatever else the reads say:
+	// this sector is not where the deal's data went. It is judged before the
+	// sector-visibility guard because the claim does not depend on seeing this
+	// sector -- a deal that landed elsewhere while the reported sector never
+	// committed would otherwise poll forever.
+	if r.claim != nil && r.claim.Sector != sectorNum {
+		return caseClaimElsewhere, sealingClaimElsewhere
 	}
-	if claim == nil {
-		return sealingNoEvidence
+
+	if r.sector == nil {
+		// This node's chain does not show the sector yet: node lag, not a verdict.
+		return caseIndeterminate, sealingNoEvidence
 	}
-	if claim.Sector != sectorNum {
-		return sealingClaimElsewhere
+
+	inSector := r.piecesKnown && pieceInSector(r.pieces, r.pieceCID, r.pieceSize, r.offset)
+	carries := sectorCarriesData(r.sector)
+
+	switch {
+	case carries && (inSector || !r.piecesKnown):
+		// The sector carries spacetime, and where the sealer reports pieces it is
+		// ours. When the sealer does not report them the weight is the only
+		// evidence there is, and spacetime in the sector is proof enough that the
+		// deal's data landed -- withholding the verdict there would strand every
+		// post-nv29 deal on a sealer whose piece list is not readable. What the
+		// piece list buys is on the zero-weight side, where it separates a staged
+		// CC from a rolled-back snap.
+		//
+		// nv28 shows a claim too; post-nv29 and the boundary show none, and read
+		// the same here.
+		if r.claim != nil {
+			return caseNv28SealedSector, sealingDone
+		}
+		return casePostSealedSector, sealingDone
+
+	case r.claim != nil:
+		// A claim hits this sector: the pre-nv29 world, where the chain's claim
+		// is the authority.
+		return caseNv28SealedSector, sealingDone
+
+	case carries:
+		// The sector carries some data, but not visibly ours. It may hold
+		// another -- or an identical -- piece, or the list may be lagging. Not a
+		// verdict: keep polling, never fail on this.
+		return caseIndeterminate, sealingNoEvidence
+
+	case inSector:
+		// Our piece is staged in the sector but the chain shows no weight yet:
+		// the data has not landed. Keep polling.
+		return caseEmptyPureCC, sealingNoEvidence
+
+	case !r.piecesKnown:
+		// Cannot tell an absent piece from an unreported list. Keep polling.
+		return caseIndeterminate, sealingNoEvidence
+
+	default:
+		// Settled sealer (the caller only judges settled states), zero weight,
+		// no claim, and our piece absent from a known list: the snap ran and
+		// fell back. This is the one shape the chain cannot tell from an empty
+		// CC; the piece list is what separates them.
+		return caseRolledBack, sealingRolledBack
 	}
-	return sealingDone
 }
 
 func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *types.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
