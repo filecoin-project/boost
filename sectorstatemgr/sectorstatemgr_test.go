@@ -12,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
@@ -228,6 +229,95 @@ func TestRefreshState(t *testing.T) {
 					require.NotEqual(t, got.UpdatedAt, zero)
 
 					//null timestamp, so that we can do deep equal
+					got.UpdatedAt = zero
+
+					require.True(t, reflect.DeepEqual(expected, got), "expected: %s, got: %s", spew.Sdump(expected), spew.Sdump(got))
+				}
+
+				return fixtures{
+					mockExpectations:  mockExpectations,
+					exerciseAndVerify: exerciseAndVerify,
+				}
+			},
+		},
+		{
+			// SectorWithDeals is what the doctor and the piece directory read to
+			// decide whether a deal's data is on chain. Since nv29 the verified
+			// arm is the only one a new deal can land in, so a set built from
+			// DealWeight alone would call every post-nv29 sector empty and the
+			// doctor would then skip every post-nv29 direct deal.
+			description: "sector with deals is built from both spacetime weight arms",
+			f: func() fixtures {
+				sqldb := db.CreateTestTmpDB(t)
+				require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
+				require.NoError(t, migrations.Migrate(sqldb))
+				mgr.sdb = db.NewSectorStateDB(sqldb)
+
+				deals, err := db.GenerateNDeals(3)
+				require.NoError(t, err)
+				sid1 := abi.SectorID{Miner: aid, Number: deals[0].SectorID}
+				sid2 := abi.SectorID{Miner: aid, Number: deals[1].SectorID}
+				sid3 := abi.SectorID{Miner: aid, Number: deals[2].SectorID}
+
+				input_StorageList := map[storiface.ID][]storiface.Decl{
+					"storage-location-uuid1": {
+						{SectorID: sid1, SectorFileType: storiface.FTSealed},
+						{SectorID: sid2, SectorFileType: storiface.FTSealed},
+						{SectorID: sid3, SectorFileType: storiface.FTSealed},
+					},
+				}
+				input_StateMinerActiveSectors := []*miner.SectorOnChainInfo{
+					{SectorNumber: sid1.Number},
+					{SectorNumber: sid2.Number},
+					{SectorNumber: sid3.Number},
+				}
+
+				// One of each shape: a pure CC (both weights zero -- a post-nv29
+				// empty CC carries the QA power bit but no spacetime), one with a
+				// pre-nv29 unverified weight, and one with only the verified
+				// weight, which is what every post-nv29 piece looks like.
+				input_StateMinerSectors := []*miner.SectorOnChainInfo{
+					{SectorNumber: sid1.Number, DealWeight: big.Zero(), VerifiedDealWeight: big.Zero()},
+					{SectorNumber: sid2.Number, DealWeight: big.NewInt(1), VerifiedDealWeight: big.Zero()},
+					{SectorNumber: sid3.Number, DealWeight: big.Zero(), VerifiedDealWeight: big.NewInt(1)},
+				}
+
+				mockExpectations := func() {
+					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList, nil)
+					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerSectors, nil)
+					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors, nil)
+				}
+
+				expected := &SectorStateUpdates{
+					Updates: map[abi.SectorID]db.SealState{
+						sid1: db.SealStateSealed,
+						sid2: db.SealStateSealed,
+						sid3: db.SealStateSealed,
+					},
+					ActiveSectors: map[abi.SectorID]struct{}{
+						sid1: {},
+						sid2: {},
+						sid3: {},
+					},
+					SectorStates: map[abi.SectorID]db.SealState{
+						sid1: db.SealStateSealed,
+						sid2: db.SealStateSealed,
+						sid3: db.SealStateSealed,
+					},
+					SectorWithDeals: map[abi.SectorID]struct{}{
+						sid2: {},
+						sid3: {},
+					},
+				}
+
+				exerciseAndVerify := func() {
+					got, err := mgr.refreshState(ctx)
+					require.NoError(t, err)
+
+					zero := time.Time{}
+					require.NotEqual(t, got.UpdatedAt, zero)
+
 					got.UpdatedAt = zero
 
 					require.True(t, reflect.DeepEqual(expected, got), "expected: %s, got: %s", spew.Sdump(expected), spew.Sdump(got))

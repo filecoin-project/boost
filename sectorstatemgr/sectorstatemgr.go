@@ -13,12 +13,12 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 
 	"github.com/filecoin-project/lotus/api"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -32,6 +32,28 @@ type SectorStateUpdates struct {
 	SectorWithDeals map[abi.SectorID]struct{}
 	SectorStates    map[abi.SectorID]db.SealState
 	UpdatedAt       time.Time
+}
+
+// SectorCarriesData reports whether a sector's on-chain spacetime weights say it
+// holds piece data. Both arms are read: DealWeight is the legacy unverified
+// spacetime, and since FIP-0118 nothing is verified, so VerifiedDealWeight tracks
+// the total spacetime of every piece. A sector activated at nv29 or later has
+// DealWeight zero with all of a new piece's spacetime in the verified arm, while a
+// pre-nv29 sector holding a plain deal has the mirror image; reading one arm would
+// report half of one era as empty. A nil weight reads as zero, and a nil sector
+// (StateSectorGetInfo returns nil, nil for a sector that is not on chain) carries
+// nothing.
+//
+// The weights are the only era-free signal here. FULL_QA_POWER is not consulted:
+// post-nv29 activation sets it on an empty CC as readily as on a full sector, and
+// upgrade-quality hands it to a pre-nv29 sector after the fact, so it says the
+// sector moved, never that our data arrived. PowerBaseEpoch is not consulted
+// either: USQ resets it, so it cannot date a sector.
+func SectorCarriesData(si *minertypes.SectorOnChainInfo) bool {
+	if si == nil {
+		return false
+	}
+	return !si.DealWeight.NilOrZero() || !si.VerifiedDealWeight.NilOrZero()
 }
 
 type StorageAPI interface {
@@ -263,14 +285,13 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	sectorWithDeals := make(map[abi.SectorID]struct{})
-	zero := big.Zero()
 	for _, info := range allSet {
 		sectorID := abi.SectorID{
 			Miner:  abi.ActorID(mid),
 			Number: info.SectorNumber,
 		}
 
-		if info.DealWeight.GreaterThan(zero) {
+		if SectorCarriesData(info) {
 			sectorWithDeals[sectorID] = struct{}{}
 		}
 	}
