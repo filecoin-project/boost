@@ -549,6 +549,26 @@ func migrateLegacyDeals(ctx context.Context, full v1api.FullNode, activeSectors 
 	return nil
 }
 
+// legacyNoClaimErr is the sentence a released Boost stored in direct_deals.error
+// when it gave up looking for a deal's claim. It is matched exactly, and the
+// other fatal sentences are deliberately not: "sector mismatch for claim" is
+// only written once a claim was found and placed in the wrong sector, which
+// needs a claim to exist, so it cannot stand in for this case.
+const legacyNoClaimErr = "no claim found"
+
+// fatalSkip reports whether a deal's recorded error is a verdict the migration
+// has to respect, rather than one it can decide again for itself.
+//
+// Only the no-claim sentence is given up on: past nv29 FIP-0118 writes no claim
+// at all, so a released Boost reached it on every post-nv29 deal that got as far
+// as sealing, and the deal's own sector is the evidence that replaced the claim.
+// Every other fatal error stands -- it says something the chain check below
+// cannot see, and re-deciding those rows would migrate deals Boost rejected for
+// reasons that still hold.
+func fatalSkip(err string, retry types.DealRetryType) bool {
+	return err != "" && retry == types.DealRetryFatal && err != legacyNoClaimErr
+}
+
 // ddoDealOnChain reports whether a DDO deal recorded in boost's DB still has
 // evidence of itself on chain, which is what earns it a place in the migration.
 //
@@ -590,8 +610,17 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 			fmt.Printf("Migrating DDO Deals: %d / %d (%0.2f%%)\n", i, len(deals), float64(i)/float64(len(deals))*100)
 		}
 		llog := log.With("DDO Deal", deal.ID.String())
-		if deal.Err != "" && deal.Retry == types.DealRetryFatal {
-			llog.Infow("Skipping as deal retry is fatal")
+		// A fatal retry normally means Boost has already given the deal up for
+		// good, so the migration leaves the row alone. The no-claim sentence is
+		// the exception: past nv29 FIP-0118 writes no claim at all, so a
+		// released Boost spent its ten minutes looking for one that can never
+		// exist and wrote this on every post-nv29 deal it started -- exactly
+		// the rows the migration exists to pick up. Excusing the sentence is not
+		// the same as believing it: the deal still has to show evidence of
+		// itself on chain below, and a sector carrying no weight is refused
+		// there just as it would be for any other row.
+		if fatalSkip(deal.Err, deal.Retry) {
+			llog.Infow("Skipping as deal retry is fatal", "err", deal.Err)
 			continue
 		}
 

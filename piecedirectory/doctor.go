@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
@@ -94,11 +95,13 @@ func (d *Doctor) Run(ctx context.Context) {
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 
-			// Prefetch the state claims
-			doclog.Debugw("prefetching state claims", "address", d.maddr)
-			claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
+			nv, err := d.fullnodeApi.StateNetworkVersion(ctx, types.EmptyTSK)
 			if err != nil {
-				return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
+				return fmt.Errorf("getting network version: %w", err)
+			}
+			claims, err := d.claimsForCheck(ctx, nv)
+			if err != nil {
+				return err
 			}
 
 			for _, pcid := range pcids {
@@ -136,7 +139,9 @@ func (d *Doctor) Run(ctx context.Context) {
 // claim pointing at another sector is a negative answer. From nv29 on FIP-0118
 // writes no claim at all, so an absent claim is the normal state rather than a
 // sign the deal is missing -- the sector's own weight answers instead, read from
-// the sector-state manager's set of sectors that carry data.
+// the sector-state manager's set of sectors that carry data. Past nv29 the doctor
+// does not read claims at all (claimsForCheck), so this falls through for every
+// direct deal and the weight arm is the only one that can match.
 //
 // allocID is the deal's allocation id, which is also its claim id.
 func directDealOnChain(allocID abi.DealID, sectorID abi.SectorID, claims map[verifregtypes.ClaimId]verifregtypes.Claim, sectorsWithDeals map[abi.SectorID]struct{}) bool {
@@ -146,6 +151,29 @@ func directDealOnChain(allocID abi.DealID, sectorID abi.SectorID, claims map[ver
 
 	_, ok := sectorsWithDeals[sectorID]
 	return ok
+}
+
+// claimsForCheck prefetches the verifreg claims a batch of pieces is checked
+// against, or reads none at all once they can no longer decide anything.
+//
+// Before nv29 a direct deal is proved by its claim, so the map is read once for
+// the whole batch. From nv29 on FIP-0118 writes no claim at all: a post-nv29
+// direct deal has none by construction and is answered by its sector's weight
+// instead (directDealOnChain), so the read carries no decision and is skipped.
+// Skipping it also keeps a failure in a call the doctor no longer needs from
+// aborting the whole batch.
+func (d *Doctor) claimsForCheck(ctx context.Context, nv network.Version) (map[verifregtypes.ClaimId]verifregtypes.Claim, error) {
+	if nv >= network.Version29 {
+		doclog.Debugw("not reading state claims at nv29+, where none are written", "address", d.maddr)
+		return nil, nil
+	}
+
+	doclog.Debugw("prefetching state claims", "address", d.maddr)
+	claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
+	}
+	return claims, nil
 }
 
 func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim) error {

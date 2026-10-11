@@ -2,6 +2,7 @@ package piecedirectory
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -10,13 +11,16 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -109,10 +113,18 @@ type fakePieceStore struct {
 	md        model.Metadata
 	isIndexed bool
 
+	// Each read can be made to fail on demand, so the doctor's error branches are
+	// reachable without an index directory to break.
+	mdErr        error
+	isIndexedErr error
+	flagErr      error
+	unflagErr    error
+
 	getMetadataCalls int
 	isIndexedCalls   int
 	unflagged        []cid.Cid
 	flagged          []cid.Cid
+	untracked        []cid.Cid
 }
 
 func (f *fakePieceStore) NextPiecesToCheck(context.Context, address.Address) ([]cid.Cid, error) {
@@ -121,26 +133,32 @@ func (f *fakePieceStore) NextPiecesToCheck(context.Context, address.Address) ([]
 
 func (f *fakePieceStore) GetPieceMetadata(context.Context, cid.Cid) (model.Metadata, error) {
 	f.getMetadataCalls++
-	return f.md, nil
+	return f.md, f.mdErr
 }
 
 func (f *fakePieceStore) IsIndexed(context.Context, cid.Cid) (bool, error) {
 	f.isIndexedCalls++
-	return f.isIndexed, nil
+	return f.isIndexed, f.isIndexedErr
 }
 
 func (f *fakePieceStore) FlagPiece(_ context.Context, piece cid.Cid, _ bool, _ address.Address) error {
+	if f.flagErr != nil {
+		return f.flagErr
+	}
 	f.flagged = append(f.flagged, piece)
 	return nil
 }
 
 func (f *fakePieceStore) UnflagPiece(_ context.Context, piece cid.Cid, _ address.Address) error {
+	if f.unflagErr != nil {
+		return f.unflagErr
+	}
 	f.unflagged = append(f.unflagged, piece)
 	return nil
 }
 
 func (f *fakePieceStore) UntrackPiece(_ context.Context, piece cid.Cid, _ address.Address) error {
-	f.unflagged = append(f.unflagged, piece)
+	f.untracked = append(f.untracked, piece)
 	return nil
 }
 
@@ -224,4 +242,216 @@ func TestCheckPieceDirectDealOnChain(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCheckPiecePostNv29WeightArm drives the doctor with a sector whose only
+// spacetime weight is in VerifiedDealWeight -- the shape FIP-0118 gives every
+// sector from nv29 on -- and builds SectorWithDeals with the same predicate the
+// sector-state manager uses. Each half is unit-tested on its own; this pins the
+// seam between them, because a doctor fed the manager's real output is the only
+// thing that decides whether a post-nv29 piece goes unflagged.
+//
+// The pre-nv29 row is the control: it reaches the doctor through the other
+// weight arm, so a regression that goes back to reading DealWeight alone breaks
+// the post-nv29 row and leaves the control standing.
+func TestCheckPiecePostNv29WeightArm(t *testing.T) {
+	const sectorNum = abi.SectorNumber(3)
+	const allocID = abi.DealID(5)
+
+	pieceCid := cid.MustParse("baga6ea4seaqlwk3idbvhtetlir6yl4gfx7ql2kctaszujoudjavzjor7aphiccy")
+	maddr, err := address.NewIDAddress(1011)
+	require.NoError(t, err)
+	mid, err := address.IDFromAddress(maddr)
+	require.NoError(t, err)
+	sectorID := abi.SectorID{Miner: abi.ActorID(mid), Number: sectorNum}
+
+	tests := []struct {
+		name          string
+		si            *miner.SectorOnChainInfo
+		wantCarries   bool
+		wantIsIndexed bool
+	}{
+		{
+			name:          "post-nv29: verified weight only",
+			si:            &miner.SectorOnChainInfo{SectorNumber: sectorNum, DealWeight: big.Zero(), VerifiedDealWeight: abi.NewStoragePower(1)},
+			wantCarries:   true,
+			wantIsIndexed: true,
+		},
+		{
+			name:          "pre-nv29 control: deal weight only",
+			si:            &miner.SectorOnChainInfo{SectorNumber: sectorNum, DealWeight: abi.NewStoragePower(1), VerifiedDealWeight: big.Zero()},
+			wantCarries:   true,
+			wantIsIndexed: true,
+		},
+		{
+			name:        "pure CC: neither weight",
+			si:          &miner.SectorOnChainInfo{SectorNumber: sectorNum, DealWeight: big.Zero(), VerifiedDealWeight: big.Zero()},
+			wantCarries: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build SectorWithDeals the way sectorstatemgr.refreshState does, so
+			// the doctor is fed what production would feed it.
+			sectorWithDeals := map[abi.SectorID]struct{}{}
+			if sectorstatemgr.SectorCarriesData(tt.si) {
+				sectorWithDeals[sectorID] = struct{}{}
+			}
+			require.Equal(t, tt.wantCarries, len(sectorWithDeals) == 1,
+				"the predicate and the doctor have to agree on this sector")
+
+			store := &fakePieceStore{
+				md: model.Metadata{Deals: []model.DealInfo{{
+					MinerAddr:    maddr,
+					SectorID:     sectorNum,
+					ChainDealID:  allocID,
+					IsDirectDeal: true,
+				}}},
+				// Indexed with an unsealed copy, so a piece that gets past the
+				// on-chain check has nothing wrong with it.
+				isIndexed: true,
+			}
+			d := &Doctor{maddr: maddr, store: store, fullnodeApi: lotusmocks.NewMockFullNode(gomock.NewController(t))}
+			lu := &sectorstatemgr.SectorStateUpdates{
+				ActiveSectors:   map[abi.SectorID]struct{}{sectorID: {}},
+				SectorWithDeals: sectorWithDeals,
+				SectorStates:    map[abi.SectorID]db.SealState{sectorID: db.SealStateUnsealed},
+			}
+
+			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil)
+			require.NoError(t, err)
+
+			if tt.wantIsIndexed {
+				require.Equal(t, 1, store.isIndexedCalls)
+			} else {
+				require.Zero(t, store.isIndexedCalls,
+					"a sector with no weight in either arm must stop the check")
+			}
+			require.Empty(t, store.flagged, "nothing is wrong with this piece")
+			require.Equal(t, []cid.Cid{pieceCid}, store.unflagged)
+		})
+	}
+}
+
+// TestCheckPieceStoreErrors pins that a read against the local index directory
+// is surfaced to the caller rather than being read as a verdict on the piece.
+// None of these branches is nv29-specific, but they were unreachable before: the
+// only other piece-doctor test needs a live index directory, so it cannot make a
+// read fail on demand.
+func TestCheckPieceStoreErrors(t *testing.T) {
+	const sectorNum = abi.SectorNumber(3)
+	const allocID = abi.DealID(5)
+
+	pieceCid := cid.MustParse("baga6ea4seaqlwk3idbvhtetlir6yl4gfx7ql2kctaszujoudjavzjor7aphiccy")
+	maddr, err := address.NewIDAddress(1011)
+	require.NoError(t, err)
+	mid, err := address.IDFromAddress(maddr)
+	require.NoError(t, err)
+	sectorID := abi.SectorID{Miner: abi.ActorID(mid), Number: sectorNum}
+
+	// A piece on chain, indexed, with an unsealed copy in an active sector: the
+	// check reaches its last store call unless a read is made to fail first.
+	metadata := model.Metadata{Deals: []model.DealInfo{{
+		MinerAddr:    maddr,
+		SectorID:     sectorNum,
+		ChainDealID:  allocID,
+		IsDirectDeal: true,
+	}}}
+	sectorState := func() *sectorstatemgr.SectorStateUpdates {
+		return &sectorstatemgr.SectorStateUpdates{
+			ActiveSectors:   map[abi.SectorID]struct{}{sectorID: {}},
+			SectorWithDeals: map[abi.SectorID]struct{}{sectorID: {}},
+			SectorStates:    map[abi.SectorID]db.SealState{sectorID: db.SealStateUnsealed},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		store   *fakePieceStore
+		wantErr string
+	}{
+		{
+			name:    "metadata read fails",
+			store:   &fakePieceStore{mdErr: errors.New("index directory down")},
+			wantErr: "failed to get piece",
+		},
+		{
+			name:  "piece not found unflags and untracks",
+			store: &fakePieceStore{mdErr: errors.New("piece not found")},
+		},
+		{
+			name:    "index status read fails",
+			store:   &fakePieceStore{md: metadata, isIndexedErr: errors.New("index directory down")},
+			wantErr: "failed to check index status",
+		},
+		{
+			name:    "flag fails",
+			store:   &fakePieceStore{md: metadata, isIndexed: false, flagErr: errors.New("index directory down")},
+			wantErr: "failed to flag piece",
+		},
+		{
+			name:    "unflag fails",
+			store:   &fakePieceStore{md: metadata, isIndexed: true, unflagErr: errors.New("index directory down")},
+			wantErr: "failed to unflag piece",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &Doctor{maddr: maddr, store: tt.store, fullnodeApi: lotusmocks.NewMockFullNode(gomock.NewController(t))}
+			err := d.checkPiece(context.Background(), pieceCid, sectorState(), &types.TipSet{}, nil)
+
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, []cid.Cid{pieceCid}, tt.store.unflagged)
+			require.Equal(t, []cid.Cid{pieceCid}, tt.store.untracked)
+		})
+	}
+}
+
+// TestClaimsForCheckSkipsAtNv29 pins the reviewer's point that the claims lookup
+// is dead weight once FIP-0118 has frozen verifreg: a failure in it used to abort
+// the whole batch, and past nv29 it cannot change any decision the doctor makes.
+// The nv29 case sets no expectation on StateGetClaims, so the mock fails the test
+// if the call is made at all.
+func TestClaimsForCheckSkipsAtNv29(t *testing.T) {
+	maddr, err := address.NewIDAddress(1011)
+	require.NoError(t, err)
+
+	t.Run("at nv29 the claims are not read", func(t *testing.T) {
+		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
+		d := &Doctor{maddr: maddr, fullnodeApi: api}
+
+		claims, err := d.claimsForCheck(context.Background(), network.Version29)
+
+		require.NoError(t, err)
+		require.Nil(t, claims)
+	})
+
+	t.Run("before nv29 the claims are read", func(t *testing.T) {
+		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
+		want := map[verifregtypes.ClaimId]verifregtypes.Claim{verifregtypes.ClaimId(5): {Sector: 3}}
+		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(want, nil)
+		d := &Doctor{maddr: maddr, fullnodeApi: api}
+
+		claims, err := d.claimsForCheck(context.Background(), network.Version28)
+
+		require.NoError(t, err)
+		require.Equal(t, want, claims)
+	})
+
+	t.Run("before nv29 a read failure is surfaced", func(t *testing.T) {
+		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
+		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(nil, errors.New("node down"))
+		d := &Doctor{maddr: maddr, fullnodeApi: api}
+
+		_, err := d.claimsForCheck(context.Background(), network.Version28)
+
+		require.ErrorContains(t, err, "getting claims for the miner")
+	})
 }
