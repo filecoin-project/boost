@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
@@ -414,44 +413,34 @@ func TestCheckPieceStoreErrors(t *testing.T) {
 	}
 }
 
-// TestClaimsForCheckSkipsAtNv29 pins the reviewer's point that the claims lookup
-// is dead weight once FIP-0118 has frozen verifreg: a failure in it used to abort
-// the whole batch, and past nv29 it cannot change any decision the doctor makes.
-// The nv29 case sets no expectation on StateGetClaims, so the mock fails the test
-// if the call is made at all.
-func TestClaimsForCheckSkipsAtNv29(t *testing.T) {
+// TestClaimsForCheck pins that the claims are read whenever a batch of pieces is
+// checked, and that a failure in the read is not passed on to the batch.
+//
+// The read is kept at nv29+ rather than skipped: the claims of the sectors being
+// checked can predate the upgrade, and only FIP-0118's post-nv29 deals are
+// claimless by construction. Not returning the error is what keeps a node that
+// cannot answer from stopping the doctor; direct deals fall back to the sector
+// weight for the round and the claims are read again on the next one.
+func TestClaimsForCheck(t *testing.T) {
 	maddr, err := address.NewIDAddress(1011)
 	require.NoError(t, err)
 
-	t.Run("at nv29 the claims are not read", func(t *testing.T) {
-		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
-		d := &Doctor{maddr: maddr, fullnodeApi: api}
-
-		claims, err := d.claimsForCheck(context.Background(), network.Version29)
-
-		require.NoError(t, err)
-		require.Nil(t, claims)
-	})
-
-	t.Run("before nv29 the claims are read", func(t *testing.T) {
+	t.Run("the claims are read", func(t *testing.T) {
 		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
 		want := map[verifregtypes.ClaimId]verifregtypes.Claim{verifregtypes.ClaimId(5): {Sector: 3}}
 		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(want, nil)
 		d := &Doctor{maddr: maddr, fullnodeApi: api}
 
-		claims, err := d.claimsForCheck(context.Background(), network.Version28)
+		claims := d.claimsForCheck(context.Background())
 
-		require.NoError(t, err)
 		require.Equal(t, want, claims)
 	})
 
-	t.Run("before nv29 a read failure is surfaced", func(t *testing.T) {
+	t.Run("a read failure leaves the claims empty", func(t *testing.T) {
 		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
 		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(nil, errors.New("node down"))
 		d := &Doctor{maddr: maddr, fullnodeApi: api}
 
-		_, err := d.claimsForCheck(context.Background(), network.Version28)
-
-		require.ErrorContains(t, err, "getting claims for the miner")
+		require.Nil(t, d.claimsForCheck(context.Background()))
 	})
 }

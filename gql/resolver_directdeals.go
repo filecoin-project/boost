@@ -256,9 +256,14 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 	}
 	if claim == nil {
 		// From nv29 on FIP-0118 writes no claim, so an absent claim says nothing
-		// about the deal. The sector's own weight is the proof instead. Reading
-		// it as "no claim found" would show every post-nv29 deal as if it had
-		// failed to land.
+		// about the deal. Reading it as "no claim found" would show every
+		// post-nv29 deal as if it had failed to land.
+		//
+		// The sector's weight is the only other read here, and it answers for the
+		// sector rather than for this deal: a pre-nv29 deal shares its sector with
+		// other pieces, so a carrying sector is not by itself proof that this
+		// deal landed. The two facts are reported side by side instead of being
+		// collapsed into a verdict.
 		sector, err := dr.fullNode.StateSectorGetInfo(ctx, dr.Provider, dr.SectorID, ltypes.EmptyTSK)
 		if err != nil {
 			log.Warnw("error getting sector for direct deal", "sector", dr.SectorID, "error", err)
@@ -267,7 +272,7 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		if !sectorstatemgr.SectorCarriesData(sector) {
 			return "Sealer: " + string(si.State) + "(No claim found)"
 		}
-		return "Sealer: " + string(si.State) + "(Data in sector)"
+		return "Sealer: " + string(si.State) + "(No claim found; sector carries data)"
 	}
 	if claim.Sector != dr.SectorID {
 		return "Sealer: " + string(si.State) + "(Sector mismatch)"

@@ -24,9 +24,10 @@ import (
 
 // TestSealingState pins the operator-facing wording of a direct deal's sealing
 // state. The post-nv29 rows matter most: FIP-0118 writes no claim, so a nil claim
-// must be answered from the sector's weight. Reading it as "No claim found" would
-// paint every post-nv29 direct deal as if it had failed to land, and the UI
-// would show a healthy deal and a broken one identically.
+// must not read as "No claim found" there, which would paint every post-nv29
+// direct deal as if it had failed to land. The sector weight is reported next to
+// the absent claim rather than as a verdict on the deal: it answers for the
+// whole sector, and a pre-nv29 deal shares its sector with other pieces.
 func TestSealingState(t *testing.T) {
 	const (
 		sectorNum   = abi.SectorNumber(7)
@@ -79,14 +80,14 @@ func TestSealingState(t *testing.T) {
 			name:      "nv29: no claim, the sector carries the data",
 			state:     lapi.SectorState(sealing.Proving),
 			sector:    &minertypes.SectorOnChainInfo{VerifiedDealWeight: weight},
-			want:      "Sealer: Proving(Data in sector)",
+			want:      "Sealer: Proving(No claim found; sector carries data)",
 			wantNoClm: false,
 		},
 		{
 			name:      "nv29: no claim, plain deal weight also counts",
 			state:     lapi.SectorState(sealing.Proving),
 			sector:    &minertypes.SectorOnChainInfo{DealWeight: weight},
-			want:      "Sealer: Proving(Data in sector)",
+			want:      "Sealer: Proving(No claim found; sector carries data)",
 			wantNoClm: false,
 		},
 		{
