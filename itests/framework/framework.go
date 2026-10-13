@@ -3,6 +3,7 @@ package framework
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,6 +67,7 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
@@ -120,6 +122,13 @@ type TestFramework struct {
 	ClientAddr    address.Address
 	MinerAddr     address.Address
 	DefaultWallet address.Address
+
+	// DirectDealsDB is the boost node's own direct-deal table, handed back so a
+	// test can assert what boost ended up saying about a direct deal. Nothing in
+	// the boost RPC API answers that question -- BoostDirectDeal only returns a
+	// rejection, and BoostDeal only reads market deals -- so without this the
+	// only thing a test can see about a direct deal is its sector on chain.
+	DirectDealsDB *db.DirectDealsDB
 }
 
 type FrameworkOpts func(pc *TestFrameworkConfig)
@@ -436,6 +445,16 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		node.Repo(r),
 		node.Override(new(v1api.FullNode), fullnodeApi),
 		node.Override(new(*gateway.EthSubHandler), fullnodeApi.EthSubRouter),
+
+		// Hand the direct-deal table back to the test. This replaces boost's own
+		// constructor with one that builds the same object and keeps a reference
+		// to it, so the node the test drives and the table it reads are the same
+		// one -- no second connection, and no assumption about where the repo
+		// keeps its database.
+		node.Override(new(*db.DirectDealsDB), func(sqldb *sql.DB) *db.DirectDealsDB {
+			f.DirectDealsDB = db.NewDirectDealsDB(sqldb)
+			return f.DirectDealsDB
+		}),
 
 		node.Override(new(*ctladdr.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
 			DealPublishControl: []string{

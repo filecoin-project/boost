@@ -71,29 +71,34 @@ func pieceListWith(pieceCID cid.Cid, size, offset abi.PaddedPieceSize) []lapi.Se
 	}
 }
 
-// sealingRead assembles a read in which our piece sits at offset 0 and the
-// sealer reports the sector's piece list, then lets each test perturb it.
+// sealingRead assembles a read in which our piece sits at offset 0, then lets
+// each test perturb it.
 func sealingRead(sector *minertypes.SectorOnChainInfo, claim *verifreg9types.Claim, opts ...func(*sealedSectorRead)) sealedSectorRead {
 	r := sealedSectorRead{
-		sector:      sector,
-		claim:       claim,
-		pieceCID:    ourPieceCID,
-		pieceSize:   ourPieceSize,
-		offset:      0,
-		piecesKnown: true,
+		sector:    sector,
+		claim:     claim,
+		pieceCID:  ourPieceCID,
+		pieceSize: ourPieceSize,
+		offset:    0,
+		pieces:    nil,
 	}
+	r.piecesKnown = sectorPiecesKnown(lapi.SectorInfo{Pieces: r.pieces})
 	for _, opt := range opts {
 		opt(&r)
 	}
 	return r
 }
 
+// withPieces sets the sealer's answer and reads it the way production does: an
+// empty answer is not a list of zero pieces, it is no answer at all. Deriving
+// the flag here rather than letting a test set it keeps the sweep honest -- the
+// combination "list known to be readable, yet empty" is not a shape any sealer
+// can produce, so no test can assert a verdict on it.
 func withPieces(pieces []lapi.SectorPiece) func(*sealedSectorRead) {
-	return func(r *sealedSectorRead) { r.pieces = pieces }
-}
-
-func withPiecesUnreported() func(*sealedSectorRead) {
-	return func(r *sealedSectorRead) { r.piecesKnown = false }
+	return func(r *sealedSectorRead) {
+		r.pieces = pieces
+		r.piecesKnown = sectorPiecesKnown(lapi.SectorInfo{Pieces: pieces})
+	}
 }
 
 // verdict is the shorthand the era table reads best with: our piece at offset
@@ -114,7 +119,6 @@ func TestVerdictEraMatrix(t *testing.T) {
 		sector   *minertypes.SectorOnChainInfo
 		claim    *verifreg9types.Claim
 		pieces   []lapi.SectorPiece
-		unreport bool
 		wantCase sealingCase
 		want     directDealSealingVerdict
 	}{
@@ -215,7 +219,7 @@ func TestVerdictEraMatrix(t *testing.T) {
 		{
 			name:     "nv29 deal on a sealer that does not report the piece list",
 			sector:   sectorWithWeights(zeroWeight, unitWeight),
-			unreport: true,
+			pieces:   nil,
 			wantCase: casePostSealedSector,
 			want:     sealingDone,
 		},
@@ -230,13 +234,14 @@ func TestVerdictEraMatrix(t *testing.T) {
 		{
 			name:     "rollback: settled, no weight, no claim, piece absent",
 			sector:   sectorWithWeights(zeroWeight, zeroWeight),
+			pieces:   pieceListWith(otherPieceCID, ourPieceSize, 0),
 			wantCase: caseRolledBack,
 			want:     sealingRolledBack,
 		},
 		{
 			name:     "rollback is never inferred from an unreported piece list",
 			sector:   sectorWithWeights(zeroWeight, zeroWeight),
-			unreport: true,
+			pieces:   nil,
 			wantCase: caseIndeterminate,
 			want:     sealingNoEvidence,
 		},
@@ -264,25 +269,66 @@ func TestVerdictEraMatrix(t *testing.T) {
 			name:     "weight non-zero but our piece not in the list, no claim",
 			sector:   sectorWithWeights(zeroWeight, unitWeight),
 			pieces:   pieceListWith(otherPieceCID, ourPieceSize, 0),
-			wantCase: caseIndeterminate,
-			want:     sealingNoEvidence,
+			wantCase: casePieceMissing,
+			want:     sealingPieceMissing,
 		},
 		{
 			name:     "weight non-zero, our piece at an offset we did not add it at",
 			sector:   sectorWithWeights(zeroWeight, unitWeight),
 			pieces:   pieceListWith(ourPieceCID, ourPieceSize, ourPieceSize),
-			wantCase: caseIndeterminate,
-			want:     sealingNoEvidence,
+			wantCase: casePieceMissing,
+			want:     sealingPieceMissing,
+		},
+		{
+			// The nv28 aborted snap: the sector holds another deal's
+			// unverified spacetime, and the list says ours is not in it.
+			name:     "nv28 aborted snap: deal weight, no claim, our piece not in the list",
+			sector:   sectorWithWeights(unitWeight, zeroWeight),
+			pieces:   pieceListWith(otherPieceCID, ourPieceSize, 0),
+			wantCase: casePieceMissing,
+			want:     sealingPieceMissing,
+		},
+		{
+			// Pre-nv29 the claim is the authority: it hits this sector, so the
+			// deal is done however the piece list reads.
+			name:     "nv28: claim hits this sector, our piece not in the list",
+			sector:   sectorWithWeights(zeroWeight, unitWeight),
+			claim:    claimOn(sealingSectorNum),
+			pieces:   pieceListWith(otherPieceCID, ourPieceSize, 0),
+			wantCase: caseNv28SealedSector,
+			want:     sealingDone,
+		},
+		{
+			// nv29, fresh seal across the upgrade: pre-committed before nv29,
+			// proved after it, so the sector activates at nv29 and FIP-0118
+			// writes no claim. Reachable, and the weight arm has to settle it.
+			name:     "nv29 fresh seal across the upgrade: verified weight, no claim",
+			sector:   sectorWithWeights(zeroWeight, unitWeight),
+			pieces:   our,
+			wantCase: casePostSealedSector,
+			want:     sealingDone,
+		},
+		{
+			name:     "nv29 fresh seal across the upgrade: our piece not in the list",
+			sector:   sectorWithWeights(zeroWeight, unitWeight),
+			pieces:   pieceListWith(otherPieceCID, ourPieceSize, 0),
+			wantCase: casePieceMissing,
+			want:     sealingPieceMissing,
+		},
+		{
+			// The same sector on a sealer that answers with no list at all:
+			// nothing can be concluded against the weight, so it stands.
+			name:     "nv29 fresh seal across the upgrade on a sealer that reports no list",
+			sector:   sectorWithWeights(zeroWeight, unitWeight),
+			pieces:   nil,
+			wantCase: casePostSealedSector,
+			want:     sealingDone,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := []func(*sealedSectorRead){withPieces(tt.pieces)}
-			if tt.unreport {
-				opts = append(opts, withPiecesUnreported())
-			}
-			gotCase, got := verdictForSealedSector(sealingRead(tt.sector, tt.claim, opts...), sealingSectorNum)
+			gotCase, got := verdictForSealedSector(sealingRead(tt.sector, tt.claim, withPieces(tt.pieces)), sealingSectorNum)
 			if gotCase != tt.wantCase || got != tt.want {
 				t.Fatalf("verdictForSealedSector() = (%v, %v), want (%v, %v)",
 					gotCase, got, tt.wantCase, tt.want)
@@ -333,12 +379,14 @@ func TestVerdictExhaustive(t *testing.T) {
 		{carries: false, claim: claimHere, inSector: false, piecesKnown: true}:  {caseNv28SealedSector, sealingDone},
 		{carries: false, claim: claimHere, inSector: false, piecesKnown: false}: {caseNv28SealedSector, sealingDone},
 
-		// Weight with no claim: post-nv29 and the boundary. Our piece confirms
-		// it where the list is readable; an unreadable list falls back to the
-		// weight rather than stranding the deal.
+		// Weight with no claim: post-nv29, the boundary and a fresh seal across
+		// it. Our piece confirms it where the list is readable; an unreadable
+		// list falls back to the weight rather than stranding the deal; a
+		// readable list that does not hold our piece is the aborted snap, and
+		// the sector's data is somebody else's.
 		{carries: true, claim: claimNone, inSector: true, piecesKnown: true}:   {casePostSealedSector, sealingDone},
 		{carries: true, claim: claimNone, inSector: false, piecesKnown: false}: {casePostSealedSector, sealingDone},
-		{carries: true, claim: claimNone, inSector: false, piecesKnown: true}:  {caseIndeterminate, sealingNoEvidence},
+		{carries: true, claim: claimNone, inSector: false, piecesKnown: true}:  {casePieceMissing, sealingPieceMissing},
 
 		{carries: true, claim: claimHere, inSector: true, piecesKnown: true}:   {caseNv28SealedSector, sealingDone},
 		{carries: true, claim: claimHere, inSector: false, piecesKnown: true}:  {caseNv28SealedSector, sealingDone},
@@ -365,13 +413,16 @@ func TestVerdictExhaustive(t *testing.T) {
 		"claim elsewhere": {claimOn(otherSectorNum), claimElsewhere},
 	}
 
+	// "list empty" is deliberately absent: a sealed sector's list is never
+	// empty, so an empty answer is the sealer not reporting one, and there is
+	// no shape in which a list is readable and holds nothing. The flag is
+	// derived from the answer, the way production derives it.
 	lists := map[string]struct {
 		pieces    []lapi.SectorPiece
 		known     bool
 		holdsOurs bool
 	}{
 		"list unreported": {nil, false, false},
-		"list empty":      {nil, true, false},
 		"our piece":       {pieceListWith(ourPieceCID, ourPieceSize, 0), true, true},
 		"another piece":   {pieceListWith(otherPieceCID, ourPieceSize, 0), true, false},
 	}
@@ -383,11 +434,7 @@ func TestVerdictExhaustive(t *testing.T) {
 			for listName, listFixture := range lists {
 				name := fmt.Sprintf("%s/%s/%s", sectorName, claimName, listName)
 				t.Run(name, func(t *testing.T) {
-					opts := []func(*sealedSectorRead){withPieces(listFixture.pieces)}
-					if !listFixture.known {
-						opts = append(opts, withPiecesUnreported())
-					}
-					r := sealingRead(sectorFixture.sector, claimFixture.claim, opts...)
+					r := sealingRead(sectorFixture.sector, claimFixture.claim, withPieces(listFixture.pieces))
 
 					gotCase, got := verdictForSealedSector(r, sealingSectorNum)
 
@@ -441,7 +488,7 @@ func TestClaimElsewhereWins(t *testing.T) {
 		"no weight, piece absent":                  sealingRead(sectorWithWeights(zeroWeight, zeroWeight), claimOn(otherSectorNum)),
 		"verified weight, piece staged":            sealingRead(sectorWithWeights(zeroWeight, unitWeight), claimOn(otherSectorNum), withPieces(our)),
 		"sector not visible on this node":          sealingRead(nil, claimOn(otherSectorNum)),
-		"sector not visible, list also unreported": sealingRead(nil, claimOn(otherSectorNum), withPiecesUnreported()),
+		"sector not visible, list also unreported": sealingRead(nil, claimOn(otherSectorNum), withPieces(nil)),
 	}
 
 	for name, r := range reads {
@@ -465,7 +512,7 @@ func TestNodeLagIsNotAVerdict(t *testing.T) {
 		"nothing visible":                           sealingRead(nil, nil),
 		"claim on our sector, sector not visible":   sealingRead(nil, claimOn(sealingSectorNum)),
 		"piece list readable, sector not visible":   sealingRead(nil, nil, withPieces(our)),
-		"piece list unreported, sector not visible": sealingRead(nil, nil, withPiecesUnreported()),
+		"piece list unreported, sector not visible": sealingRead(nil, nil, withPieces(nil)),
 	}
 
 	for name, r := range tests {
@@ -519,16 +566,84 @@ func TestBoundaryIsInvisible(t *testing.T) {
 
 	// The same sector before the data lands: a pure CC in either era, where the
 	// piece list is the only thing that can tell a staged piece from a rolled
-	// back snap.
+	// back snap. A rollback is a list that holds somebody else's piece -- an
+	// empty answer is not a list of zero pieces, so it says nothing either way.
 	staged := &minertypes.SectorOnChainInfo{Activation: preNv29, PowerBaseEpoch: postNv29}
 	stageCase, stageVerdict := verdict(staged, nil, our)
-	rollCase, rollVerdict := verdict(staged, nil, nil)
+	rollCase, rollVerdict := verdict(staged, nil, pieceListWith(otherPieceCID, ourPieceSize, 0))
 
 	if stageCase != caseEmptyPureCC || stageVerdict != sealingNoEvidence {
 		t.Fatalf("staged piece = (%v, %v), want (empty-pure-cc, sealingNoEvidence)", stageCase, stageVerdict)
 	}
 	if rollCase != caseRolledBack || rollVerdict != sealingRolledBack {
 		t.Fatalf("absent piece = (%v, %v), want (rolled-back, sealingRolledBack)", rollCase, rollVerdict)
+	}
+}
+
+// TestFreshSealAcrossNv29 pins the other crossing a direct deal can make: the
+// pre-commit was submitted before nv29 and the prove-commit landed after it.
+//
+// It is not a *boundary* in the activation/power-base sense -- the actor writes
+// one epoch for both at prove-commit, so both are post-nv29 -- but it is
+// perfectly reachable, and the deal that comes out of it is a deal that has to
+// finish: the piece is in the sector, verifreg has been frozen, and FIP-0118
+// wrote no claim. Watching such a deal for a claim it can never get is watching
+// it forever, so the weight arm has to be enough on its own.
+//
+// The two crossings are listed here side by side because their on-chain reads
+// are the same shape: data with no claim. Nothing in the verdict may depend on
+// which of them produced it -- the sealer knows how the data got there, the
+// chain does not.
+func TestFreshSealAcrossNv29(t *testing.T) {
+	const (
+		preNv29  = abi.ChainEpoch(100)
+		postNv29 = abi.ChainEpoch(200)
+	)
+
+	// The sector a straddling fresh seal produces: one epoch for both fields,
+	// because prove-commit writes them together.
+	freshSeal := &minertypes.SectorOnChainInfo{
+		Activation:         postNv29,
+		PowerBaseEpoch:     postNv29,
+		VerifiedDealWeight: unitWeight,
+	}
+	// A snap across the same upgrade, for the equivalence: activation left on
+	// the pre-nv29 side, power base moved by the update.
+	snap := &minertypes.SectorOnChainInfo{
+		Activation:         preNv29,
+		PowerBaseEpoch:     postNv29,
+		VerifiedDealWeight: unitWeight,
+	}
+	// A fresh seal that did not finish: the piece was handed to the sealer
+	// before the upgrade and has not landed. This is the shape that must keep
+	// polling rather than be mistaken for a landed deal or a rollback.
+	staged := &minertypes.SectorOnChainInfo{Activation: preNv29, PowerBaseEpoch: preNv29}
+
+	our := pieceListWith(ourPieceCID, ourPieceSize, 0)
+	someoneElses := pieceListWith(otherPieceCID, ourPieceSize, 0)
+
+	tests := []struct {
+		name     string
+		sector   *minertypes.SectorOnChainInfo
+		pieces   []lapi.SectorPiece
+		wantCase sealingCase
+		want     directDealSealingVerdict
+	}{
+		{"fresh seal landed, no claim", freshSeal, our, casePostSealedSector, sealingDone},
+		{"snap landed, no claim", snap, our, casePostSealedSector, sealingDone},
+		{"fresh seal landed, another piece took the sector", freshSeal, someoneElses, casePieceMissing, sealingPieceMissing},
+		{"fresh seal still staging", staged, our, caseEmptyPureCC, sealingNoEvidence},
+		{"fresh seal rolled back to a CC", staged, someoneElses, caseRolledBack, sealingRolledBack},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// No claim in any row: this is the whole premise of the crossing.
+			gotCase, got := verdict(tt.sector, nil, tt.pieces)
+			if gotCase != tt.wantCase || got != tt.want {
+				t.Fatalf("verdictForSealedSector() = (%v, %v), want (%v, %v)", gotCase, got, tt.wantCase, tt.want)
+			}
+		})
 	}
 }
 

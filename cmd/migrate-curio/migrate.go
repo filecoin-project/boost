@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -38,6 +39,7 @@ import (
 
 	"github.com/filecoin-project/curio/harmony/harmonydb"
 
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
@@ -569,27 +571,125 @@ func fatalSkip(err string, retry types.DealRetryType) bool {
 	return err != "" && retry == types.DealRetryFatal && err != legacyNoClaimErr
 }
 
+// ddoOnChainResult is the three-way answer to "did this DDO deal's data land in
+// its sector". It is a result type rather than a bool plus error because
+// ddoNoPieceSource is neither a verdict nor a contradiction: the run has no way
+// to read the sector's pieces, so it cannot decide, and the caller has to count
+// it and move on rather than abort.
+type ddoOnChainResult int
+
+const (
+	// ddoNotOnChain: the evidence was read and does not place our piece.
+	ddoNotOnChain ddoOnChainResult = iota
+	// ddoOnChain: the deal's data is in the sector.
+	ddoOnChain
+	// ddoNoPieceSource: no claim, the sector carries data, and the pieces gave no
+	// answer -- either the list could not be read or it came back empty, which a
+	// sector that carries data cannot be. "Our piece is in there" is unproven
+	// either way, so nothing is migrated.
+	ddoNoPieceSource
+)
+
 // ddoDealOnChain reports whether a DDO deal recorded in boost's DB still has
-// evidence of itself on chain, which is what earns it a place in the migration.
+// evidence of itself in the sector it belongs to, which is what earns it a place
+// in the migration.
 //
 // The evidence differs by era. Before nv29 the chain's verifreg claim is the
-// proof, and a claim pointing at another sector is an answer rather than
+// proof, and a claim pointing at another sector is a contradiction rather than
 // evidence for this one -- it cannot be repaired here, so it is an error. From
 // nv29 on FIP-0118 writes no claim at all, so a post-nv29 deal has none by
-// construction and its sector's own weight answers instead; reading that absent
-// claim as "the deal did not land" would drop every post-nv29 direct deal from
-// the migration.
+// construction and its sector answers instead; reading that absent claim as "the
+// deal did not land" would drop every post-nv29 direct deal from the migration.
 //
-// claim and si are the two reads; si is consulted only when there is no claim
-// and may be nil, which carries no weight.
-func ddoDealOnChain(claim *verifreg9types.Claim, si *miner.SectorOnChainInfo, sectorNum abi.SectorNumber) (bool, error) {
-	if claim == nil {
-		return sectorstatemgr.SectorCarriesData(si), nil
+// The sector's weight alone is not enough to answer with. It is a property of
+// the whole sector, and a sector can hold several pieces from several deals, so
+// it says "something landed here", never "this deal landed here". The case that
+// shows the gap is a snap that aborted and was followed by another piece
+// entering the same sector: the sector carries data, our piece is not in it, and
+// recovering the deal would hand a client data that was never sealed. So when
+// there is no claim the piece list has to be read, and our (PieceCID, Size,
+// offset) has to appear in it.
+//
+// pieces and piecesKnown come from the sealer's recorded piece list. When that
+// list gives no answer the result is ddoNoPieceSource, never a guess -- including
+// when it comes back empty for a sector that carries data, because such a sector
+// has pieces by definition, so an empty list means the list was not written (the
+// migration ran before `curio guided-setup`) rather than that our piece is
+// absent. Reading that emptiness as absence would drop every post-nv29 deal in
+// silence, which is the failure this whole check exists to avoid.
+func ddoDealOnChain(claim *verifreg9types.Claim, si *miner.SectorOnChainInfo, pieces []lapi.SectorPiece, piecesKnown bool, deal *types.DirectDeal) (ddoOnChainResult, error) {
+	if claim != nil {
+		if claim.Sector != deal.SectorID {
+			return ddoNotOnChain, errors.New("sector mismatch for deal")
+		}
+		return ddoOnChain, nil
 	}
-	if claim.Sector != sectorNum {
-		return false, errors.New("sector mismatch for deal")
+	if !sectorstatemgr.SectorCarriesData(si) {
+		return ddoNotOnChain, nil
 	}
-	return true, nil
+	if !piecesKnown || len(pieces) == 0 {
+		return ddoNoPieceSource, nil
+	}
+	if !sectorstatemgr.PieceInSector(pieces, deal.PieceCID, deal.PieceSize, deal.Offset) {
+		return ddoNotOnChain, nil
+	}
+	return ddoOnChain, nil
+}
+
+// ddoPiecesFromHarmony reads a sector's piece list out of Curio's recorded
+// metadata (the sectors_meta_pieces table, filled by curio guided-setup from the
+// lotus-miner metadata datastore, and kept up to date for sectors Curio handles
+// itself). piece_num is the piece's position in the sector, so ordering by it
+// rebuilds the list in offset order, which is what PieceInSector accumulates.
+//
+// The bool reports whether the list was obtained. A missing table, a migration
+// that has not run guided-setup yet, or a row that does not read is not a per-deal
+// problem, so it answers false rather than failing: the caller counts those deals
+// and reports them once, rather than turning a deployment ordering gap into a
+// cutover failure. The error is returned for the log line, not to decide anything.
+func ddoPiecesFromHarmony(ctx context.Context, hdb *harmonydb.DB, spID uint64, sectorNum abi.SectorNumber) ([]lapi.SectorPiece, bool, error) {
+	var rows []ddoSectorPieceRow
+
+	err := hdb.Select(ctx, &rows, `SELECT piece_num, piece_cid, piece_size FROM sectors_meta_pieces
+		WHERE sp_id = $1 AND sector_num = $2 ORDER BY piece_num`, spID, sectorNum)
+	if err != nil {
+		return nil, false, err
+	}
+
+	pieces, err := ddoPiecesFromRows(sectorNum, rows)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return pieces, true, nil
+}
+
+// ddoSectorPieceRow is one row of sectors_meta_pieces, the only recorded piece
+// list a boost -> curio migration can read. piece_size is the padded size, and
+// piece_num is the piece's position in the sector.
+type ddoSectorPieceRow struct {
+	PieceNum  int64  `db:"piece_num"`
+	PieceCID  string `db:"piece_cid"`
+	PieceSize int64  `db:"piece_size"`
+}
+
+// ddoPiecesFromRows converts recorded rows into the sealer's piece-list shape,
+// in the order it was read (piece_num ascending), which is the offset order
+// PieceInSector accumulates over. A row whose cid does not parse is returned as
+// an error rather than skipped: it would shift every following piece's offset.
+func ddoPiecesFromRows(sectorNum abi.SectorNumber, rows []ddoSectorPieceRow) ([]lapi.SectorPiece, error) {
+	pieces := make([]lapi.SectorPiece, 0, len(rows))
+	for _, r := range rows {
+		pc, err := cid.Parse(r.PieceCID)
+		if err != nil {
+			return nil, fmt.Errorf("sector %d: piece %d: parsing piece cid %q: %w", sectorNum, r.PieceNum, r.PieceCID, err)
+		}
+		pieces = append(pieces, lapi.SectorPiece{
+			Piece: abi.PieceInfo{Size: abi.PaddedPieceSize(r.PieceSize), PieceCID: pc},
+		})
+	}
+
+	return pieces, nil
 }
 
 func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bitfield.BitField, maddr address.Address, hdb *harmonydb.DB, sqldb, mdb *sql.DB) error {
@@ -604,6 +704,11 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 	if err != nil {
 		return fmt.Errorf("failed to get all DDO deals: %w", err)
 	}
+
+	// Counted, not fatal: these are the post-nv29 deals that could be neither
+	// recovered nor refused because the sector's piece list could not be read.
+	// See ddoPiecesFromHarmony.
+	var noPieceSource int
 
 	for i, deal := range deals {
 		if i > 0 && i%100 == 0 {
@@ -634,23 +739,48 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 			return fmt.Errorf("deal: %s: error getting the claim status: %w", deal.ID.String(), err)
 		}
 		// From nv29 on FIP-0118 writes no claim, so a deal onboarded after the
-		// upgrade has none by design and its sector's weight is the proof
-		// instead. The sector is read only when that can be needed, so the
+		// upgrade has none by design and its sector is the evidence instead. The
+		// sector and its piece list are read only when that can be needed, so the
 		// pre-nv29 path keeps its single chain call.
-		var si *miner.SectorOnChainInfo
+		var (
+			si          *miner.SectorOnChainInfo
+			pieces      []lapi.SectorPiece
+			piecesKnown bool
+			pieceErr    error
+		)
 		if claim == nil {
 			si, err = full.StateSectorGetInfo(ctx, maddr, deal.SectorID, ltypes.EmptyTSK)
 			if err != nil {
 				return fmt.Errorf("deal: %s: error getting the sector: %w", deal.ID.String(), err)
 			}
+
+			// A sector carrying no weight has no piece of ours to look for, so
+			// the list is read only when the weight says there is data to explain.
+			if sectorstatemgr.SectorCarriesData(si) {
+				pieces, piecesKnown, pieceErr = ddoPiecesFromHarmony(ctx, hdb, mid, deal.SectorID)
+			}
 		}
 
-		onChain, err := ddoDealOnChain(claim, si, deal.SectorID)
+		onChain, err := ddoDealOnChain(claim, si, pieces, piecesKnown, deal)
 		if err != nil {
 			return fmt.Errorf("deal: %s: %w", deal.ID.String(), err)
 		}
-		if !onChain {
-			llog.Infow("Skipping as neither a claim nor sector data is on chain", "sector", deal.SectorID)
+		switch onChain {
+		case ddoNoPieceSource:
+			// The deal looks live (no claim, sector carries data) but this run
+			// cannot see the sector's pieces, which is what the recovery is
+			// decided on. Skipping is the safe half of the trade: migrating it
+			// would be recovering a deal on the sector's weight alone, and that is
+			// the case the piece check exists to refuse. The read error is not
+			// raised to a failed run -- see ddoPiecesFromHarmony -- but it is
+			// neither swallowed nor guessed at: pieceErr is nil when the list was
+			// read and simply had nothing for this sector.
+			noPieceSource++
+			llog.Warnw("Skipping: no claim found and the sector's piece list gave no answer",
+				"sector", deal.SectorID, "err", pieceErr)
+			continue
+		case ddoNotOnChain:
+			llog.Infow("Skipping as neither a claim nor this deal's piece is in the sector", "sector", deal.SectorID)
 			continue
 		}
 
@@ -770,6 +900,13 @@ func migrateDDODeals(ctx context.Context, full v1api.FullNode, activeSectors bit
 		if err != nil {
 			return fmt.Errorf("failed to commit Haromy changes: %w", err)
 		}
+	}
+
+	if noPieceSource > 0 {
+		fmt.Printf("Skipped %d direct deal(s) with no claim whose sector's piece list could not be read (see the warnings above).\n"+
+			"These are post-nv29 deals: the claim can never appear, so the sector's pieces are the only evidence left. "+
+			"Run `curio guided-setup` (Migrate from existing Lotus-Miner) before this migration to populate "+
+			"sectors_meta_pieces, then run this migration again -- these deals stay unmigrated until then.\n", noPieceSource)
 	}
 
 	return nil

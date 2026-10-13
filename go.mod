@@ -27,6 +27,7 @@ require (
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.2
 	github.com/filecoin-project/go-commp-utils v0.1.4
+	github.com/filecoin-project/go-commp-utils/v2 v2.1.0
 	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-ds-versioning v0.1.2
 	github.com/filecoin-project/go-fil-commcid v0.3.1
@@ -180,7 +181,6 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.1 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.4.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
-	github.com/filecoin-project/go-commp-utils/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-crypto v0.1.0 // indirect
 	github.com/filecoin-project/go-f3 v0.8.14 // indirect
 	github.com/filecoin-project/go-hamt-ipld v0.1.5 // indirect

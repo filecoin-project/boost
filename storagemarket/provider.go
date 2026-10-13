@@ -48,6 +48,10 @@ var (
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
 	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
+	// ErrSectorRemovedByProvider: the sector was removed by the storage
+	// provider. Distinct from ErrSectorSealingFailed because nothing failed to
+	// seal: the place the deal's data was going no longer exists.
+	ErrSectorRemovedByProvider = errors.New("storage failed - sector was removed by the storage provider")
 )
 
 var (

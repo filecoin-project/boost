@@ -11,6 +11,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -54,6 +56,26 @@ func SectorCarriesData(si *minertypes.SectorOnChainInfo) bool {
 		return false
 	}
 	return !si.DealWeight.NilOrZero() || !si.VerifiedDealWeight.NilOrZero()
+}
+
+// PieceInSector reports whether the piece is in the sector's piece list at the
+// given offset.
+//
+// The offsets have to be rebuilt rather than read: the list carries each piece's
+// size and no offset field, so a piece's offset is the sum of the padded sizes of
+// the pieces ahead of it, in list order, padding pieces included. That is the same
+// sum the sealer returned to the client as the offset, which is what the deal
+// records, so comparing them compares like with like.
+func PieceInSector(pieces []api.SectorPiece, pieceCID cid.Cid, pieceSize abi.PaddedPieceSize, offset abi.PaddedPieceSize) bool {
+	var off abi.PaddedPieceSize
+	for _, p := range pieces {
+		if p.Piece.PieceCID.Equals(pieceCID) && p.Piece.Size == pieceSize && off == offset {
+			return true
+		}
+		off += p.Piece.Size
+	}
+
+	return false
 }
 
 type StorageAPI interface {
