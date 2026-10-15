@@ -217,11 +217,15 @@ func TestVerdictEraMatrix(t *testing.T) {
 			want:     sealingDone,
 		},
 		{
+			// Weight, no claim and no list: the sealer has told us nothing
+			// about whose piece the sector carries, and the claim that would
+			// have settled a pre-nv29 deal does not exist past the upgrade.
+			// There is no verdict to give.
 			name:     "nv29 deal on a sealer that does not report the piece list",
 			sector:   sectorWithWeights(zeroWeight, unitWeight),
 			pieces:   nil,
-			wantCase: casePostSealedSector,
-			want:     sealingDone,
+			wantCase: caseIndeterminate,
+			want:     sealingNoEvidence,
 		},
 		{
 			name:     "USQ: both weight arms on one sector, claim present",
@@ -317,12 +321,13 @@ func TestVerdictEraMatrix(t *testing.T) {
 		},
 		{
 			// The same sector on a sealer that answers with no list at all:
-			// nothing can be concluded against the weight, so it stands.
+			// the weight cannot be attributed to this deal, and no claim exists
+			// past the upgrade to attribute it either. There is no verdict.
 			name:     "nv29 fresh seal across the upgrade on a sealer that reports no list",
 			sector:   sectorWithWeights(zeroWeight, unitWeight),
 			pieces:   nil,
-			wantCase: casePostSealedSector,
-			want:     sealingDone,
+			wantCase: caseIndeterminate,
+			want:     sealingNoEvidence,
 		},
 	}
 
@@ -380,12 +385,13 @@ func TestVerdictExhaustive(t *testing.T) {
 		{carries: false, claim: claimHere, inSector: false, piecesKnown: false}: {caseNv28SealedSector, sealingDone},
 
 		// Weight with no claim: post-nv29, the boundary and a fresh seal across
-		// it. Our piece confirms it where the list is readable; an unreadable
-		// list falls back to the weight rather than stranding the deal; a
-		// readable list that does not hold our piece is the aborted snap, and
-		// the sector's data is somebody else's.
+		// it. Weight is a fact about the sector, not about this deal, so it
+		// completes one only where our piece is in a list the sealer reports; a
+		// readable list that does not hold our piece is the aborted snap and the
+		// sector's data is somebody else's; with no list at all nothing says
+		// whose weight it is, and the deal keeps polling.
 		{carries: true, claim: claimNone, inSector: true, piecesKnown: true}:   {casePostSealedSector, sealingDone},
-		{carries: true, claim: claimNone, inSector: false, piecesKnown: false}: {casePostSealedSector, sealingDone},
+		{carries: true, claim: claimNone, inSector: false, piecesKnown: false}: {caseIndeterminate, sealingNoEvidence},
 		{carries: true, claim: claimNone, inSector: false, piecesKnown: true}:  {casePieceMissing, sealingPieceMissing},
 
 		{carries: true, claim: claimHere, inSector: true, piecesKnown: true}:   {caseNv28SealedSector, sealingDone},

@@ -512,15 +512,14 @@ func TestCheckSealingOnceSettledStates(t *testing.T) {
 			wantCase:    casePostSealedSector,
 		},
 		{
-			// The post-nv29 deal on a sealer whose list is not readable at all:
-			// the weight is the only evidence there is, and it has to be
-			// enough, or every such deal hangs.
-			name:        "nv29 on a sealer that reports no piece list: the weight decides",
-			sector:      sectorWithWeights(zeroWeight, unitWeight),
-			pieces:      nil,
-			wantDone:    true,
-			wantNoError: true,
-			wantCase:    casePostSealedSector,
+			// Weight, no claim, no piece list: the sector carries somebody's
+			// data and the sealer will not say whose. The weight is not
+			// evidence about this deal, so the watch keeps polling rather than
+			// completing on aggregate evidence.
+			name:     "nv29 on a sealer that reports no piece list: no verdict from the weight alone",
+			sector:   sectorWithWeights(zeroWeight, unitWeight),
+			pieces:   nil,
+			wantDone: false,
 		},
 		{
 			name:      "rollback: no weight, no claim, our piece gone from the list",
@@ -919,7 +918,8 @@ func newWatchFixture(t *testing.T) *chainFixture {
 	return f
 }
 
-// insertDeal stores the deal the watch will re-read each poll.
+// insertDeal stores a deal row for the reader-side assertions. The watch itself
+// takes no input from the row.
 func (f *chainFixture) insertDeal(t *testing.T, deal *types.DirectDeal) {
 	t.Helper()
 	require.NoError(t, f.ddp.directDealsDB.Insert(context.Background(), deal))
@@ -944,7 +944,6 @@ func TestWatchSealingUpdatesStopsOnShutdown(t *testing.T) {
 	}()
 
 	entry := f.deal()
-	f.insertDeal(t, entry)
 	derr := f.ddp.watchSealingUpdates(entry)
 
 	require.NotNil(t, derr)
@@ -1017,7 +1016,6 @@ func TestWatchSealingUpdatesReturnsImmediatelyWhenDone(t *testing.T) {
 	f.expectClaim(nil)
 
 	entry := f.deal()
-	f.insertDeal(t, entry)
 	// N.B. compare against nil rather than require.NoError: the watch returns a
 	// *dealMakingError, and a nil one in an error interface is not nil.
 	require.Nil(t, f.ddp.watchSealingUpdates(entry))
@@ -1038,7 +1036,6 @@ func TestWatchSealingUpdatesFailsOnUnrecoverable(t *testing.T) {
 	f.expectNoChainReads()
 
 	entry := f.deal()
-	f.insertDeal(t, entry)
 	derr := f.ddp.watchSealingUpdates(entry)
 
 	require.NotNil(t, derr)
@@ -1062,49 +1059,31 @@ func mustLogs(t *testing.T, ldb *db.LogsDB, id uuid.UUID) []db.DealLog {
 	return l
 }
 
-// TestWatchSealingUpdatesStopsWhenTheDealIsAlreadyComplete pins the database read
-// that opens each poll. The watch can run for as long as a sector takes to seal,
-// and the deal row is the authority on whether the deal is done -- so if it is
-// already complete there is nothing to wait for, and polling a sector for a
-// finished deal would hold the thread open for no reason.
-func TestWatchSealingUpdatesStopsWhenTheDealIsAlreadyComplete(t *testing.T) {
+// TestWatchSealingUpdatesIgnoresACompleteDealRow pins the ownership rule rather
+// than a reachable state, which is the point: the row is this thread's output,
+// and the only caller has already gated on it being incomplete, so a complete
+// row cannot be handed to the watch. Pinning the unreachable shape is what keeps
+// it unreachable -- re-adding a peek at the row would end the watch on a
+// completion this process never established, and would do it silently, since a
+// watch that stopped for the row and a watch that finished from the chain look
+// the same from the caller.
+//
+// The discriminator is the log line: only the chain read can write it.
+func TestWatchSealingUpdatesIgnoresACompleteDealRow(t *testing.T) {
 	f := newWatchFixture(t)
+	f.expectSealerState(sealing.Proving, pieceListWith(ourPieceCID, ourPieceSize, 0))
+	f.expectSectorOnChain(sectorWithWeights(zeroWeight, unitWeight))
+	f.expectClaim(nil)
 
-	// The sealer is mid-seal: only the database knows the deal is already done,
-	// so a watch that trusted the sealer alone would park on the ticker here.
 	entry := f.deal()
 	entry.Checkpoint = dealcheckpoints.Complete
 	f.insertDeal(t, entry)
 
 	require.Nil(t, f.ddp.watchSealingUpdates(entry))
 
-	// It stopped without asking the sealer or the chain anything.
-	logsForDeal, err := f.logsDB.Logs(context.Background(), entry.ID)
-	require.NoError(t, err)
-	require.Empty(t, logMessages(logsForDeal))
-}
-
-// TestWatchSealingUpdatesPollsWhileTheDealIsIncomplete is the other side: a deal
-// row that is not complete must not short-circuit the watch.
-func TestWatchSealingUpdatesPollsWhileTheDealIsIncomplete(t *testing.T) {
-	f := newWatchFixture(t)
-	f.expectSealerState(sealing.AddPiece, nil)
-	f.expectNoChainReads()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	f.ddp.ctx = ctx
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
-
-	entry := f.deal()
-	entry.Checkpoint = dealcheckpoints.AddedPiece
-	f.insertDeal(t, entry)
-
-	derr := f.ddp.watchSealingUpdates(entry)
-	require.NotNil(t, derr)
-	require.Equal(t, types.DealRetryAuto, derr.retry)
+	msgs := logMessages(mustLogs(t, f.logsDB, entry.ID))
+	require.Contains(t, msgs, "the deal's sector is committed and live on chain",
+		"the watch has to reach its own verdict, not stop at the row")
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -78,7 +77,6 @@ type resolver struct {
 	mpool          *mpoolmonitor.MpoolMonitor
 	mma            *lib.MultiMinerAccessor
 	askProv        storedask.StoredAsk
-	curio          bool
 }
 
 func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals legacy.LegacyDealManager, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor, assk storedask.StoredAsk) (*resolver, error) {
@@ -111,15 +109,6 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		askProv:        assk,
 	}
 
-	v, err := spApi.Version(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	if strings.Contains(v.String(), "curio") {
-		ret.curio = true
-	}
-
 	return ret, nil
 }
 
@@ -135,7 +124,7 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio), nil
+	return newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
 }
 
 type filterArgs struct {
@@ -188,7 +177,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
 		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
-		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio))
+		resolvers = append(resolvers, newDealResolver(r.mpool, &deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
 	}
 
 	return &dealListResolver{
@@ -221,7 +210,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	}
 
 	net := make(chan *dealResolver, 1)
-	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio)
+	net <- newDealResolver(r.mpool, deal, r.provider, r.dealsDB, r.logsDB, r.spApi)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -233,7 +222,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, fmt.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool, curio: r.curio}
+	sub := &subLastUpdate{sub: dealUpdatesSub, provider: r.provider, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi, mpool: r.mpool}
 	go func() {
 		sub.Pipe(ctx, net) // blocks until connection is closed
 		close(net)
@@ -273,7 +262,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			// New deal
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
-				rsv := newDealResolver(r.mpool, new(evti.(types.ProviderDealState)), r.provider, r.dealsDB, r.logsDB, r.spApi, r.curio)
+				rsv := newDealResolver(r.mpool, new(evti.(types.ProviderDealState)), r.provider, r.dealsDB, r.logsDB, r.spApi)
 				totalCount, err := r.dealsDB.Count(ctx, "", nil)
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
@@ -417,12 +406,11 @@ type dealResolver struct {
 	dealsDB     *db.DealsDB
 	logsDB      *db.LogsDB
 	spApi       sealingpipeline.API
-	curio       bool
 }
 
 func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealState,
 	provider *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB,
-	spApi sealingpipeline.API, curio bool) *dealResolver {
+	spApi sealingpipeline.API) *dealResolver {
 	return &dealResolver{
 		mpool:             mpool,
 		ProviderDealState: *deal,
@@ -431,7 +419,6 @@ func newDealResolver(mpool *mpoolmonitor.MpoolMonitor, deal *types.ProviderDealS
 		dealsDB:           dealsDB,
 		logsDB:            logsDB,
 		spApi:             spApi,
-		curio:             curio,
 	}
 }
 
@@ -644,9 +631,9 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
-		if dr.curio {
-			return "Waiting for sector to seal"
-		}
+		// One label for every sealer. It used to read "Waiting for sector to
+		// seal" when the sealer answered as Curio, because boost waited there
+		// too; that wait is gone, so the label is the same work on every sealer.
 		return "Indexing"
 	case dealcheckpoints.IndexedAndAnnounced:
 		return "Indexed and Announced"
@@ -759,7 +746,6 @@ type subLastUpdate struct {
 	logsDB   *db.LogsDB
 	spApi    sealingpipeline.API
 	mpool    *mpoolmonitor.MpoolMonitor
-	curio    bool
 }
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
@@ -799,7 +785,7 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 		updates := s.sub.Out()
 	loop:
 		for {
-			rsv := newDealResolver(s.mpool, new(lastUpdate.(types.ProviderDealState)), s.provider, s.dealsDB, s.logsDB, s.spApi, s.curio)
+			rsv := newDealResolver(s.mpool, new(lastUpdate.(types.ProviderDealState)), s.provider, s.dealsDB, s.logsDB, s.spApi)
 
 			select {
 			case <-ctx.Done():

@@ -50,58 +50,98 @@ func TestDirectDealOnChain(t *testing.T) {
 	withDeals := map[abi.SectorID]struct{}{sectorID: {}}
 
 	tests := []struct {
-		name     string
-		claims   map[verifregtypes.ClaimId]verifregtypes.Claim
-		withDeal map[abi.SectorID]struct{}
-		checkFor abi.SectorID
-		want     bool
+		name       string
+		claims     map[verifregtypes.ClaimId]verifregtypes.Claim
+		claimsRead bool
+		withDeal   map[abi.SectorID]struct{}
+		checkFor   abi.SectorID
+		want       bool
+		wantKnown  bool
 	}{
 		{
-			name:     "nv28: claim hits this sector",
-			claims:   claims,
-			checkFor: sectorID,
-			want:     true,
+			name:       "nv28: claim hits this sector",
+			claims:     claims,
+			claimsRead: true,
+			checkFor:   sectorID,
+			want:       true,
+			wantKnown:  true,
 		},
 		{
-			name:     "nv28: claim points at another sector",
-			claims:   elsewhere,
-			withDeal: withDeals,
-			checkFor: sectorID,
-			want:     false,
+			name:       "nv28: claim points at another sector",
+			claims:     elsewhere,
+			claimsRead: true,
+			withDeal:   withDeals,
+			checkFor:   sectorID,
+			want:       false,
+			wantKnown:  true,
 		},
 		{
-			name:     "another deal's claim in this sector does not stand in for this deal's",
-			claims:   map[verifregtypes.ClaimId]verifregtypes.Claim{verifregtypes.ClaimId(99): {Sector: sectorNum}},
-			withDeal: withDeals,
-			checkFor: sectorID,
-			want:     true, // no claim of its own, so the sector decides
+			name:       "another deal's claim in this sector does not stand in for this deal's",
+			claims:     map[verifregtypes.ClaimId]verifregtypes.Claim{verifregtypes.ClaimId(99): {Sector: sectorNum}},
+			claimsRead: true,
+			withDeal:   withDeals,
+			checkFor:   sectorID,
+			want:       true, // no claim of its own, so the sector decides
+			wantKnown:  true,
 		},
 		{
-			name:     "nv29: no claim, sector carries data",
-			claims:   nil,
-			withDeal: withDeals,
-			checkFor: sectorID,
-			want:     true,
+			name:       "nv29: no claim, sector carries data",
+			claims:     nil,
+			claimsRead: true,
+			withDeal:   withDeals,
+			checkFor:   sectorID,
+			want:       true,
+			wantKnown:  true,
 		},
 		{
-			name:     "no claim and the sector is not on chain",
-			claims:   nil,
-			withDeal: withDeals,
-			checkFor: otherSectorID,
-			want:     false,
+			name:       "no claim and the sector is not on chain",
+			claims:     nil,
+			claimsRead: true,
+			withDeal:   withDeals,
+			checkFor:   otherSectorID,
+			want:       false,
+			wantKnown:  true,
 		},
 		{
-			name:     "no claim and no sector state at all",
-			claims:   nil,
-			withDeal: nil,
-			checkFor: sectorID,
-			want:     false,
+			name:       "no claim and no sector state at all",
+			claims:     nil,
+			claimsRead: true,
+			withDeal:   nil,
+			checkFor:   sectorID,
+			want:       false,
+			wantKnown:  true,
+		},
+		{
+			// The read failed. An empty map is not "no claims exist", so a deal
+			// that would have been proved by its claim cannot be called missing:
+			// the answer is unknown, and the caller must not spend it as a
+			// negative.
+			name:       "claims not read: the weight cannot answer, so neither can the doctor",
+			claims:     nil,
+			claimsRead: false,
+			withDeal:   withDeals,
+			checkFor:   otherSectorID,
+			want:       false,
+			wantKnown:  false,
+		},
+		{
+			// The one thing that still answers without the claims: the sector's
+			// own weight, which is a read that did happen.
+			name:       "claims not read: the sector's weight answers on its own",
+			claims:     nil,
+			claimsRead: false,
+			withDeal:   withDeals,
+			checkFor:   sectorID,
+			want:       true,
+			wantKnown:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, directDealOnChain(allocID, tt.checkFor, tt.claims, tt.withDeal))
+			got, known := directDealOnChain(allocID, tt.checkFor, tt.claims, tt.claimsRead, tt.withDeal)
+			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.wantKnown, known)
 		})
 	}
 }
@@ -224,7 +264,7 @@ func TestCheckPieceDirectDealOnChain(t *testing.T) {
 
 			// No claims: post-nv29, so the sector's weight is the only evidence
 			// left, and head is never reached for a direct deal.
-			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil)
+			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil, true)
 
 			require.NoError(t, err)
 			require.Equal(t, 1, store.getMetadataCalls)
@@ -318,7 +358,7 @@ func TestCheckPiecePostNv29WeightArm(t *testing.T) {
 				SectorStates:    map[abi.SectorID]db.SealState{sectorID: db.SealStateUnsealed},
 			}
 
-			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil)
+			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil, true)
 			require.NoError(t, err)
 
 			if tt.wantIsIndexed {
@@ -399,7 +439,7 @@ func TestCheckPieceStoreErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &Doctor{maddr: maddr, store: tt.store, fullnodeApi: lotusmocks.NewMockFullNode(gomock.NewController(t))}
-			err := d.checkPiece(context.Background(), pieceCid, sectorState(), &types.TipSet{}, nil)
+			err := d.checkPiece(context.Background(), pieceCid, sectorState(), &types.TipSet{}, nil, true)
 
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
@@ -419,8 +459,12 @@ func TestCheckPieceStoreErrors(t *testing.T) {
 // The read is kept at nv29+ rather than skipped: the claims of the sectors being
 // checked can predate the upgrade, and only FIP-0118's post-nv29 deals are
 // claimless by construction. Not returning the error is what keeps a node that
-// cannot answer from stopping the doctor; direct deals fall back to the sector
-// weight for the round and the claims are read again on the next one.
+// cannot answer from stopping the doctor; the pieces that hinge on the claims go
+// unchecked for the round and the claims are read again on the next one.
+//
+// The bool is the part that has to survive the failure. An empty map and a
+// failed read are the same value and opposite facts, and the caller has to tell
+// them apart, or it spends the failure as evidence.
 func TestClaimsForCheck(t *testing.T) {
 	maddr, err := address.NewIDAddress(1011)
 	require.NoError(t, err)
@@ -431,16 +475,100 @@ func TestClaimsForCheck(t *testing.T) {
 		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(want, nil)
 		d := &Doctor{maddr: maddr, fullnodeApi: api}
 
-		claims := d.claimsForCheck(context.Background())
+		claims, read := d.claimsForCheck(context.Background())
 
 		require.Equal(t, want, claims)
+		require.True(t, read)
 	})
 
-	t.Run("a read failure leaves the claims empty", func(t *testing.T) {
+	t.Run("a read failure leaves the claims empty, and says so", func(t *testing.T) {
 		api := lotusmocks.NewMockFullNode(gomock.NewController(t))
 		api.EXPECT().StateGetClaims(gomock.Any(), maddr, types.EmptyTSK).Return(nil, errors.New("node down"))
 		d := &Doctor{maddr: maddr, fullnodeApi: api}
 
-		require.Nil(t, d.claimsForCheck(context.Background()))
+		claims, read := d.claimsForCheck(context.Background())
+
+		require.Nil(t, claims)
+		require.False(t, read)
 	})
+}
+
+// TestCheckPieceClaimReadFailureKeepsTheAlert pins what a claims read that never
+// happened may not be spent on. The piece belongs to a direct deal in a sector
+// the doctor does not see carrying data, which is exactly the shape a
+// pre-nv29 deal in a legacy sector extended with --drop-claims has: no weight,
+// and its verifreg claim as the only thing that says the data is on chain.
+//
+// Reading the failed lookup as "no claim" declares that deal missing, unflags
+// the piece and returns -- clearing a health alert on the strength of an RPC
+// error, without ever checking the index or the unsealed copy that the alert was
+// there for. The row below is the control and is what makes the first one mean
+// something: with the claims actually read, the same piece is a clean one.
+//
+// The read failure is not fatal to the batch: other pieces go on being checked,
+// and this one is judged on the next round, when the claims can be read again.
+func TestCheckPieceClaimReadFailureKeepsTheAlert(t *testing.T) {
+	const sectorNum = abi.SectorNumber(3)
+	const allocID = abi.DealID(5)
+
+	pieceCid := cid.MustParse("baga6ea4seaqlwk3idbvhtetlir6yl4gfx7ql2kctaszujoudjavzjor7aphiccy")
+	maddr, err := address.NewIDAddress(1011)
+	require.NoError(t, err)
+	mid, err := address.IDFromAddress(maddr)
+	require.NoError(t, err)
+	sectorID := abi.SectorID{Miner: abi.ActorID(mid), Number: sectorNum}
+
+	for _, tt := range []struct {
+		name          string
+		claimsRead    bool
+		wantUnflagged bool
+	}{
+		{
+			// The claims were read: this deal really has none and its sector
+			// carries nothing, so the data is not on chain and the alert goes.
+			name:          "claims read: the deal is genuinely missing",
+			claimsRead:    true,
+			wantUnflagged: true,
+		},
+		{
+			// The claims were not read: nothing here says the deal is missing.
+			name:          "claims not read: the alert stays",
+			claimsRead:    false,
+			wantUnflagged: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakePieceStore{
+				md: model.Metadata{Deals: []model.DealInfo{{
+					MinerAddr:    maddr,
+					SectorID:     sectorNum,
+					ChainDealID:  allocID,
+					IsDirectDeal: true,
+				}}},
+				isIndexed: true,
+			}
+			fullnodeApi := lotusmocks.NewMockFullNode(gomock.NewController(t))
+
+			d := &Doctor{maddr: maddr, store: store, fullnodeApi: fullnodeApi}
+			lu := &sectorstatemgr.SectorStateUpdates{
+				ActiveSectors:   map[abi.SectorID]struct{}{sectorID: {}},
+				SectorWithDeals: nil,
+				SectorStates:    map[abi.SectorID]db.SealState{sectorID: db.SealStateUnsealed},
+			}
+
+			err := d.checkPiece(context.Background(), pieceCid, lu, &types.TipSet{}, nil, tt.claimsRead)
+			require.NoError(t, err)
+
+			if tt.wantUnflagged {
+				require.Equal(t, []cid.Cid{pieceCid}, store.unflagged)
+			} else {
+				require.Empty(t, store.unflagged, "a read that did not happen is not a verdict")
+			}
+			// Neither round touches the alert in the other direction, and both
+			// stop before the index checks: an on-chain question is answered
+			// before, not after.
+			require.Empty(t, store.flagged)
+			require.Zero(t, store.isIndexedCalls)
+		})
+	}
 }

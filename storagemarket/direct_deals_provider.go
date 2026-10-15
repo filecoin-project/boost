@@ -548,17 +548,13 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *types.Direc
 func (ddp *DirectDealsProvider) watchSealingUpdates(entry *types.DirectDeal) *dealMakingError {
 	var lastSealingState lapi.SectorState
 
+	// The deal row is this thread's output, not an input. The only caller has
+	// already found it incomplete, and no writer can complete it while the watch
+	// runs: the running map admits one thread per deal, FailPausedDeal rejects a
+	// running deal, RetryPausedDeal refuses a complete one, and this thread
+	// writes Complete only after this function returns. So every verdict below
+	// comes from the chain, and none of them is read back from the row.
 	check := func() (bool, *dealMakingError) {
-		// The deal row is the authority on whether this deal is done: entry is a
-		// snapshot from when the thread started, and the watch can poll for as long
-		// as sealing takes, so completion is re-read from the database.
-		dbDeal, err := ddp.directDealsDB.ByID(ddp.ctx, entry.ID)
-		if err != nil {
-			log.Warnw("re-reading direct deal from db", "id", entry.ID, "err", err.Error())
-		} else if dbDeal.Checkpoint >= dealcheckpoints.Complete {
-			return true, nil
-		}
-
 		step := ddp.checkSealingOnce(ddp.ctx, entry)
 
 		if step.observed && step.state != lastSealingState {
@@ -899,6 +895,12 @@ type sealedSectorRead struct {
 // claim. They differ only in how the data got there -- the sealer's business,
 // not something the chain records.
 //
+// The weight is a fact about the sector, not about this deal: a sector can
+// carry somebody else's piece, and half a sector's weight is not half a verdict.
+// So weight alone completes a deal only where a claim hits this sector; with no
+// claim it completes one only together with the sealer's list showing our piece
+// at our offset. Weight, no claim and no list establishes nothing and polls.
+//
 // It returns the verdict and the case the reads identify (for logs).
 func verdictForSealedSector(r sealedSectorRead, sectorNum abi.SectorNumber) (sealingCase, directDealSealingVerdict) {
 	// A claim pointing at another sector is terminal whatever else the reads say:
@@ -918,14 +920,10 @@ func verdictForSealedSector(r sealedSectorRead, sectorNum abi.SectorNumber) (sea
 	carries := sectorCarriesData(r.sector)
 
 	switch {
-	case carries && (inSector || !r.piecesKnown):
-		// Weight is present, and where the sealer reports pieces ours is among
-		// them. When it reports none the weight is the only evidence: spacetime is
-		// proof enough that the data landed, and withholding the verdict would
-		// strand every post-nv29 deal on a sealer whose list is unreadable. What
-		// the list buys is on the zero-weight side, separating a staged CC from a
-		// rolled-back snap. (nv28 shows a claim too; post-nv29 and the boundary
-		// show none and read the same.)
+	case carries && inSector:
+		// Weight is present and the sealer's list holds our piece at our offset:
+		// the spacetime that landed is this deal's. (nv28 shows a claim too;
+		// post-nv29 and the boundary show none and read the same.)
 		if r.claim != nil {
 			return caseNv28SealedSector, sealingDone
 		}
@@ -936,7 +934,7 @@ func verdictForSealedSector(r sealedSectorRead, sectorNum abi.SectorNumber) (sea
 		// authority.
 		return caseNv28SealedSector, sealingDone
 
-	case carries:
+	case carries && r.piecesKnown:
 		// Weight is present and the sealer's list does not hold our piece at the
 		// placement we recorded: the data here is not this deal's. The snap could
 		// not have been ours -- an aborted snap whose sector then took another
@@ -946,6 +944,12 @@ func verdictForSealedSector(r sealedSectorRead, sectorNum abi.SectorNumber) (sea
 		// and sits after the claim arm: before nv29 a claim on this sector settles
 		// the deal whether or not the list agrees.
 		return casePieceMissing, sealingPieceMissing
+
+	case carries:
+		// Weight, no claim, and the sealer does not report the sector's list.
+		// The weight says something landed here; nothing says it was ours, and
+		// there is no claim to ask either. Keep polling.
+		return caseIndeterminate, sealingNoEvidence
 
 	case inSector:
 		// Our piece is staged in the sector but the chain shows no weight yet:

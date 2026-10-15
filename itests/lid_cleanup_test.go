@@ -201,7 +201,7 @@ func TestLIDCleanup(t *testing.T) {
 		allocationId = uint64(id)
 	}
 
-	// Hold the import back until the upgrade is two seconds away: late enough
+	// Hold the import back until the upgrade is twenty epochs away: late enough
 	// that sealing cannot finish first, early enough that the deal is still
 	// accepted. The sector can only start sealing here, so it proves on the far
 	// side of the upgrade and gets no claim - the state the cleanup below has to
