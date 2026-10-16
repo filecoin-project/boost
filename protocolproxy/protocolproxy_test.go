@@ -91,6 +91,17 @@ func TestOutboundForwarding(t *testing.T) {
 			require.NoError(t, err)
 			pp.Start(ctx)
 
+			// Connect the service node up front and wait for the proxy to
+			// register its routes, so that the forwarding request below is
+			// never sent before the route exists
+			require.NoError(t, tn.serviceNode.Connect(ctx, peer.AddrInfo{
+				ID: peers.proxyNode.id,
+				Addrs: []multiaddr.Multiaddr{
+					peers.proxyNode.multiAddr,
+				},
+			}))
+			waitForRoutes(t, pp, testProtocols...)
+
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
 					request, err := io.ReadAll(s)
@@ -219,25 +230,29 @@ func TestInboundForwarding(t *testing.T) {
 					},
 				})
 				require.NoError(t, err)
+
+				// the proxy learns the route from a notifiee fired on the
+				// listener goroutine, so it may not be active yet
+				waitForRoutes(t, pp, testProtocols...)
 			}
 			s, err := tn.publicNode.NewStream(tn.ctx, tn.proxyNode.ID(), testCase.protocols...)
-			if testCase.willErrorOpening {
+			switch {
+			case testCase.willErrorOpening:
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				_, err := s.Write([]byte("request"))
-
-				require.NoError(t, err)
-				_ = s.CloseWrite()
-				require.NoError(t, err)
-				streamResponse, err := io.ReadAll(s)
-				if testCase.willErrorReading {
-					require.Error(t, err)
-				} else {
-					require.NoError(t, err)
-					require.Equal(t, "response", string(streamResponse))
-					_ = s.Close()
+			case testCase.willErrorReading:
+				// the proxy resets a stream it cannot route. The reset can
+				// land before negotiation finishes, so the failure shows up
+				// either on the open or somewhere in the round trip
+				if err == nil {
+					_, err = requestAndReadResponse(s)
 				}
+				require.Error(t, err)
+			default:
+				require.NoError(t, err)
+				streamResponse, err := requestAndReadResponse(s)
+				require.NoError(t, err)
+				require.Equal(t, "response", streamResponse)
+				_ = s.Close()
 			}
 			pp.Close()
 		})
@@ -265,6 +280,39 @@ type peerInfos struct {
 	serviceNode      peerInfo
 	otherServiceNode peerInfo
 	publicNode       peerInfo
+}
+
+// requestAndReadResponse writes a request on the stream, half closes it and
+// reads the response. It returns the first error from any of those steps: a
+// stream the proxy resets fails wherever the reset happens to land.
+func requestAndReadResponse(s network.Stream) (string, error) {
+	if _, err := s.Write([]byte("request")); err != nil {
+		return "", err
+	}
+	if err := s.CloseWrite(); err != nil {
+		return "", err
+	}
+	response, err := io.ReadAll(s)
+	return string(response), err
+}
+
+// waitForRoutes blocks until the proxy has registered the service node's
+// routes. The proxy learns them from libp2p's connection notifiee, which the
+// swarm fires from its listener goroutine, so a connection can be established
+// (and a stream opened) before the route is active. A request that arrives in
+// that window is rejected, or has its stream reset.
+func waitForRoutes(t *testing.T, pp *ProtocolProxy, protocols ...protocol.ID) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		pp.activeRoutesLk.RLock()
+		defer pp.activeRoutesLk.RUnlock()
+		for _, id := range protocols {
+			if _, ok := pp.activeRoutes[id]; !ok {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, time.Millisecond, "proxy did not register routes %v", protocols)
 }
 
 func setupTestNet(ctx context.Context, t *testing.T, pis peerInfos) *testNet {
