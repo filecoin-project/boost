@@ -13,13 +13,13 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 
+	mocksealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
+	"github.com/filecoin-project/boost/storagemarket/types"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-
-	mocksealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
-	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
 // TestSealingState pins the operator-facing wording of a direct deal's sealing

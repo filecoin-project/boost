@@ -3,10 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/require"
 
 	zerocomm "github.com/filecoin-project/go-commp-utils/v2/zerocomm"
 	"github.com/filecoin-project/go-state-types/abi"

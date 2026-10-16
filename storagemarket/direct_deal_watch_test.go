@@ -12,17 +12,17 @@ import (
 
 	verifreg9types "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 
-	lapi "github.com/filecoin-project/lotus/api"
-	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
-	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
-	sealing "github.com/filecoin-project/lotus/storage/pipeline"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	mocksealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+
+	lapi "github.com/filecoin-project/lotus/api"
+	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
 
 // TestSealingStateGateEverySealerState pins the gate for every state lotus's
