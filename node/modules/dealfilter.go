@@ -3,16 +3,19 @@ package modules
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/build"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
@@ -36,9 +39,20 @@ func BasicDealFilter(userCmd dtypes.StorageDealFilter) func(onlineOk dtypes.Cons
 		fullNodeApi v1api.FullNode,
 		r lotus_repo.LockedRepo,
 	) dtypes.StorageDealFilter {
+		// Once per process: past nv29 the notice applies to every deal that arrives.
+		var warnDatacapDeprecated sync.Once
+
 		return func(ctx context.Context, params dealfilter.DealFilterParams) (bool, string, error) {
 			deal := params.DealParams
 			pr := deal.ClientDealProposal.Proposal
+
+			nv, err := fullNodeApi.StateNetworkVersion(ctx, ltypes.EmptyTSK)
+			if err != nil {
+				return false, "failed to get network version", err
+			}
+			// Handed to the external filter below, which cannot ask the chain itself.
+			params.NetworkVersion = nv
+			atNv29 := storagemarket.RejectedAtNv29(nv)
 
 			// TODO: maybe handle in userCmd?
 			b, err := onlineOk()
@@ -63,25 +77,44 @@ func BasicDealFilter(userCmd dtypes.StorageDealFilter) func(onlineOk dtypes.Cons
 			}
 
 			// TODO: maybe handle in userCmd?
-			b, err = verifiedOk()
+			considerVerified, err := verifiedOk()
 			if err != nil {
 				return false, "miner error", err
-			}
-
-			if pr.VerifiedDeal && !b {
-				log.Warnf("verified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
-				return false, "miner is not accepting verified storage deals", nil
 			}
 
 			// TODO: maybe handle in userCmd?
-			b, err = unverifiedOk()
+			considerUnverified, err := unverifiedOk()
 			if err != nil {
 				return false, "miner error", err
 			}
 
-			if !pr.VerifiedDeal && !b {
-				log.Warnf("unverified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
-				return false, "miner is not accepting unverified storage deals", nil
+			if atNv29 {
+				// FIP-0118 deprecates datacap at nv29, so no deal is verified and the two consider-flags
+				// collapse into one switch; read separately, verified-on with unverified-off would reject every
+				// deal.
+				if !considerVerified && !considerUnverified {
+					log.Warnf("storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
+					return false, "miner is not accepting storage deals", nil
+				}
+				if considerVerified != considerUnverified {
+					warnDatacapDeprecated.Do(func() {
+						log.Warnw("network version 29 deprecates datacap (FIP-0118): no deal is verified any more, "+
+							"so ConsiderVerifiedStorageDeals and ConsiderUnverifiedStorageDeals are read as a single "+
+							"switch and deals are still being accepted",
+							"ConsiderVerifiedStorageDeals", considerVerified,
+							"ConsiderUnverifiedStorageDeals", considerUnverified)
+					})
+				}
+			} else {
+				if pr.VerifiedDeal && !considerVerified {
+					log.Warnf("verified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
+					return false, "miner is not accepting verified storage deals", nil
+				}
+
+				if !pr.VerifiedDeal && !considerUnverified {
+					log.Warnf("unverified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
+					return false, "miner is not accepting unverified storage deals", nil
+				}
 			}
 
 			// TODO: maybe handle in userCmd?

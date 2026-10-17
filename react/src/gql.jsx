@@ -72,7 +72,6 @@ const MinerAddressQuery = gql`
     query AppMinerAddressQuery {
         minerAddress {
             MinerID
-            IsCurio
         }
     }
 `;

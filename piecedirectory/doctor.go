@@ -33,13 +33,24 @@ var doclog = logging.Logger("piecedoc")
 // pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
 	maddr       address.Address
-	store       *bdclient.Store
+	store       pieceStore
 	ssm         *sectorstatemgr.SectorStateMgr
 	fullnodeApi api.FullNode
 }
 
 func NewDoctor(maddr address.Address, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *Doctor {
 	return &Doctor{maddr: maddr, store: store, ssm: ssm, fullnodeApi: fullnodeApi}
+}
+
+// pieceStore is the slice of the local index directory the doctor uses. It is an
+// interface so a check can be driven without a running index directory.
+type pieceStore interface {
+	NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
+	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
+	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
+	FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool, maddr address.Address) error
+	UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
+	UntrackPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
 }
 
 // The average interval between calls to NextPiecesToCheck
@@ -83,15 +94,10 @@ func (d *Doctor) Run(ctx context.Context) {
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 
-			// Prefetch the state claims
-			doclog.Debugw("prefetching state claims", "address", d.maddr)
-			claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
-			if err != nil {
-				return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
-			}
+			claims, claimsRead := d.claimsForCheck(ctx)
 
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid, lu, head, claims)
+				err := d.checkPiece(ctx, pcid, lu, head, claims, claimsRead)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -120,7 +126,64 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim) error {
+// directDealOnChain answers whether a direct deal's data is on chain, from the
+// two reads the doctor has, and says whether those reads answered at all.
+//
+// Before nv29 the deal's claim is the proof, and a claim pointing at another
+// sector is a negative answer. From nv29 on FIP-0118 writes no claim at all, so
+// an absent claim is the normal state rather than a sign the deal is missing --
+// the sector's own weight answers instead, read from the sector-state manager's
+// set of sectors that carry data. Every direct deal whose claim is absent,
+// post-nv29 or not, settles on that weight arm.
+//
+// found is only meaningful together with decided. A claim read that failed
+// leaves an empty map that is indistinguishable from "this miner has no claims",
+// and the two mean opposite things for a deal whose claim is its only evidence:
+// nothing was read is not nothing is there. Only the sector's own weight can
+// still decide the deal in that state, and where it says no the answer is
+// undecided, not negative. A negative here is what clears a piece's alert, so it
+// has to come from a read that actually happened.
+//
+// allocID is the deal's allocation id, which is also its claim id.
+func directDealOnChain(allocID abi.DealID, sectorID abi.SectorID, claims map[verifregtypes.ClaimId]verifregtypes.Claim, claimsRead bool, sectorsWithDeals map[abi.SectorID]struct{}) (found bool, decided bool) {
+	if claim, ok := claims[verifregtypes.ClaimId(allocID)]; ok {
+		return claim.Sector == sectorID.Number, true
+	}
+
+	if _, ok := sectorsWithDeals[sectorID]; ok {
+		return true, true
+	}
+
+	return false, claimsRead
+}
+
+// claimsForCheck prefetches the verifreg claims a batch of pieces is checked
+// against.
+//
+// The map is read once for the whole batch. A pre-nv29 direct deal is proved by
+// its claim; from nv29 on FIP-0118 writes no claim at all, so a post-nv29 deal
+// has none by construction and is answered by its sector's weight instead
+// (directDealOnChain). The read is still made at nv29+, because the claims of
+// the sectors being checked can predate the upgrade and dropping them would
+// leave those deals on the weight arm alone.
+//
+// The bool reports whether the claims were read. It has to be told apart from an
+// empty map: a legacy sector extended with --drop-claims can carry no weight and
+// still have a claim, so a failed read must not be spent as evidence, or the
+// deals on it are declared missing and their pieces lose their alerts. A failed
+// read is not fatal to the batch -- it only leaves the pieces that hinge on it
+// for the next round.
+func (d *Doctor) claimsForCheck(ctx context.Context) (map[verifregtypes.ClaimId]verifregtypes.Claim, bool) {
+	doclog.Debugw("prefetching state claims", "address", d.maddr)
+	claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
+	if err != nil {
+		doclog.Errorw("getting claims for the miner; deals whose only evidence is a claim go unchecked this round", "miner", d.maddr, "err", err)
+		return nil, false
+	}
+	return claims, true
+}
+
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet, claims map[verifregtypes.ClaimId]verifregtypes.Claim, claimsRead bool) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
 	// Check if piece belongs to an active sector
@@ -186,16 +249,35 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	// Check that Deal is actually on-chain for the active sectors
 	if d.fullnodeApi != nil { // nil in tests
 		found := false
+		// undecided records a direct deal the reads could not answer either way:
+		// the deal is not declared missing on the strength of a read that never
+		// happened.
+		undecided := false
 		for _, dealId := range chainDeals {
+			mid, err := address.IDFromAddress(dealId.MinerAddr)
+			if err != nil {
+				return err
+			}
+			sectorID := abi.SectorID{
+				Miner:  abi.ActorID(mid),
+				Number: dealId.SectorID,
+			}
+
 			if dealId.IsDirectDeal {
 				doclog.Debugw("checking state for direct deal", "piece", pieceCid, "allocation", dealId.ChainDealID)
-				for _, v := range claims {
-					if v.Sector == dealId.SectorID {
-						found = true
-					}
+				onChain, decided := directDealOnChain(dealId.ChainDealID, sectorID, claims, claimsRead, lu.SectorWithDeals)
+				if onChain {
+					found = true
+				}
+				if !decided {
+					undecided = true
 				}
 			} else {
 				doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId.ChainDealID)
+				// An error here does not carry the same ambiguity as a failed
+				// claims read: this call reports an absent deal as an error, so
+				// absence and failure arrive as one signal and there is nothing to
+				// weigh against it. A moved deal has to be able to lose its alert.
 				_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId.ChainDealID, head.Key())
 				if err == nil {
 					found = true
@@ -205,6 +287,16 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		}
 
 		if !found {
+			if undecided {
+				// The claim read failed and the sector carries no weight, so
+				// nothing here says the deal is gone. Leave the piece exactly as
+				// it is -- clearing the alert and flagging it are both verdicts,
+				// and this round has none. The next round reads the claims again.
+				doclog.Warnw("cannot tell whether a direct deal is on chain, leaving the piece for the next round",
+					"piece", pieceCid.String(), "miner", d.maddr.String())
+				return nil
+			}
+
 			doclog.Debugw("ignoring and unflagging piece as no deal id found on chain", "piece", pieceCid)
 
 			err = d.store.UnflagPiece(ctx, pieceCid, d.maddr)

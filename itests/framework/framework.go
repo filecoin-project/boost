@@ -3,6 +3,7 @@ package framework
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,6 +67,7 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
@@ -105,6 +107,13 @@ type TestFrameworkConfig struct {
 	MaxStagingBytes           int64
 	ProvisionalWalletBalances int64
 	StartEpochSealingBuffer   uint64
+	// SectorSize is the size of every sector the miner seals. Zero means the
+	// framework's default (8MiB). See WithSectorSize.
+	SectorSize abi.SectorSize
+	// MutateSealing is applied to the miner's sealing config after the
+	// framework's own overrides, so a test can change how the sealer places a
+	// piece -- which is the sealer's decision, not boost's.
+	MutateSealing func(*sealiface.Config)
 }
 
 type TestFramework struct {
@@ -120,6 +129,13 @@ type TestFramework struct {
 	ClientAddr    address.Address
 	MinerAddr     address.Address
 	DefaultWallet address.Address
+
+	// DirectDealsDB is the boost node's own direct-deal table, handed back so a
+	// test can assert what boost ended up saying about a direct deal. Nothing in
+	// the boost RPC API answers that question -- BoostDirectDeal only returns a
+	// rejection, and BoostDeal only reads market deals -- so without this the
+	// only thing a test can see about a direct deal is its sector on chain.
+	DirectDealsDB *db.DirectDealsDB
 }
 
 type FrameworkOpts func(pc *TestFrameworkConfig)
@@ -154,18 +170,58 @@ func WithStartEpochSealingBuffer(e uint64) FrameworkOpts {
 	}
 }
 
+// WithSectorSize seals into sectors of the given size instead of the
+// framework's 8MiB. It is a test's clock, not its subject: every proof the
+// sealer produces for a real sector is priced by the sector size, and the
+// replica-update proof a snap needs is minutes of work at 8MiB and seconds at
+// 2KiB. A test that only needs the snap to be real -- not large -- should say so
+// here rather than pay for the default.
+//
+// The size applies to the miner and the full node, which have to agree on it.
+// The piece a test seals must fit: a 2KiB sector takes a piece of 2KiB or less,
+// padding included.
+func WithSectorSize(size abi.SectorSize) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.SectorSize = size
+	}
+}
+
+// WithSnapDeals makes the sealer place a deal's piece into an existing
+// committed-capacity sector instead of sealing a new one, which is what a snap
+// deal is. The signalling is the same two switches Lotus's own onboarding tests
+// use: stop sealing new sectors for deals and stop preferring them. A test that
+// needs this has to pledge a CC sector first -- with nothing to snap into, the
+// piece has nowhere to land and stays in the miner's piece queue.
+//
+// MakeCCSectorsAvailable is deliberately left off. With it on, a pledged CC
+// sector goes to the sealer's Available state on its own, where a piece can be
+// assigned to it at any moment. Left off, the sector stays in Proving, which is
+// what makes it ineligible for an upgrade until someone marks it for one -- see
+// TestDirectDealSnapAcrossNv29, which uses that as the hold.
+func WithSnapDeals() FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MutateSealing = func(sc *sealiface.Config) {
+			sc.PreferNewSectorsForDeals = false
+			sc.MakeNewSectorForDeals = false
+			sc.MakeCCSectorsAvailable = false
+		}
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
 	//bal, err := chaintypes.ParseFIL("1000fil")
 	//require.NoError(t, err)
 	fmc := &TestFrameworkConfig{
 		// default provisional balance
 		ProvisionalWalletBalances: 9e18,
+		// 8MiB sectors unless a test asks for another size
+		SectorSize: 8 << 20,
 	}
 	for _, opt := range opts {
 		opt(fmc)
 	}
 
-	fullNode, miner := FullNodeAndMiner(t, fmc.Ensemble)
+	fullNode, miner := FullNodeAndMiner(t, fmc.Ensemble, fmc.SectorSize, fmc.MutateSealing)
 	return &TestFramework{
 		ctx:        ctx,
 		config:     fmc,
@@ -175,13 +231,16 @@ func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) 
 	}
 }
 
-func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, *kit.TestMiner) {
+// FullNodeAndMiner builds the full node and the miner every test runs against.
+// sectorSize is the size both are built for; mutateSealing, when set, is applied
+// to the miner's sealing config after the framework's own overrides -- see
+// WithSnapDeals.
+func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble, sectorSize abi.SectorSize, mutateSealing func(*sealiface.Config)) (*kit.TestFullNode, *kit.TestMiner) {
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
 
-	// 8MiB sectors
-	secSizeOpt := kit.SectorSize(8 << 20)
+	secSizeOpt := kit.SectorSize(sectorSize)
 	minerOpts := []kit.NodeOpt{
 		kit.WithSubsystems(kit.SSealing, kit.SSectorStorage, kit.SMining),
 		kit.DisableLibp2p(),
@@ -201,6 +260,9 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.CommitBatchWait = time.Second
 					sc.StartEpochSealingBuffer = 30
 					sc.PreCommitBatchWait = time.Second
+					if mutateSealing != nil {
+						mutateSealing(&sc)
+					}
 					return sc, nil
 				}, nil
 			}),
@@ -436,6 +498,16 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		node.Repo(r),
 		node.Override(new(v1api.FullNode), fullnodeApi),
 		node.Override(new(*gateway.EthSubHandler), fullnodeApi.EthSubRouter),
+
+		// Hand the direct-deal table back to the test. This replaces boost's own
+		// constructor with one that builds the same object and keeps a reference
+		// to it, so the node the test drives and the table it reads are the same
+		// one -- no second connection, and no assumption about where the repo
+		// keeps its database.
+		node.Override(new(*db.DirectDealsDB), func(sqldb *sql.DB) *db.DirectDealsDB {
+			f.DirectDealsDB = db.NewDirectDealsDB(sqldb)
+			return f.DirectDealsDB
+		}),
 
 		node.Override(new(*ctladdr.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
 			DealPublishControl: []string{

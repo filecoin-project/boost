@@ -8,17 +8,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 
 	"github.com/filecoin-project/lotus/api"
+	minertypes "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -32,6 +33,48 @@ type SectorStateUpdates struct {
 	SectorWithDeals map[abi.SectorID]struct{}
 	SectorStates    map[abi.SectorID]db.SealState
 	UpdatedAt       time.Time
+}
+
+// SectorCarriesData reports whether a sector's on-chain spacetime weights say it
+// holds piece data. Both arms are read: DealWeight is the legacy unverified
+// spacetime, and since FIP-0118 nothing is verified, so VerifiedDealWeight tracks
+// the total spacetime of every piece. A sector activated at nv29 or later has
+// DealWeight zero with all of a new piece's spacetime in the verified arm, while a
+// pre-nv29 sector holding a plain deal has the mirror image; reading one arm would
+// report half of one era as empty. A nil weight reads as zero, and a nil sector
+// (StateSectorGetInfo returns nil, nil for a sector that is not on chain) carries
+// nothing.
+//
+// The weights are the only era-free signal here. FULL_QA_POWER is not consulted:
+// post-nv29 activation sets it on an empty CC as readily as on a full sector, and
+// upgrade-quality hands it to a pre-nv29 sector after the fact, so it says the
+// sector moved, never that our data arrived. PowerBaseEpoch is not consulted
+// either: USQ resets it, so it cannot date a sector.
+func SectorCarriesData(si *minertypes.SectorOnChainInfo) bool {
+	if si == nil {
+		return false
+	}
+	return !si.DealWeight.NilOrZero() || !si.VerifiedDealWeight.NilOrZero()
+}
+
+// PieceInSector reports whether the piece is in the sector's piece list at the
+// given offset.
+//
+// The offsets have to be rebuilt rather than read: the list carries each piece's
+// size and no offset field, so a piece's offset is the sum of the padded sizes of
+// the pieces ahead of it, in list order, padding pieces included. That is the same
+// sum the sealer returned to the client as the offset, which is what the deal
+// records, so comparing them compares like with like.
+func PieceInSector(pieces []api.SectorPiece, pieceCID cid.Cid, pieceSize abi.PaddedPieceSize, offset abi.PaddedPieceSize) bool {
+	var off abi.PaddedPieceSize
+	for _, p := range pieces {
+		if p.Piece.PieceCID.Equals(pieceCID) && p.Piece.Size == pieceSize && off == offset {
+			return true
+		}
+		off += p.Piece.Size
+	}
+
+	return false
 }
 
 type StorageAPI interface {
@@ -263,14 +306,13 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	sectorWithDeals := make(map[abi.SectorID]struct{})
-	zero := big.Zero()
 	for _, info := range allSet {
 		sectorID := abi.SectorID{
 			Miner:  abi.ActorID(mid),
 			Number: info.SectorNumber,
 		}
 
-		if info.DealWeight.GreaterThan(zero) {
+		if SectorCarriesData(info) {
 			sectorWithDeals[sectorID] = struct{}{}
 		}
 	}

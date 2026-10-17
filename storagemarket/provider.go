@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +47,10 @@ var (
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 	ErrDealNotInSector     = errors.New("storage failed - deal not found in sector")
 	ErrSectorSealingFailed = errors.New("storage failed - sector failed to seal")
+	// ErrSectorRemovedByProvider: the sector was removed by the storage
+	// provider. Distinct from ErrSectorSealingFailed because nothing failed to
+	// seal: the place the deal's data was going no longer exists.
+	ErrSectorRemovedByProvider = errors.New("storage failed - sector was removed by the storage provider")
 )
 
 var (
@@ -85,7 +88,6 @@ type Config struct {
 	// Cache timeout for Sealing Pipeline status
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
-	Curio                       bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -160,13 +162,12 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		return nil, err
 	}
 
-	v, err := sps.Version(context.Background())
-	if err != nil {
+	// Ask the sealer for its version before the provider exists. Nothing branches
+	// on the answer -- who the sealer is stopped being boost's business -- but
+	// this is where an unreachable sealer API stops the node at startup, rather
+	// than surfacing on the first deal.
+	if _, err := sps.Version(context.Background()); err != nil {
 		return nil, err
-	}
-
-	if strings.Contains(v.String(), "curio") {
-		cfg.Curio = true
 	}
 
 	newDealPS, err := newDealPubsub()

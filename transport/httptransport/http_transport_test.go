@@ -258,6 +258,74 @@ func TestDealSizeIsZero(t *testing.T) {
 	assertFileContents(t, of, st.carBytes)
 }
 
+// TestZeroContentLengthRejected covers a server that answers the HEAD request
+// with Content-Length: 0. The deal size is unknown here, so the HEAD response is
+// the only place the size can come from; a zero deal size makes the chunk size
+// zero, and the division that follows it panics inside the detached transfer
+// goroutine. The transfer has to come back as an error event instead of
+// reaching that division.
+func TestZeroContentLengthRejected(t *testing.T) {
+	ctx := context.Background()
+
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Fail(t, "should never happen")
+		case http.MethodHead:
+			addContentLengthHeader(w, 0)
+		}
+	}
+
+	svr := httptest.NewServer(handler)
+	defer svr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)), 0, types.HttpRequest{URL: svr.URL}, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+
+	lastEvt := evts[len(evts)-1]
+	require.Error(t, lastEvt.Error, "the transfer must fail rather than panic")
+	require.Contains(t, lastEvt.Error.Error(), "deal size must be greater than zero",
+		"the terminal event should report the size rejection")
+	require.NotContains(t, lastEvt.Error.Error(), "panic",
+		"the size check has to run before the divide-by-zero, not be caught by the panic recovery")
+}
+
+// TestZeroContentLengthRejectedWithKnownDealSize pins the order of the two size
+// guards. When the deal size is known and the server says zero bytes, the
+// mismatch is what gets reported, so the error names the real disagreement
+// instead of blaming the response size.
+func TestZeroContentLengthRejectedWithKnownDealSize(t *testing.T) {
+	ctx := context.Background()
+	st := newServerTest(t, 100*readBufferSize+30)
+
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Fail(t, "should never happen")
+		case http.MethodHead:
+			addContentLengthHeader(w, 0)
+		}
+	}
+
+	svr := httptest.NewServer(handler)
+	defer svr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(numChunks)), len(st.carBytes), types.HttpRequest{URL: svr.URL}, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+
+	lastEvt := evts[len(evts)-1]
+	require.Error(t, lastEvt.Error)
+	require.Contains(t, lastEvt.Error.Error(), "deal size mismatch")
+}
+
 func TestFailIfDealSizesDontMatch(t *testing.T) {
 	ctx := context.Background()
 	st := newServerTest(t, 100*readBufferSize+30)

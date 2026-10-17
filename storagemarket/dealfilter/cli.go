@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"os/exec"
 
+	"github.com/filecoin-project/go-state-types/network"
+
 	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/boost/storagemarket/funds"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
@@ -14,7 +16,13 @@ import (
 )
 
 const agent = "boost"
-const jsonVersion = "2.2.0"
+
+// The two payloads go to different filters, so each carries its own version.
+// The storage payload gained a field, which a filter decoding it strictly sees.
+const (
+	storageFilterVersion   = "2.3.0"
+	retrievalFilterVersion = "2.2.0"
+)
 
 type StorageDealFilter func(ctx context.Context, deal DealFilterParams) (bool, string, error)
 type RetrievalDealFilter func(ctx context.Context, deal legacyretrievaltypes.ProviderDealState) (bool, string, error)
@@ -26,6 +34,7 @@ func CliStorageDealFilter(cmd string) StorageDealFilter {
 			SealingPipelineState sealingpipeline.Status
 			FundsState           funds.Status
 			StorageState         storagespace.Status
+			NetworkVersion       network.Version
 			DealType             string
 			FormatVersion        string
 			Agent                string
@@ -34,8 +43,9 @@ func CliStorageDealFilter(cmd string) StorageDealFilter {
 			SealingPipelineState: deal.SealingPipelineState,
 			FundsState:           deal.FundsState,
 			StorageState:         deal.StorageState,
+			NetworkVersion:       deal.NetworkVersion,
 			DealType:             "storage",
-			FormatVersion:        jsonVersion,
+			FormatVersion:        storageFilterVersion,
 			Agent:                agent,
 		}
 		return runDealFilter(ctx, cmd, d)
@@ -52,7 +62,7 @@ func CliRetrievalDealFilter(cmd string) RetrievalDealFilter {
 		}{
 			ProviderDealState: deal,
 			DealType:          "retrieval",
-			FormatVersion:     jsonVersion,
+			FormatVersion:     retrievalFilterVersion,
 			Agent:             agent,
 		}
 		return runDealFilter(ctx, cmd, d)

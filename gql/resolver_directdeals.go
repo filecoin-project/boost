@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -125,6 +126,7 @@ func (r *resolver) DirectDeal(ctx context.Context, args struct{ ID graphql.ID })
 		dealsDB:     r.dealsDB,
 		logsDB:      r.logsDB,
 		spApi:       r.spApi,
+		fullNode:    r.fullNode,
 	}, nil
 }
 
@@ -253,7 +255,24 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 		return "Sealer: " + string(si.State)
 	}
 	if claim == nil {
-		return "Sealer: " + string(si.State) + "(No claim found)"
+		// From nv29 on FIP-0118 writes no claim, so an absent claim says nothing
+		// about the deal. Reading it as "no claim found" would show every
+		// post-nv29 deal as if it had failed to land.
+		//
+		// The sector's weight is the only other read here, and it answers for the
+		// sector rather than for this deal: a pre-nv29 deal shares its sector with
+		// other pieces, so a carrying sector is not by itself proof that this
+		// deal landed. The two facts are reported side by side instead of being
+		// collapsed into a verdict.
+		sector, err := dr.fullNode.StateSectorGetInfo(ctx, dr.Provider, dr.SectorID, ltypes.EmptyTSK)
+		if err != nil {
+			log.Warnw("error getting sector for direct deal", "sector", dr.SectorID, "error", err)
+			return "Sealer: " + string(si.State)
+		}
+		if !sectorstatemgr.SectorCarriesData(sector) {
+			return "Sealer: " + string(si.State) + "(No claim found)"
+		}
+		return "Sealer: " + string(si.State) + "(No claim found; sector carries data)"
 	}
 	if claim.Sector != dr.SectorID {
 		return "Sealer: " + string(si.State) + "(Sector mismatch)"

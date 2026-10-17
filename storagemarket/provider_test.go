@@ -34,6 +34,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/db"
 	bdclientutil "github.com/filecoin-project/boost/extern/boostd-data/clientutil"
@@ -1397,6 +1398,11 @@ type providerConfig struct {
 	publishWalletBal int64
 	collatWalletBal  int64
 
+	// networkVersion is what the mock full node reports. It defaults to nv28,
+	// the last version where datacap still worked, so the verified deal cases
+	// below keep exercising the datacap checks.
+	networkVersion network.Version
+
 	price         abi.TokenAmount
 	verifiedPrice abi.TokenAmount
 	minPieceSize  abi.PaddedPieceSize
@@ -1500,6 +1506,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		escrowFunds:          big.NewInt(5000000),
 		publishWalletBal:     1000,
 		collatWalletBal:      1000,
+		networkVersion:       network.Version28,
 
 		price:         abi.NewTokenAmount(0),
 		verifiedPrice: abi.NewTokenAmount(0),
@@ -1678,6 +1685,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		Locked: pc.lockedFunds,
 		Escrow: pc.escrowFunds,
 	}, nil).AnyTimes()
+
+	fn.EXPECT().StateNetworkVersion(gomock.Any(), gomock.Any()).Return(pc.networkVersion, nil).AnyTimes()
 
 	fn.EXPECT().WalletBalance(gomock.Any(), ph.PledgeCollatWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 	fn.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()

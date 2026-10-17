@@ -106,7 +106,7 @@ var fetchCmd = &cli.Command{
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		idbs := lotus_blockstore.WrapIDStore(bs)
+		idbs := lotus_blockstore.RejectIdentityCids(bs)
 		brn := &blockReceiver{bs: idbs, ctx: ctx, cancel: cancel}
 		bsClient := client.New(ctx, net, nilRouter, idbs, client.WithBlockReceivedNotifier(brn))
 		defer func() {

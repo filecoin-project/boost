@@ -17,11 +17,14 @@ import (
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/boost/cmd/boost/util"
 	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/testutil"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -34,6 +37,14 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 )
+
+// lidCleanupUpgradeHeight is where this ensemble crosses to nv29. Everything
+// above the wait below - the datacap grant and the allocation - needs verifreg
+// to still accept it, so the constant only has to outlast that setup: the test
+// then waits for this height before importing the deal, which is what puts the
+// sector's activation on the nv29 side of the upgrade and leaves it with no
+// claim for the rest of the test to cope with.
+const lidCleanupUpgradeHeight = abi.ChainEpoch(1200)
 
 func TestLIDCleanup(t *testing.T) {
 	ctx := context.Background()
@@ -53,6 +64,10 @@ func TestLIDCleanup(t *testing.T) {
 	require.NoError(t, err)
 
 	var eopts []kit.EnsembleOpt
+	// The ensemble otherwise defaults to buildconstants.TestNetworkVersion
+	// (nv29), where verifreg rejects AddVerifier and the direct deal leg of this
+	// test cannot even be set up. It starts at nv28 instead and crosses below.
+	eopts = append(eopts, kit.LatestActorsAt(lidCleanupUpgradeHeight))
 	eopts = append(eopts, kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.Account(verifier1Key, abi.NewTokenAmount(bal.Int64())))
 	eopts = append(eopts, kit.RealProofs())
@@ -186,6 +201,23 @@ func TestLIDCleanup(t *testing.T) {
 		allocationId = uint64(id)
 	}
 
+	// Hold the import back until the upgrade is twenty epochs away: late enough
+	// that sealing cannot finish first, early enough that the deal is still
+	// accepted. The sector can only start sealing here, so it proves on the far
+	// side of the upgrade and gets no claim - the state the cleanup below has to
+	// keep working through. Both ends of that window are asserted, so a run that
+	// misses it fails instead of quietly testing the nv28 path.
+	require.Eventuallyf(t, func() bool {
+		h, err := f.FullNode.ChainHead(ctx)
+		require.NoError(t, err)
+		return h.Height() >= lidCleanupUpgradeHeight-20
+	}, 10*time.Minute, time.Second, "the chain never reached the nv29 upgrade height")
+
+	nvAtImport, err := f.FullNode.StateNetworkVersion(ctx, types.EmptyTSK)
+	require.NoError(t, err)
+	require.Less(t, nvAtImport, network.Version29,
+		"the datacap grant, the allocation and the import all have to happen before nv29; raise lidCleanupUpgradeHeight")
+
 	head, err := f.FullNode.ChainHead(ctx)
 	require.NoError(t, err)
 
@@ -223,6 +255,64 @@ func TestLIDCleanup(t *testing.T) {
 		require.NoError(t, err)
 		return len(stateList) == 5
 	}, 10*time.Minute, 2*time.Second, "sectors are still not proving after 5 minutes")
+
+	// The sector proved under nv29, where FIP-0118 keeps verifreg out of sector
+	// activation, so the deal has no claim and never will. Check both halves of
+	// that: the chain really did cross, and the claim really is absent. Without
+	// them a run that quietly stopped crossing would keep passing while covering
+	// the nv28 path it was meant to replace.
+	nvSealed, err := f.FullNode.StateNetworkVersion(ctx, types.EmptyTSK)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, nvSealed, network.Version29, "the upgrade should have landed while the sector was sealing")
+
+	claimsAtNv29, err := f.FullNode.StateGetClaims(ctx, f.MinerAddr, types.EmptyTSK)
+	require.NoError(t, err)
+	_, claimed := claimsAtNv29[verifreg.ClaimId(allocationId)]
+	require.False(t, claimed, "a sector sealed at nv29 should have no claim, and the cleanup below has to cope with that")
+
+	// The other half of what a boost -> Curio migration reads off the chain for
+	// this deal: the sector has to carry data, or there is nothing to look for a
+	// piece in. Assert both ends of that on the sector that really did seal across
+	// the upgrade -- it activated at or after the upgrade height, its DealWeight is
+	// zero because nv29 writes all of a piece's spacetime into the verified arm,
+	// and the shared predicate the migration decides with therefore reads it as
+	// carrying data. A sector that quietly sealed at nv28 instead would have a
+	// claim and a DealWeight, so this fails with the rest rather than passing on
+	// the wrong era.
+	sectorNums, err := f.LotusMiner.SectorsListInStates(ctx, states)
+	require.NoError(t, err)
+
+	var sealedAtNv29 []*miner.SectorOnChainInfo
+	for _, sn := range sectorNums {
+		si, err := f.FullNode.StateSectorGetInfo(ctx, f.MinerAddr, sn, types.EmptyTSK)
+		require.NoError(t, err)
+		if si != nil && si.Activation >= lidCleanupUpgradeHeight {
+			sealedAtNv29 = append(sealedAtNv29, si)
+		}
+	}
+	require.Len(t, sealedAtNv29, 1, "only the direct deal's sector should activate on the nv29 side of the upgrade")
+	ddSector := sealedAtNv29[0]
+	require.True(t, ddSector.DealWeight.IsZero(), "nv29 writes no unverified spacetime")
+	require.True(t, sectorstatemgr.SectorCarriesData(ddSector),
+		"the sector the migration would read for this deal carries data")
+
+	// The other half of the cross-epoch deal, and the half this test was missing:
+	// boost's own record of it. Everything above is about the sector, and a sector
+	// can be proving while the deal hangs in the sealing watch forever -- which is
+	// precisely the nv29 failure this change exists to fix, since there is no
+	// claim coming for the watch to trip over. So the sector assertions would all
+	// pass on a deal that never resolved, and the row is the only place that says
+	// which of the three it did: complete, failed, or still waiting.
+	require.Eventuallyf(t, func() bool {
+		row, err := f.DirectDealsDB.ByID(ctx, dealUuid)
+		return err == nil && row.Checkpoint >= dealcheckpoints.Complete
+	}, 5*time.Minute, 2*time.Second, "the direct deal never left the sealing watch")
+
+	ddDeal, err := f.DirectDealsDB.ByID(ctx, dealUuid)
+	require.NoError(t, err)
+	require.NotEqual(t, smtypes.DealRetryFatal, ddDeal.Retry,
+		"the deal sealed across nv29 has to complete, not be failed: %s", ddDeal.Err)
+	require.Empty(t, ddDeal.Err)
 
 	// Verify that LID has entries for all deals
 	prop1, err := cborutil.AsIpld(&res1.DealParams.ClientDealProposal)

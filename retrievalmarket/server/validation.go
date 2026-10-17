@@ -97,6 +97,13 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *legacyretriev
 		return errors.New("incorrect CID for this proposal")
 	}
 
+	// The graphsync wire schema marks the request selector optional, so a
+	// request may arrive with a nil selector. dagcbor.Encode dereferences it
+	// and panics, so reject it here before encoding.
+	if selector == nil {
+		return errors.New("selector is required")
+	}
+
 	// Check the proposal selector matches
 	buf := new(bytes.Buffer)
 	err := dagcbor.Encode(selector, buf)
