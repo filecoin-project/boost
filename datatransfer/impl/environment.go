@@ -24,4 +24,7 @@ func (ce *channelEnvironment) ID() peer.ID {
 
 func (ce *channelEnvironment) CleanupChannel(chid datatransfer.ChannelID) {
 	ce.m.transport.CleanupChannel(chid)
+	// Release the channel's span, as upstream go-data-transfer does. Without
+	// this the spans index grows for the lifetime of the process.
+	ce.m.spansIndex.EndChannelSpan(chid)
 }
