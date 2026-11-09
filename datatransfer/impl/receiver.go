@@ -135,6 +135,16 @@ func (r *receiver) ReceiveError(err error) {
 	log.Errorf("received error message on data transfer: %s", err.Error())
 }
 
+// validRestartChannelID reports whether chid names a channel this node
+// initiated with sender as the counterparty. This is the same condition the
+// handler enforces on the stored channel; it is checked against the
+// wire-supplied id first so that an attacker-controlled id is never formatted
+// (ChannelID.String is quadratic in the peer id length and runs under the
+// spans index write lock) or looked up.
+func validRestartChannelID(chid datatransfer.ChannelID, self, sender peer.ID) bool {
+	return chid.Initiator == self && chid.Responder == sender
+}
+
 func (r *receiver) ReceiveRestartExistingChannelRequest(ctx context.Context,
 	sender peer.ID,
 	incoming datatransfer.Request) {
@@ -142,6 +152,18 @@ func (r *receiver) ReceiveRestartExistingChannelRequest(ctx context.Context,
 	ch, err := incoming.RestartChannelId()
 	if err != nil {
 		log.Errorf("cannot restart channel: failed to fetch channel Id: %w", err)
+		return
+	}
+
+	// A restart request must come from the responder of a channel this node
+	// initiated. Validate the wire-supplied id against the authenticated
+	// sender before it is used: ChannelID.String takes the spans index write
+	// lock and base58-encodes both peer ids, which is quadratic in their
+	// length, so an oversized attacker-controlled id could otherwise burn CPU
+	// while blocking the graphsync response loop. This is the same condition
+	// enforced below on the stored channel; checking it here only rejects such
+	// requests before any expensive work happens.
+	if !validRestartChannelID(ch, r.manager.peerID, sender) {
 		return
 	}
 

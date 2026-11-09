@@ -52,9 +52,22 @@ func (trq *TransferRequest1_1) IsRestartExistingChannelRequest() bool {
 	return trq.MessageType == uint64(types.RestartExistingChannelRequestMessage)
 }
 
+// maxPeerIDLen bounds the peer ids accepted in a restart request. libp2p
+// derives peer ids as multihashes: keys of at most 42 bytes are inlined with
+// the identity multihash (2-byte header), and larger keys are SHA2-256 hashed
+// (2-byte header + 32-byte digest), so a real peer id is at most 44 bytes.
+// The 128-byte bound leaves room for future key types while keeping
+// peer.ID.String (base58, quadratic in the input length) cheap for anything
+// that gets past this check.
+const maxPeerIDLen = 128
+
 func (trq *TransferRequest1_1) RestartChannelId() (datatransfer2.ChannelID, error) {
 	if !trq.IsRestartExistingChannelRequest() {
 		return datatransfer2.ChannelID{}, xerrors.New("not a restart request")
+	}
+	if len(trq.RestartChannel.Initiator) > maxPeerIDLen ||
+		len(trq.RestartChannel.Responder) > maxPeerIDLen {
+		return datatransfer2.ChannelID{}, xerrors.New("restart request channel id is too long")
 	}
 	return trq.RestartChannel, nil
 }
