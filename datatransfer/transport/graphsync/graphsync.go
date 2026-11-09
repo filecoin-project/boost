@@ -606,7 +606,6 @@ func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hook
 		// Lock the channel for the duration of this method
 		ch = t.trackDTChannel(chid)
 		ch.lk.Lock()
-		defer ch.lk.Unlock()
 
 		request := msg.(datatransfer.Request)
 		responseMessage, err = t.events.OnRequestReceived(chid, request)
@@ -621,11 +620,29 @@ func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hook
 		// Lock the channel for the duration of this method
 		ch = t.trackDTChannel(chid)
 		ch.lk.Lock()
-		defer ch.lk.Unlock()
 
 		response := msg.(datatransfer.Response)
 		err = t.events.OnResponseReceived(chid, response)
 	}
+
+	// The channel is tracked before the request has been validated. Release
+	// the lock when the hook returns, and if the transfer never made it as far
+	// as being registered on the channel (gsDataRequestRcvd sets requestID and
+	// isOpen) then the entry is orphaned: every cleanup path (cancel,
+	// completion, network error) looks the channel up through
+	// requestIDToChannelID, which is only populated on the success path, so
+	// nothing else will ever remove it. Drop it here so that anonymous peers
+	// cannot grow dtChannels without bound by sending requests that get
+	// rejected.
+	defer func() {
+		orphaned := !ch.isOpen && ch.requestID == nil
+		ch.lk.Unlock()
+		if orphaned {
+			// CleanupChannel calls ch.cleanup, which locks ch.lk, so it must
+			// be called after the lock above has been released.
+			t.CleanupChannel(chid)
+		}
+	}()
 
 	// If we need to send a response, add the response message as an extension
 	if responseMessage != nil {
@@ -635,7 +652,7 @@ func (t *Transport) gsReqRecdHook(p peer.ID, request graphsync.RequestData, hook
 		extensions, extensionErr := extension.ToExtensionData(responseMessage, incomingReqExtensions)
 		if extensionErr != nil {
 			log.Debugw("failed to convert extension data", "err", extensionErr)
-			hookActions.TerminateWithError(err)
+			hookActions.TerminateWithError(extensionErr)
 			return
 		}
 		for _, extension := range extensions {
