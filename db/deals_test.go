@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -308,4 +309,30 @@ func TestSqlDbBkp(t *testing.T) {
 	req.NoError(err)
 	req.Len(dealList, len(deals))
 
+}
+
+func TestDealsDBRejectsUndefinedCID(t *testing.T) {
+	req := require.New(t)
+	ctx := context.Background()
+
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
+	require.NoError(t, migrations.Migrate(sqldb))
+
+	db := NewDealsDB(sqldb)
+	deals, err := GenerateDeals()
+	req.NoError(err)
+
+	// A CID field that is undefined cannot be represented as a string that
+	// round-trips through cid.Parse, so the insert must fail rather than write
+	// a row that breaks every subsequent read of the deals table.
+	deal := deals[0]
+	deal.DealDataRoot = cid.Undef
+	err = db.Insert(ctx, &deal)
+	req.ErrorContains(err, "cannot marshal undefined cid")
+
+	// The table is left untouched.
+	allDeals, err := db.List(ctx, "", nil, nil, 0, 0)
+	req.NoError(err)
+	req.Empty(allDeals)
 }

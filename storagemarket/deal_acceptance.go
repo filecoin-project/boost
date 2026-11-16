@@ -47,6 +47,15 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 		return &validationError{error: fmt.Errorf("proposal PieceCID undefined")}
 	}
 
+	// DealDataRoot is part of the unsigned DealParams, so it is not covered by
+	// the client signature and CBOR decoding tolerates its absence. Reject an
+	// undefined value here: it cannot be round-tripped through the deals DB
+	// (it would be stored as the unparseable string "b"), and a single such
+	// row makes every subsequent Provider.Start() fail in ListActive.
+	if !deal.DealDataRoot.Defined() {
+		return &validationError{error: fmt.Errorf("deal data root undefined")}
+	}
+
 	if ok, err := p.validateSignature(deal); err != nil || !ok {
 		if err != nil {
 			return &validationError{
