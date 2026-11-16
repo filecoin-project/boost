@@ -20,10 +20,73 @@ import (
 
 var ErrCommpMismatch = fmt.Errorf("commp mismatch")
 
+// validatePieceData checks that the deal's data file can actually be consumed
+// by addPiece. It must be called before the deal is published: once published
+// the provider's collateral is locked on chain, so any failure that happens
+// afterwards and is classified as fatal also prevents the deal from ever being
+// activated, and the collateral is slashed when the deal misses its activation
+// deadline.
+//
+// The checks here mirror the ones in openReader (see deal_execution.go), so a
+// file accepted here is guaranteed to pass openReader. In particular, note that
+// carv2.ReadVersion only reads the CAR pragma, while the sealer path uses the
+// strict carv2.OpenReader which also validates the 40-byte CARv2 header.
+func validatePieceData(filePath string, pieceSize abi.PaddedPieceSize) error {
+	st, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", filePath, err)
+	}
+	if st.Size() == 0 {
+		return fmt.Errorf("empty file")
+	}
+
+	// openReader inflates the file up to pieceSize.Unpadded() and errors out if
+	// the file is larger than that.
+	if uint64(st.Size()) > uint64(pieceSize.Unpadded()) {
+		return fmt.Errorf("file size %d exceeds unpadded piece size %d", st.Size(), pieceSize.Unpadded())
+	}
+
+	// Strict CAR validation: unlike carv2.ReadVersion, OpenReader also reads
+	// and validates the full 40-byte CARv2 header.
+	r, err := carv2.OpenReader(filePath)
+	if err != nil {
+		return fmt.Errorf("invalid CAR file: %w", err)
+	}
+	if err := r.Close(); err != nil {
+		return fmt.Errorf("closing CAR reader: %w", err)
+	}
+	return nil
+}
+
+// validatePieceDataForDeal wraps validatePieceData, mapping a validation
+// failure to a dealMakingError.
+func (p *Provider) validatePieceDataForDeal(deal *types.ProviderDealState) *dealMakingError {
+	if err := validatePieceData(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize); err != nil {
+		retry := types.DealRetryFatal
+		if deal.IsOffline {
+			// Allow manual retry so the provider can supply the correct file
+			retry = types.DealRetryManual
+		}
+		return &dealMakingError{
+			retry: retry,
+			error: fmt.Errorf("invalid deal data: %w", err),
+		}
+	}
+	return nil
+}
+
 // Verify that the commp provided in the deal proposal matches commp calculated
 // over the downloaded file
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 	p.dealLogger.Infow(deal.DealUuid, "checking commP")
+
+	// Make sure the file can be handed to the sealing subsystem before the deal
+	// is published. After publication the provider's collateral is locked, and
+	// a file that only fails in addPiece would burn that collateral.
+	if derr := p.validatePieceDataForDeal(deal); derr != nil {
+		return derr
+	}
+
 	pieceCid, err := p.generatePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		err.error = fmt.Errorf("failed to generate CommP: %w", err.error)
