@@ -191,6 +191,17 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
+		// Validate the piece data immediately before publishing. Besides
+		// rejecting malformed data as early as possible in verifyCommP, this
+		// also covers deals that resumed at the Transferred checkpoint (where
+		// verifyCommP is not re-run) and makes the check independent of how the
+		// deal reached this point.
+		if deal.Checkpoint < dealcheckpoints.Published {
+			if err := p.validatePieceDataForDeal(deal); err != nil {
+				return err
+			}
+		}
+
 		if err := p.publishDeal(ctx, pub, deal); err != nil {
 			return err
 		}
