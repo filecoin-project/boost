@@ -1040,6 +1040,15 @@ func TestDealVerification(t *testing.T) {
 			},
 			expectedErr: "proposal PieceCID undefined",
 		},
+		"deal data root undefined": {
+			ask: &legacytypes.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withUndefinedDealDataRoot()).withNoOpMinerStub().build()
+			},
+			expectedErr: "deal data root undefined",
+		},
 		"proposal end 9 before proposal start 10": {
 			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
@@ -1763,20 +1772,21 @@ func (h *ProviderHarness) Stop() {
 }
 
 type dealProposalConfig struct {
-	normalFileSize      int
-	offlineDeal         bool
-	verifiedDeal        bool
-	providerCollateral  abi.TokenAmount
-	clientAddr          address.Address
-	minerAddr           address.Address
-	pieceCid            cid.Cid
-	pieceSize           abi.PaddedPieceSize
-	undefinedPieceCid   bool
-	startEpoch          abi.ChainEpoch
-	endEpoch            abi.ChainEpoch
-	label               market.DealLabel
-	carVersion          CarVersion
-	sectorsStatusDealId abi.DealID
+	normalFileSize        int
+	offlineDeal           bool
+	verifiedDeal          bool
+	providerCollateral    abi.TokenAmount
+	clientAddr            address.Address
+	minerAddr             address.Address
+	pieceCid              cid.Cid
+	pieceSize             abi.PaddedPieceSize
+	undefinedPieceCid     bool
+	undefinedDealDataRoot bool
+	startEpoch            abi.ChainEpoch
+	endEpoch              abi.ChainEpoch
+	label                 market.DealLabel
+	carVersion            CarVersion
+	sectorsStatusDealId   abi.DealID
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1850,6 +1860,12 @@ func withUndefinedPieceCid() dealProposalOpt {
 	}
 }
 
+func withUndefinedDealDataRoot() dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.undefinedDealDataRoot = true
+	}
+}
+
 func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.startEpoch = start
@@ -1888,6 +1904,10 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	require.NoError(tbuilder.t, err)
 	rootCid, carFilePath, err := testutil.CreateDenseCARv2(tbuilder.ph.TempDir, randomFilepath)
 	require.NoError(tbuilder.t, err)
+	dealDataRoot := rootCid
+	if dc.undefinedDealDataRoot {
+		dealDataRoot = cid.Undef
+	}
 
 	// if the file should be a version 1 car file
 	if dc.carVersion == CarVersion1 {
@@ -1958,7 +1978,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 				Data: []byte("sig"),
 			}, // We don't do signature verification in Boost SM testing.
 		},
-		DealDataRoot: rootCid,
+		DealDataRoot: dealDataRoot,
 		Transfer: types.Transfer{
 			Type:   "http",
 			Params: xferParams,

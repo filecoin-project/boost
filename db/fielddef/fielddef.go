@@ -54,6 +54,12 @@ func (fd *CidFieldDef) Marshall() (interface{}, error) {
 	if fd.F == nil {
 		return nil, nil
 	}
+	// An undefined CID encodes as the one-character string "b", which cid.Parse
+	// rejects with "cid too short". Refuse to write a value that cannot be read
+	// back, so a malformed value fails the insert instead of poisoning the row.
+	if !fd.F.Defined() {
+		return nil, fmt.Errorf("cannot marshal undefined cid")
+	}
 	return fd.F.String(), nil
 }
 
@@ -83,6 +89,9 @@ func (fd *CidPtrFieldDef) FieldPtr() interface{} {
 func (fd *CidPtrFieldDef) Marshall() (interface{}, error) {
 	if (*fd.F) == nil {
 		return nil, nil
+	}
+	if !(*fd.F).Defined() {
+		return nil, fmt.Errorf("cannot marshal undefined cid")
 	}
 	return (*fd.F).String(), nil
 }
